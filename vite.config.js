@@ -8,4 +8,28 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    define: {
+        global: 'window',
+    },
+    resolve: {
+        alias: {
+            '$': 'jquery',
+            'jQuery': 'jquery',
+            'jquery': 'jquery'
+        },
+    },
+    optimizeDeps: {
+        include: [
+            'jquery',
+            'jointjs',
+            'lodash',
+            'backbone'
+        ]
+    },
+    build: {
+        commonjsOptions: {
+            include: [/jointjs/, /node_modules/],
+            transformMixedEsModules: true
+        }
+    }
 });
