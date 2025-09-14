@@ -1,4 +1,4 @@
-// resources/js/app.js - VERSIÓN FINAL COMPLETA
+// resources/js/app.js - VERSIÓN QUE FUNCIONABA + ARREGLOS MÍNIMOS
 import './bootstrap';
 import Alpine from 'alpinejs';
 import * as joint from 'jointjs';
@@ -12,10 +12,9 @@ window.Alpine = Alpine;
 // Iniciar Alpine
 Alpine.start();
 
-// Crear shapes UML personalizadas (sin modificar joint.shapes)
+// Crear shapes UML personalizadas (IGUAL QUE FUNCIONABA)
 window.UMLShapes = {};
 
-// Clase UML completa
 window.UMLShapes.Class = joint.dia.Element.extend({
     markup: [
         '<g class="rotatable">',
@@ -44,13 +43,16 @@ window.UMLShapes.Class = joint.dia.Element.extend({
                 'stroke-width': 1,
                 fill: '#ffffff',
                 width: 200,
+                height: 40,
                 y: 35
             },
             '.uml-class-methods-rect': {
                 stroke: '#2563eb',
                 'stroke-width': 1,
                 fill: '#f8fafc',
-                width: 200
+                width: 200,
+                height: 45,
+                y: 75
             },
             '.uml-class-name-text': {
                 ref: '.uml-class-name-rect',
@@ -103,14 +105,12 @@ window.UMLShapes.Class = joint.dia.Element.extend({
         const totalHeight = headerHeight + attrHeight + methodHeight;
         const width = 200;
 
-        // Actualizar dimensiones
         attrs['.uml-class-name-rect'].height = headerHeight;
         attrs['.uml-class-attrs-rect'].height = attrHeight;
         attrs['.uml-class-attrs-rect'].y = headerHeight;
         attrs['.uml-class-methods-rect'].height = methodHeight;
         attrs['.uml-class-methods-rect'].y = headerHeight + attrHeight;
 
-        // Actualizar textos
         attrs['.uml-class-name-text'].text = className;
         attrs['.uml-class-attrs-text'].text = attributes.join('\n');
         attrs['.uml-class-methods-text'].text = methods.join('\n');
@@ -120,7 +120,6 @@ window.UMLShapes.Class = joint.dia.Element.extend({
     }
 });
 
-// Factory function
 window.UMLShapes.createClass = function(options = {}) {
     const defaults = {
         position: { x: 0, y: 0 },
@@ -132,7 +131,7 @@ window.UMLShapes.createClass = function(options = {}) {
     return new window.UMLShapes.Class({...defaults, ...options});
 };
 
-// Editor UML completo
+// Editor UML (IGUAL QUE FUNCIONABA + ARREGLOS MÍNIMOS)
 class UMLDiagramEditor {
     constructor() {
         this.graph = new joint.dia.Graph();
@@ -163,30 +162,38 @@ class UMLDiagramEditor {
             gridSize: 20,
             drawGrid: true,
             background: { color: '#f9fafb' },
-            interactive: (element) => this.selectedTool === 'select',
+
+            // ✅ ARREGLO 1: INTERACTIVIDAD DINÁMICA CORRECTA
+            interactive: (elementView) => {
+                console.log('🔧 Interactividad consultada para tool:', this.selectedTool);
+                // Solo interactivo cuando está en modo seleccionar
+                return this.selectedTool === 'select';
+            },
+
             defaultLink: new joint.shapes.standard.Link(),
             linkPinning: false,
             snapLabels: true
         });
 
-        // Zoom con mouse wheel
+        // Zoom con mouse wheel (MANTENER IGUAL)
         this.paper.on('blank:mousewheel', (evt, x, y, delta) => {
             evt.preventDefault();
             this.zoom(x, y, delta);
         });
 
-        // Click en canvas
+        // Click en canvas (MANTENER IGUAL)
         this.paper.on('blank:pointerdown', (evt, x, y) => {
             this.handleCanvasClick(x, y);
         });
 
-        // Selección de elementos
+        // Selección de elementos (MANTENER IGUAL)
         this.paper.on('element:pointerdown', (elementView) => {
             this.selectElement(elementView.model);
         });
     }
 
     setupEventListeners() {
+        // Zoom buttons (MANTENER IGUAL)
         document.getElementById('zoom-in')?.addEventListener('click', () => this.zoomIn());
         document.getElementById('zoom-out')?.addEventListener('click', () => this.zoomOut());
         document.getElementById('zoom-fit')?.addEventListener('click', () => this.zoomToFit());
@@ -200,10 +207,81 @@ class UMLDiagramEditor {
     }
 
     setupLivewireListeners() {
+        console.log('🎧 Configurando listeners Livewire...');
+
+        // ✅ ARREGLO 2: LISTENER MEJORADO + POLLING DE RESPALDO
         window.addEventListener('tool-selected', (event) => {
+            console.log('📡 Evento Livewire recibido:', event.detail);
             this.selectedTool = event.detail;
-            this.paper.setInteractivity(this.selectedTool === 'select');
+
+            // Importante: actualizar interactividad del paper
+            this.paper.setInteractivity((elementView) => {
+                return this.selectedTool === 'select';
+            });
+
+            console.log('🔧 Tool actualizado a:', this.selectedTool);
         });
+
+        // POLLING DE RESPALDO MEJORADO: Detectar botones activos
+        let lastDetectedTool = 'select';
+        setInterval(() => {
+            try {
+                // Buscar TODOS los botones posibles
+                const allButtons = document.querySelectorAll('button[wire\\:click*="selectTool"]');
+                console.log('🔍 Polling: Botones encontrados:', allButtons.length);
+
+                let activeButton = null;
+
+                // Buscar por clases CSS que indican activo
+                const activeSelectors = [
+                    '.border-blue-500',
+                    '.bg-blue-50',
+                    '.text-blue-700'
+                ];
+
+                for (const selector of activeSelectors) {
+                    activeButton = document.querySelector(`button[wire\\:click*="selectTool"]${selector}`);
+                    if (activeButton) {
+                        console.log('🔍 Botón activo encontrado con selector:', selector);
+                        break;
+                    }
+                }
+
+                if (activeButton) {
+                    const buttonText = activeButton.textContent.toLowerCase().trim();
+                    console.log('🔍 Texto del botón activo:', buttonText);
+
+                    let toolFromDOM = 'select';
+
+                    if (buttonText.includes('clase')) toolFromDOM = 'class';
+                    else if (buttonText.includes('asociación')) toolFromDOM = 'association';
+                    else if (buttonText.includes('herencia')) toolFromDOM = 'inheritance';
+                    else if (buttonText.includes('agregación')) toolFromDOM = 'aggregation';
+                    else if (buttonText.includes('composición')) toolFromDOM = 'composition';
+                    else if (buttonText.includes('seleccionar')) toolFromDOM = 'select';
+
+                    console.log('🔍 Tool detectado del DOM:', toolFromDOM);
+
+                    if (toolFromDOM !== lastDetectedTool) {
+                        console.log('🔄 POLLING: Cambio detectado!', lastDetectedTool, '->', toolFromDOM);
+                        this.selectedTool = toolFromDOM;
+                        lastDetectedTool = toolFromDOM;
+
+                        // Actualizar interactividad
+                        this.paper.setInteractivity((elementView) => {
+                            return this.selectedTool === 'select';
+                        });
+
+                        console.log('✅ Tool actualizado via polling a:', this.selectedTool);
+                    }
+                } else {
+                    console.log('❌ No se encontró botón activo');
+                }
+
+            } catch (error) {
+                console.error('Error en polling:', error);
+            }
+        }, 500); // Cada 500ms para debugging
 
         window.addEventListener('clear-diagram', () => {
             this.clearDiagram();
@@ -266,6 +344,7 @@ class UMLDiagramEditor {
         }
     }
 
+    // Funciones de zoom (MANTENER IGUAL)
     zoom(x, y, delta) {
         const oldZoom = this.currentZoom;
         const newZoom = Math.max(0.2, Math.min(3, oldZoom + delta * 0.1));
@@ -337,9 +416,23 @@ class UMLDiagramEditor {
     }
 }
 
-// Inicializar cuando DOM esté listo
+// Inicializar (MANTENER IGUAL + DEBUG HELPERS)
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('paper-container')) {
-        window.DiagramEditor = { instance: new UMLDiagramEditor() };
+        const editor = new UMLDiagramEditor();
+
+        window.DiagramEditor = {
+            instance: editor,
+            debug: {
+                getTool: () => editor.selectedTool,
+                setTool: (tool) => {
+                    editor.selectedTool = tool;
+                    editor.paper.setInteractivity((elementView) => {
+                        return editor.selectedTool === 'select';
+                    });
+                    console.log('🔧 Tool cambiado manualmente a:', tool);
+                }
+            }
+        };
     }
 });

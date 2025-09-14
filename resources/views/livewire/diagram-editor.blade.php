@@ -133,6 +133,27 @@
                 </div>
 
                 <div class="mt-4 pt-4 border-t border-gray-200">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Debug Manual</h4>
+                    <div class="space-y-2">
+                        <button
+                            onclick="window.DiagramEditor.debug.setTool('class'); console.log('🔧 MANUAL: Tool cambiado a class')"
+                            class="w-full bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-xs">
+                            🔧 Activar Clase (Manual)
+                        </button>
+                        <button
+                            onclick="window.DiagramEditor.debug.setTool('select'); console.log('🔧 MANUAL: Tool cambiado a select')"
+                            class="w-full bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded text-xs">
+                            👆 Activar Seleccionar (Manual)
+                        </button>
+                        <button
+                            onclick="console.log('🔧 CURRENT TOOL:', window.DiagramEditor.instance?.selectedTool)"
+                            class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">
+                            🔍 Ver Tool Actual
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-gray-200">
                     <h4 class="text-sm font-medium text-gray-700 mb-2">Atajos de teclado</h4>
                     <div class="text-xs text-gray-500 space-y-1">
                         <div class="flex justify-between">

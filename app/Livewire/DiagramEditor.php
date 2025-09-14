@@ -28,8 +28,15 @@ class DiagramEditor extends Component
 
     public function selectTool($tool)
     {
+        logger("🔧 PHP: Herramienta seleccionada: {$tool}");
+        logger("🔧 PHP: Herramienta anterior: {$this->selectedTool}");
+
         $this->selectedTool = $tool;
+
+        logger("🔧 PHP: Dispatching tool-selected event con: {$tool}");
         $this->dispatch('tool-selected', $tool);
+
+        logger("🔧 PHP: Evento dispatched exitosamente");
     }
 
     #[On('save-diagram')]
