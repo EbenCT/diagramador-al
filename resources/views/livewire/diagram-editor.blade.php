@@ -54,19 +54,6 @@
                         class="w-full flex items-center space-x-2 p-3 rounded-md border {{ $selectedTool === 'class' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
                         <span class="text-lg">📋</span>
                         <span>Clase</span>
-                    </button>
-                    <button
-                        wire:click="selectTool('interface')"
-                        class="w-full flex items-center space-x-2 p-3 rounded-md border {{ $selectedTool === 'interface' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
-                        <span class="text-lg">🔌</span>
-                        <span>Interfaz</span>
-                    </button>
-                    <button
-                        wire:click="selectTool('abstract')"
-                        class="w-full flex items-center space-x-2 p-3 rounded-md border {{ $selectedTool === 'abstract' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
-                        <span class="text-lg">📝</span>
-                        <span>Clase Abstracta</span>
-                    </button>
                 </div>
             </div>
 

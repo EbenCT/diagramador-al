@@ -104,120 +104,30 @@ class UMLDiagramEditor {
             case 'class':
                 this.createClass(x, y);
                 break;
-            case 'interface':
-                this.createInterface(x, y);
-                break;
-            case 'abstract':
-                this.createAbstractClass(x, y);
-                break;
         }
     }
 
     createClass(x, y) {
         const className = prompt('Nombre de la clase:', 'MiClase') || 'MiClase';
 
-        const classElement = new joint.shapes.uml.Class({
+        // Usar la nueva función factory para evitar errores
+        const classElement = window.UMLShapes.createClass({
             position: { x: x - 75, y: y - 60 },
             size: { width: 150, height: 120 },
             name: className,
             attributes: [
-                '- atributo1: String',
-                '+ atributo2: int'
+                '- id: int',
+                '- nombre: String',
+                '- email: String'
             ],
             methods: [
-                '+ metodo1(): void',
-                '+ metodo2(param: String): boolean'
-            ],
-            attrs: {
-                '.uml-class-name-rect': {
-                    fill: '#ffffff',
-                    stroke: '#333333',
-                    'stroke-width': 2
-                },
-                '.uml-class-attrs-rect': {
-                    fill: '#ffffff',
-                    stroke: '#333333',
-                    'stroke-width': 1
-                },
-                '.uml-class-methods-rect': {
-                    fill: '#ffffff',
-                    stroke: '#333333',
-                    'stroke-width': 1
-                }
-            }
+                '+ getId(): int',
+                '+ getNombre(): String',
+                '+ setNombre(nombre: String): void'
+            ]
         });
 
         this.graph.addCell(classElement);
-        this.updateCanvasInfo();
-    }
-
-    createInterface(x, y) {
-        const interfaceName = prompt('Nombre de la interfaz:', 'MiInterfaz') || 'MiInterfaz';
-
-        const interfaceElement = new joint.shapes.uml.Interface({
-            position: { x: x - 75, y: y - 60 },
-            size: { width: 150, height: 100 },
-            name: interfaceName,
-            methods: [
-                '+ metodo1(): void',
-                '+ metodo2(param: String): boolean'
-            ],
-            attrs: {
-                '.uml-class-name-rect': {
-                    fill: '#e8f4fd',
-                    stroke: '#1e88e5',
-                    'stroke-width': 2
-                },
-                '.uml-class-methods-rect': {
-                    fill: '#e8f4fd',
-                    stroke: '#1e88e5',
-                    'stroke-width': 1
-                }
-            }
-        });
-
-        this.graph.addCell(interfaceElement);
-        this.updateCanvasInfo();
-    }
-
-    createAbstractClass(x, y) {
-        const className = prompt('Nombre de la clase abstracta:', 'MiClaseAbstracta') || 'MiClaseAbstracta';
-
-        const abstractElement = new joint.shapes.uml.Abstract({
-            position: { x: x - 75, y: y - 60 },
-            size: { width: 150, height: 120 },
-            name: className,
-            attributes: [
-                '- atributo1: String',
-                '# atributo2: int'
-            ],
-            methods: [
-                '+ metodo1(): void',
-                '+ metodoAbstracto(): boolean'
-            ],
-            attrs: {
-                '.uml-class-name-rect': {
-                    fill: '#fff3e0',
-                    stroke: '#f57c00',
-                    'stroke-width': 2
-                },
-                '.uml-class-name-text': {
-                    'font-style': 'italic'
-                },
-                '.uml-class-attrs-rect': {
-                    fill: '#fff3e0',
-                    stroke: '#f57c00',
-                    'stroke-width': 1
-                },
-                '.uml-class-methods-rect': {
-                    fill: '#fff3e0',
-                    stroke: '#f57c00',
-                    'stroke-width': 1
-                }
-            }
-        });
-
-        this.graph.addCell(abstractElement);
         this.updateCanvasInfo();
     }
 

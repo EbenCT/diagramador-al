@@ -10,12 +10,10 @@ class DiagramEditor extends Component
     public $selectedTool = 'select'; // Herramienta seleccionada
     public $diagramTitle = 'Mi Diagrama UML';
 
-    // Herramientas disponibles
+    // Herramientas disponibles para UML (solo clases)
     public $tools = [
         'select' => 'Seleccionar',
         'class' => 'Clase',
-        'interface' => 'Interfaz',
-        'abstract' => 'Clase Abstracta',
         'association' => 'Asociación',
         'inheritance' => 'Herencia',
         'aggregation' => 'Agregación',
