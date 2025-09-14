@@ -217,19 +217,34 @@ export class UMLDiagramEditor {
         const className = prompt('Nombre de la clase:', 'MiClase');
         if (!className) return;
 
+        // Prompt para atributos básicos
+        const attrsPrompt = `Atributos iniciales para "${className}" (opcional, uno por línea):
+Formato: visibilidad nombre: tipo
+Ejemplo: - id: int
+         + nombre: String`;
+
+        const attrsString = prompt(attrsPrompt, `- id: int\n- ${className.toLowerCase()}Name: String`);
+        const attributes = attrsString ?
+            attrsString.split('\n').map(attr => attr.trim()).filter(attr => attr) :
+            [`- id: int`, `- ${className.toLowerCase()}Name: String`];
+
+        // Prompt para métodos básicos
+        const methodsPrompt = `Métodos iniciales para "${className}" (opcional, uno por línea):
+Formato: visibilidad nombre(parámetros): tipoRetorno
+Ejemplo: + getId(): int
+         + setNombre(nombre: String): void`;
+
+        const methodsString = prompt(methodsPrompt, `+ getId(): int\n+ get${className}Name(): String\n+ set${className}Name(name: String): void`);
+        const methods = methodsString ?
+            methodsString.split('\n').map(method => method.trim()).filter(method => method) :
+            [`+ getId(): int`, `+ get${className}Name(): String`, `+ set${className}Name(name: String): void`];
+
         const classElement = new joint.shapes.uml.Class({
             position: { x: x - 100, y: y - 60 },
             size: { width: 200, height: 120 },
             className: className,
-            attributes: [
-                '- id: int',
-                `- ${className.toLowerCase()}Name: String`
-            ],
-            methods: [
-                '+ getId(): int',
-                `+ get${className}Name(): String`,
-                `+ set${className}Name(name: String): void`
-            ]
+            attributes: attributes,
+            methods: methods
         });
 
         this.graph.addCell(classElement);
@@ -239,6 +254,23 @@ export class UMLDiagramEditor {
         this.selectTool('select');
 
         console.log('✅ Clase creada:', className);
+    }
+
+    showToolInstructions(tool) {
+        const instructions = {
+            'select': 'Haz clic para seleccionar • Arrastra para mover • Doble clic para editar',
+            'class': 'Haz clic en el canvas para crear una nueva clase',
+            'association': 'Selecciona dos clases para crear una asociación',
+            'inheritance': 'Selecciona clase hijo, luego clase padre',
+            'aggregation': 'Selecciona contenedor, luego contenido (diamante vacío)',
+            'composition': 'Selecciona todo, luego parte (diamante lleno)'
+        };
+
+        // Mostrar en un elemento de instrucciones si existe
+        const instructionsEl = document.getElementById('tool-instructions');
+        if (instructionsEl) {
+            instructionsEl.textContent = instructions[tool] || '';
+        }
     }
 
     createRelationship(source, target) {
