@@ -1,12 +1,16 @@
-{{-- CSS de JointJS --}}
+{{-- resources/views/livewire/diagram-editor.blade.php --}}
+{{-- VERSIÓN SIMPLIFICADA - Solo responsabilidades de Livewire --}}
+
 <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jointjs/3.7.3/joint.css" />
 
 <div class="h-screen flex flex-col bg-gray-100">
-    <!-- Header/Toolbar -->
+    <!-- Header/Toolbar - SOLO funciones de Livewire -->
     <div class="bg-white shadow-sm border-b border-gray-200 px-4 py-3">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-4">
                 <h1 class="text-xl font-semibold text-gray-900">{{ $diagramTitle }}</h1>
+
+                {{-- Solo botones que SÍ necesitan Livewire --}}
                 <div class="flex items-center space-x-2">
                     <button
                         wire:click="saveDiagram"
@@ -15,6 +19,7 @@
                     </button>
                     <button
                         wire:click="clearDiagram"
+                        wire:confirm="¿Estás seguro de limpiar todo el diagrama?"
                         class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         🗑️ Limpiar
                     </button>
@@ -26,12 +31,12 @@
                 </div>
             </div>
 
-            <!-- Controles de zoom -->
+            <!-- Controles de zoom - JavaScript directo -->
             <div class="flex items-center space-x-2">
-                <button id="zoom-in" class="p-2 hover:bg-gray-100 rounded-md transition-colors" title="Acercar">
+                <button id="zoom-in" class="p-2 hover:bg-gray-100 rounded-md transition-colors" title="Acercar (Scroll Up)">
                     🔍+
                 </button>
-                <button id="zoom-out" class="p-2 hover:bg-gray-100 rounded-md transition-colors" title="Alejar">
+                <button id="zoom-out" class="p-2 hover:bg-gray-100 rounded-md transition-colors" title="Alejar (Scroll Down)">
                     🔍-
                 </button>
                 <button id="zoom-fit" class="p-2 hover:bg-gray-100 rounded-md transition-colors" title="Ajustar al contenido">
@@ -45,143 +50,66 @@
     </div>
 
     <div class="flex flex-1 overflow-hidden">
-        <!-- Sidebar con herramientas UML -->
+        <!-- Sidebar - JavaScript generará el toolbar aquí -->
         <div class="w-64 bg-white shadow-sm border-r border-gray-200 flex flex-col">
             <div class="p-4 border-b border-gray-200">
                 <h2 class="text-lg font-medium text-gray-900">Herramientas UML</h2>
             </div>
 
-            <!-- Herramientas de navegación -->
-            <div class="p-4 border-b border-gray-200">
-                <h3 class="text-sm font-medium text-gray-700 mb-3">Navegación</h3>
-                <button
-                    wire:click="selectTool('select')"
-                    class="w-full flex items-center space-x-3 p-3 rounded-md border transition-all {{ $selectedTool === 'select' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
-                    <span class="text-lg">👆</span>
-                    <span>Seleccionar</span>
-                </button>
-            </div>
-
-            <!-- Elementos UML -->
-            <div class="p-4 border-b border-gray-200">
-                <h3 class="text-sm font-medium text-gray-700 mb-3">Elementos</h3>
-                <div class="space-y-2">
-                    <button
-                        wire:click="selectTool('class')"
-                        class="w-full flex items-center space-x-3 p-3 rounded-md border transition-all {{ $selectedTool === 'class' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
-                        <span class="text-lg">📦</span>
-                        <span>Clase</span>
-                    </button>
+            {{-- Container para toolbar generado por JavaScript --}}
+            <div id="js-toolbar" class="flex-1">
+                {{-- El JavaScript creará los botones aquí --}}
+                <div class="p-4 text-center text-gray-500 text-sm">
+                    <div class="animate-pulse">Cargando herramientas...</div>
                 </div>
             </div>
 
-            <!-- Relaciones UML -->
-            <div class="p-4 border-b border-gray-200">
-                <h3 class="text-sm font-medium text-gray-700 mb-3">Relaciones</h3>
-                <div class="space-y-2">
-                    <button
-                        wire:click="selectTool('association')"
-                        class="w-full flex items-center space-x-3 p-3 rounded-md border transition-all {{ $selectedTool === 'association' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
-                        <span class="text-lg">↔️</span>
-                        <span>Asociación</span>
-                    </button>
-
-                    <button
-                        wire:click="selectTool('inheritance')"
-                        class="w-full flex items-center space-x-3 p-3 rounded-md border transition-all {{ $selectedTool === 'inheritance' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
-                        <span class="text-lg">⬆️</span>
-                        <span>Herencia</span>
-                    </button>
-
-                    <button
-                        wire:click="selectTool('aggregation')"
-                        class="w-full flex items-center space-x-3 p-3 rounded-md border transition-all {{ $selectedTool === 'aggregation' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
-                        <span class="text-lg">◇</span>
-                        <span>Agregación</span>
-                    </button>
-
-                    <button
-                        wire:click="selectTool('composition')"
-                        class="w-full flex items-center space-x-3 p-3 rounded-md border transition-all {{ $selectedTool === 'composition' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50' }}">
-                        <span class="text-lg">◆</span>
-                        <span>Composición</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Información contextual -->
-            <div class="p-4 flex-1">
-                <div class="bg-blue-50 rounded-lg p-3">
-                    <h4 class="text-sm font-medium text-blue-900 mb-2">
-                        {{ $tools[$selectedTool] ?? $selectedTool }}
-                    </h4>
-
-                    <div class="text-xs text-blue-700">
-                        @if($selectedTool === 'select')
-                            <p>• Haz clic para seleccionar elementos</p>
-                            <p>• Arrastra para mover elementos</p>
-                            <p>• Usa la rueda del ratón para zoom</p>
-                        @elseif($selectedTool === 'class')
-                            <p>• Haz clic en el canvas para crear una clase</p>
-                            <p>• Se abrirá un prompt para el nombre</p>
-                        @else
-                            <p>• Selecciona el primer elemento</p>
-                            <p>• Luego selecciona el segundo elemento</p>
-                            <p>• Se creará la relación automáticamente</p>
-                        @endif
+            {{-- Instrucciones dinámicas --}}
+            <div class="p-4 border-t border-gray-200 bg-gray-50">
+                <div class="text-sm">
+                    <div class="font-medium text-gray-700 mb-2">Instrucciones:</div>
+                    <div id="tool-instructions" class="text-gray-600 italic">
+                        Selecciona una herramienta para comenzar
                     </div>
                 </div>
 
-                <div class="mt-4 pt-4 border-t border-gray-200">
-                    <h4 class="text-sm font-medium text-gray-700 mb-2">Debug Manual</h4>
-                    <div class="space-y-2">
-                        <button
-                            onclick="window.DiagramEditor.debug.setTool('class'); console.log('🔧 MANUAL: Tool cambiado a class')"
-                            class="w-full bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-xs">
-                            🔧 Activar Clase (Manual)
-                        </button>
-                        <button
-                            onclick="window.DiagramEditor.debug.setTool('select'); console.log('🔧 MANUAL: Tool cambiado a select')"
-                            class="w-full bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded text-xs">
-                            👆 Activar Seleccionar (Manual)
-                        </button>
-                        <button
-                            onclick="console.log('🔧 CURRENT TOOL:', window.DiagramEditor.instance?.selectedTool)"
-                            class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">
-                            🔍 Ver Tool Actual
-                        </button>
-                    </div>
-                </div>
-
-                <div class="mt-4 pt-4 border-t border-gray-200">
-                    <h4 class="text-sm font-medium text-gray-700 mb-2">Atajos de teclado</h4>
-                    <div class="text-xs text-gray-500 space-y-1">
-                        <div class="flex justify-between">
-                            <span>Guardar</span>
-                            <code class="bg-gray-100 px-1 rounded">Ctrl+S</code>
-                        </div>
-                        <div class="flex justify-between">
-                            <span>Zoom</span>
-                            <code class="bg-gray-100 px-1 rounded">Scroll</code>
-                        </div>
+                {{-- Atajos de teclado --}}
+                <div class="mt-4 pt-4 border-t border-gray-300">
+                    <div class="text-xs font-medium text-gray-700 mb-2">Atajos:</div>
+                    <div class="grid grid-cols-2 gap-2 text-xs text-gray-500">
+                        <div>1-6: Herramientas</div>
+                        <div>Ctrl+S: Guardar</div>
+                        <div>Scroll: Zoom</div>
+                        <div>Click+Drag: Pan</div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Canvas principal -->
-        <div class="flex-1 relative">
+        <div class="flex-1 relative overflow-hidden">
             <div
                 id="paper-container"
-                class="w-full h-full bg-gray-50"
-                style="min-height: 600px;">
-                <!-- JointJS se renderizará aquí -->
+                class="w-full h-full bg-gray-50 relative">
+                {{-- JointJS se renderiza aquí --}}
+
+                {{-- Overlay de estado --}}
+                <div class="absolute top-4 left-4 bg-white px-3 py-2 rounded-lg shadow-sm border z-10">
+                    <div class="flex items-center space-x-3 text-sm">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-green-500 rounded-full" id="editor-status"></div>
+                            <span class="text-gray-600">Editor listo</span>
+                        </div>
+                        <div class="text-gray-400">|</div>
+                        <span id="current-tool" class="font-mono text-gray-800">select</span>
+                    </div>
+                </div>
             </div>
 
-            <!-- Loading overlay -->
+            {{-- Loading overlay para operaciones Livewire --}}
             <div
                 wire:loading
-                class="absolute inset-0 bg-gray-900 bg-opacity-10 flex items-center justify-center z-10">
+                class="absolute inset-0 bg-gray-900 bg-opacity-10 flex items-center justify-center z-20">
                 <div class="bg-white px-6 py-3 rounded-lg shadow-lg">
                     <div class="flex items-center space-x-3">
                         <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
@@ -192,17 +120,19 @@
         </div>
     </div>
 
-    <!-- Notificaciones flash -->
+    {{-- Notificaciones flash - Solo para operaciones Livewire --}}
     @if (session()->has('message'))
         <div
-            class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-20 transform transition-all"
+            class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-30"
             x-data="{ show: true }"
             x-show="show"
             x-init="setTimeout(() => show = false, 4000)"
-            x-transition:enter="translate-x-full"
-            x-transition:enter-start="translate-x-full"
-            x-transition:enter-end="translate-x-0"
-            x-transition:leave="translate-x-full">
+            x-transition:enter="transform transition-all duration-300"
+            x-transition:enter-start="translate-x-full opacity-0"
+            x-transition:enter-end="translate-x-0 opacity-100"
+            x-transition:leave="transform transition-all duration-300"
+            x-transition:leave-start="translate-x-0 opacity-100"
+            x-transition:leave-end="translate-x-full opacity-0">
             <div class="flex items-center space-x-2">
                 <span class="text-lg">✅</span>
                 <span>{{ session('message') }}</span>
@@ -210,10 +140,51 @@
         </div>
     @endif
 
-    {{-- Datos para JavaScript --}}
+    {{-- Error notifications --}}
+    @if (session()->has('error'))
+        <div
+            class="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-30"
+            x-data="{ show: true }"
+            x-show="show"
+            x-init="setTimeout(() => show = false, 5000)"
+            x-transition:enter="transform transition-all duration-300"
+            x-transition:enter-start="translate-x-full opacity-0"
+            x-transition:enter-end="translate-x-0 opacity-100"
+            x-transition:leave="transform transition-all duration-300"
+            x-transition:leave-start="translate-x-0 opacity-100"
+            x-transition:leave-end="translate-x-full opacity-0">
+            <div class="flex items-center space-x-2">
+                <span class="text-lg">❌</span>
+                <span>{{ session('error') }}</span>
+            </div>
+        </div>
+    @endif
+
+    {{-- Datos para JavaScript - SOLO datos necesarios --}}
     <script>
-        // Pasar datos del componente a JavaScript
+        // Datos del servidor para JavaScript
         window.diagramData = @json($diagramData);
-        window.selectedTool = @json($selectedTool);
+
+        // Estado inicial
+        document.addEventListener('DOMContentLoaded', function() {
+            // Actualizar indicador de herramienta actual
+            const updateCurrentTool = () => {
+                const toolEl = document.getElementById('current-tool');
+                if (toolEl && window.DiagramEditor?.instance) {
+                    toolEl.textContent = window.DiagramEditor.instance.selectedTool;
+                }
+            };
+
+            // Actualizar cada segundo
+            setInterval(updateCurrentTool, 1000);
+
+            // Indicar que JS está cargado
+            setTimeout(() => {
+                const statusEl = document.getElementById('editor-status');
+                if (statusEl) {
+                    statusEl.className = 'w-2 h-2 bg-green-500 rounded-full';
+                }
+            }, 1000);
+        });
     </script>
 </div>

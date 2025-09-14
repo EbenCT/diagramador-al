@@ -1,3 +1,4 @@
+// vite.config.js - Asegurar JointJS
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 
@@ -9,27 +10,9 @@ export default defineConfig({
         }),
     ],
     define: {
-        global: 'window',
-    },
-    resolve: {
-        alias: {
-            '$': 'jquery',
-            'jQuery': 'jquery',
-            'jquery': 'jquery'
-        },
+        global: 'globalThis',
     },
     optimizeDeps: {
-        include: [
-            'jquery',
-            'jointjs',
-            'lodash',
-            'backbone'
-        ]
-    },
-    build: {
-        commonjsOptions: {
-            include: [/jointjs/, /node_modules/],
-            transformMixedEsModules: true
-        }
+        include: ['jointjs', 'lodash', 'backbone', 'jquery']
     }
 });

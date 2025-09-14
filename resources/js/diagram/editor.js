@@ -1,0 +1,401 @@
+// resources/js/diagram/editor.js - VERSIÓN MEJORADA
+import * as joint from 'jointjs';
+
+export class UMLDiagramEditor {
+    constructor() {
+        this.graph = new joint.dia.Graph();
+        this.paper = null;
+        this.selectedTool = 'select';
+        this.selectedElement = null;
+        this.currentZoom = 1;
+
+        // Estados para relaciones
+        this.relationshipMode = false;
+        this.firstElementSelected = null;
+
+        this.init();
+    }
+
+    init() {
+        this.createPaper();
+        this.setupEventListeners();
+        this.setupToolbar();
+        this.loadDiagramData();
+
+        console.log('✅ UMLDiagramEditor inicializado');
+    }
+
+    createPaper() {
+        const container = document.getElementById('paper-container');
+        if (!container) {
+            console.error('❌ Container #paper-container no encontrado');
+            return;
+        }
+
+        this.paper = new joint.dia.Paper({
+            el: container,
+            model: this.graph,
+            width: '100%',
+            height: '100%',
+            gridSize: 20,
+            drawGrid: true,
+            background: { color: '#f9fafb' },
+
+            // Interactividad dinámica basada en herramienta seleccionada
+            interactive: (elementView) => {
+                return this.selectedTool === 'select';
+            },
+
+            // Configuración de zoom con mouse wheel
+            mouseWheelZoom: true,
+        });
+
+        // Eventos del paper
+        this.paper.on('element:pointerdown', this.onElementClick.bind(this));
+        this.paper.on('blank:pointerdown', this.onBlankClick.bind(this));
+        this.paper.on('element:pointermove', this.updateCanvasInfo.bind(this));
+    }
+
+    setupEventListeners() {
+        // Zoom controls
+        document.getElementById('zoom-in')?.addEventListener('click', () => this.zoomIn());
+        document.getElementById('zoom-out')?.addEventListener('click', () => this.zoomOut());
+        document.getElementById('zoom-fit')?.addEventListener('click', () => this.zoomToFit());
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                this.saveDiagram();
+            }
+
+            // Herramientas rápidas
+            if (!e.ctrlKey && !e.altKey) {
+                switch(e.key) {
+                    case '1': this.selectTool('select'); break;
+                    case '2': this.selectTool('class'); break;
+                    case '3': this.selectTool('association'); break;
+                    case '4': this.selectTool('inheritance'); break;
+                    case '5': this.selectTool('aggregation'); break;
+                    case '6': this.selectTool('composition'); break;
+                }
+            }
+        });
+    }
+
+    setupToolbar() {
+        // Crear toolbar nativo en JavaScript (más confiable)
+        const toolbar = this.createNativeToolbar();
+
+        // Si hay un container específico para toolbar, usarlo
+        const toolbarContainer = document.getElementById('js-toolbar');
+        if (toolbarContainer) {
+            toolbarContainer.innerHTML = '';
+            toolbarContainer.appendChild(toolbar);
+        }
+    }
+
+    createNativeToolbar() {
+        const toolbar = document.createElement('div');
+        toolbar.className = 'flex flex-col space-y-2 p-4';
+
+        const tools = [
+            { id: 'select', icon: '👆', label: 'Seleccionar', shortcut: '1' },
+            { id: 'class', icon: '📦', label: 'Clase', shortcut: '2' },
+            { id: 'association', icon: '↔️', label: 'Asociación', shortcut: '3' },
+            { id: 'inheritance', icon: '⬆️', label: 'Herencia', shortcut: '4' },
+            { id: 'aggregation', icon: '◇', label: 'Agregación', shortcut: '5' },
+            { id: 'composition', icon: '♦️', label: 'Composición', shortcut: '6' },
+        ];
+
+        tools.forEach(tool => {
+            const button = document.createElement('button');
+            button.className = `flex items-center space-x-3 p-3 rounded-md border transition-all w-full text-left ${
+                this.selectedTool === tool.id ?
+                'border-blue-500 bg-blue-50 text-blue-700' :
+                'border-gray-200 hover:bg-gray-50'
+            }`;
+
+            button.innerHTML = `
+                <span class="text-lg">${tool.icon}</span>
+                <span class="flex-1">${tool.label}</span>
+                <code class="text-xs bg-gray-100 px-1 rounded">${tool.shortcut}</code>
+            `;
+
+            button.addEventListener('click', () => this.selectTool(tool.id));
+            button.dataset.tool = tool.id;
+
+            toolbar.appendChild(button);
+        });
+
+        return toolbar;
+    }
+
+    selectTool(tool) {
+        console.log(`🔧 Herramienta seleccionada: ${tool}`);
+
+        this.selectedTool = tool;
+        this.relationshipMode = ['association', 'inheritance', 'aggregation', 'composition'].includes(tool);
+        this.firstElementSelected = null;
+
+        // Actualizar interactividad del paper
+        this.paper.setInteractivity(tool === 'select');
+
+        // Actualizar botones del toolbar
+        this.updateToolbarButtons();
+
+        // Mostrar instrucciones
+        this.showToolInstructions(tool);
+    }
+
+    updateToolbarButtons() {
+        const buttons = document.querySelectorAll('button[data-tool]');
+        buttons.forEach(button => {
+            const isActive = button.dataset.tool === this.selectedTool;
+            button.className = `flex items-center space-x-3 p-3 rounded-md border transition-all w-full text-left ${
+                isActive ?
+                'border-blue-500 bg-blue-50 text-blue-700' :
+                'border-gray-200 hover:bg-gray-50'
+            }`;
+        });
+    }
+
+    showToolInstructions(tool) {
+        const instructions = {
+            'select': 'Haz clic en elementos para seleccionar y mover',
+            'class': 'Haz clic en el canvas para crear una nueva clase',
+            'association': 'Selecciona dos clases para crear una asociación',
+            'inheritance': 'Selecciona clase hijo, luego clase padre',
+            'aggregation': 'Selecciona contenedor, luego contenido',
+            'composition': 'Selecciona todo, luego parte'
+        };
+
+        // Mostrar en un elemento de instrucciones si existe
+        const instructionsEl = document.getElementById('tool-instructions');
+        if (instructionsEl) {
+            instructionsEl.textContent = instructions[tool] || '';
+        }
+    }
+
+    onElementClick(elementView, evt, x, y) {
+        if (this.selectedTool === 'select') {
+            this.selectElement(elementView.model);
+            return;
+        }
+
+        if (this.relationshipMode) {
+            this.handleRelationshipClick(elementView.model);
+        }
+    }
+
+    onBlankClick(evt, x, y) {
+        if (this.selectedTool === 'class') {
+            this.createClass(x, y);
+        } else if (this.selectedTool === 'select' && this.selectedElement) {
+            // Deseleccionar
+            this.selectElement(null);
+        }
+    }
+
+    handleRelationshipClick(element) {
+        if (!this.firstElementSelected) {
+            this.firstElementSelected = element;
+            this.highlightElement(element, true, 'orange');
+            console.log(`Primera clase seleccionada para ${this.selectedTool}`);
+        } else {
+            if (this.firstElementSelected.id !== element.id) {
+                this.createRelationship(this.firstElementSelected, element);
+            }
+
+            // Reset
+            this.highlightElement(this.firstElementSelected, false);
+            this.firstElementSelected = null;
+        }
+    }
+
+    createClass(x, y) {
+        const className = prompt('Nombre de la clase:', 'MiClase');
+        if (!className) return;
+
+        const classElement = new joint.shapes.uml.Class({
+            position: { x: x - 100, y: y - 60 },
+            size: { width: 200, height: 120 },
+            className: className,
+            attributes: [
+                '- id: int',
+                `- ${className.toLowerCase()}Name: String`
+            ],
+            methods: [
+                '+ getId(): int',
+                `+ get${className}Name(): String`,
+                `+ set${className}Name(name: String): void`
+            ]
+        });
+
+        this.graph.addCell(classElement);
+        this.updateCanvasInfo();
+
+        // Volver a select después de crear
+        this.selectTool('select');
+
+        console.log('✅ Clase creada:', className);
+    }
+
+    createRelationship(source, target) {
+        const relationships = {
+            'association': joint.shapes.uml.Association,
+            'inheritance': joint.shapes.uml.Inheritance,
+            'aggregation': joint.shapes.uml.Aggregation,
+            'composition': joint.shapes.uml.Composition
+        };
+
+        const RelationshipClass = relationships[this.selectedTool];
+        if (!RelationshipClass) return;
+
+        const link = new RelationshipClass({
+            source: { id: source.id },
+            target: { id: target.id }
+        });
+
+        this.graph.addCell(link);
+        console.log(`✅ Relación ${this.selectedTool} creada`);
+    }
+
+    selectElement(element) {
+        // Deseleccionar anterior
+        if (this.selectedElement) {
+            this.highlightElement(this.selectedElement, false);
+        }
+
+        // Seleccionar nuevo
+        this.selectedElement = element;
+        if (element) {
+            this.highlightElement(element, true);
+        }
+    }
+
+    highlightElement(element, highlight, color = 'blue') {
+        const elementView = this.paper.findViewByModel(element);
+        if (elementView) {
+            if (highlight) {
+                elementView.highlight(null, {
+                    highlighter: {
+                        name: 'stroke',
+                        options: {
+                            attrs: {
+                                'stroke': color,
+                                'stroke-width': 3
+                            }
+                        }
+                    }
+                });
+            } else {
+                elementView.unhighlight();
+            }
+        }
+    }
+
+    // Métodos de zoom (mantener los que ya tienes)
+    zoom(x, y, delta) {
+        const oldZoom = this.currentZoom;
+        const newZoom = Math.max(0.2, Math.min(3, oldZoom + delta * 0.1));
+
+        if (newZoom !== oldZoom) {
+            this.currentZoom = newZoom;
+            this.paper.scale(newZoom, newZoom);
+            this.updateCanvasInfo();
+        }
+    }
+
+    zoomIn() {
+        this.currentZoom = Math.min(3, this.currentZoom + 0.1);
+        this.paper.scale(this.currentZoom, this.currentZoom);
+        this.updateCanvasInfo();
+    }
+
+    zoomOut() {
+        this.currentZoom = Math.max(0.2, this.currentZoom - 0.1);
+        this.paper.scale(this.currentZoom, this.currentZoom);
+        this.updateCanvasInfo();
+    }
+
+    zoomToFit() {
+        this.paper.scaleContentToFit({ padding: 20 });
+        this.currentZoom = this.paper.scale().sx;
+        this.updateCanvasInfo();
+    }
+
+    updateCanvasInfo() {
+        const elementCount = this.graph.getElements().length;
+        const zoomPercent = Math.round(this.currentZoom * 100);
+
+        const infoElement = document.getElementById('canvas-info');
+        if (infoElement) {
+            infoElement.textContent = `Elementos: ${elementCount} | Zoom: ${zoomPercent}%`;
+        }
+    }
+
+    // Integración con Livewire para persistencia
+    saveDiagram() {
+        try {
+            const diagramData = JSON.stringify(this.graph.toJSON());
+
+            // Enviar a Livewire
+            if (window.Livewire) {
+                window.Livewire.dispatch('save-diagram', [diagramData]);
+                console.log('✅ Diagrama enviado a Livewire para guardar');
+            }
+        } catch (error) {
+            console.error('❌ Error al guardar:', error);
+        }
+    }
+
+    loadDiagramData() {
+        if (window.diagramData && window.diagramData !== '[]') {
+            try {
+                const data = JSON.parse(window.diagramData);
+                if (data.cells && data.cells.length > 0) {
+                    this.graph.fromJSON(data);
+                    this.updateCanvasInfo();
+                    console.log('✅ Diagrama cargado desde Livewire');
+                }
+            } catch (e) {
+                console.error('❌ Error cargando diagrama:', e);
+            }
+        }
+    }
+
+    clearDiagram() {
+        this.graph.clear();
+        this.selectedElement = null;
+        this.firstElementSelected = null;
+        this.updateCanvasInfo();
+    }
+
+    // Método público para debugging
+    getState() {
+        return {
+            selectedTool: this.selectedTool,
+            elementCount: this.graph.getElements().length,
+            zoom: this.currentZoom,
+            relationshipMode: this.relationshipMode,
+            hasSelection: !!this.selectedElement
+        };
+    }
+}
+
+// Inicialización global
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('paper-container');
+    if (container) {
+        const editor = new UMLDiagramEditor();
+
+        // Hacer accesible globalmente para debugging
+        window.DiagramEditor = {
+            instance: editor,
+            debug: () => editor.getState()
+        };
+
+        console.log('🎯 UML Diagram Editor listo! Usa window.DiagramEditor.debug() para ver estado');
+    }
+});
