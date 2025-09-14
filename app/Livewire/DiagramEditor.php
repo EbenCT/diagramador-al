@@ -2,15 +2,16 @@
 
 namespace App\Livewire;
 
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class DiagramEditor extends Component
 {
-    public $diagramData = '[]'; // JSON del diagrama
-    public $selectedTool = 'select'; // Herramienta seleccionada
-    public $diagramTitle = 'Mi Diagrama UML';
+    public $diagramData = '[]';
+    public $selectedTool = 'select';
+    public $diagramTitle = 'Diagrama de Clases UML';
 
-    // Herramientas disponibles para UML (solo clases)
+    // Herramientas UML disponibles
     public $tools = [
         'select' => 'Seleccionar',
         'class' => 'Clase',
@@ -22,10 +23,7 @@ class DiagramEditor extends Component
 
     public function mount()
     {
-        // Inicializar diagrama vacío
-        $this->diagramData = json_encode([
-            'cells' => []
-        ]);
+        $this->diagramData = json_encode(['cells' => []]);
     }
 
     public function selectTool($tool)
@@ -34,10 +32,13 @@ class DiagramEditor extends Component
         $this->dispatch('tool-selected', $tool);
     }
 
-    public function saveDiagram($diagramData)
+    #[On('save-diagram')]
+    public function saveDiagram($diagramData = null)
     {
-        $this->diagramData = $diagramData;
-        // Aquí luego guardaremos en BD
+        if ($diagramData) {
+            $this->diagramData = $diagramData;
+        }
+
         session()->flash('message', 'Diagrama guardado exitosamente');
     }
 
@@ -45,6 +46,12 @@ class DiagramEditor extends Component
     {
         $this->diagramData = json_encode(['cells' => []]);
         $this->dispatch('clear-diagram');
+        session()->flash('message', 'Diagrama limpiado');
+    }
+
+    public function exportDiagram()
+    {
+        session()->flash('message', 'Funcionalidad de exportación próximamente');
     }
 
     public function render()

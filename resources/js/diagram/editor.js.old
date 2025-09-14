@@ -1,3 +1,4 @@
+// resources/js/diagram/editor.js
 import * as joint from 'jointjs';
 import $ from 'jquery';
 
@@ -24,6 +25,10 @@ class UMLDiagramEditor {
 
     createPaper() {
         const container = document.getElementById('paper-container');
+        if (!container) {
+            console.error('Container #paper-container no encontrado');
+            return;
+        }
 
         this.paper = new joint.dia.Paper({
             el: container,
@@ -44,7 +49,7 @@ class UMLDiagramEditor {
             snapLabels: true
         });
 
-        // Configurar zoom con mouse wheel
+        // Configurar zoom con mouse wheel (MANTENER FUNCIONALIDAD ORIGINAL)
         this.paper.on('blank:mousewheel', (evt, x, y, delta) => {
             evt.preventDefault();
             this.zoom(x, y, delta);
@@ -62,7 +67,7 @@ class UMLDiagramEditor {
     }
 
     setupEventListeners() {
-        // Botones de zoom
+        // Botones de zoom (MANTENER FUNCIONALIDAD ORIGINAL)
         document.getElementById('zoom-in')?.addEventListener('click', () => {
             this.zoomIn();
         });
@@ -89,6 +94,7 @@ class UMLDiagramEditor {
         window.addEventListener('tool-selected', (event) => {
             this.selectedTool = event.detail;
             this.paper.setInteractivity(this.selectedTool === 'select');
+            console.log('Tool selected:', this.selectedTool);
         });
 
         // Escuchar comando de limpiar diagrama
@@ -100,35 +106,63 @@ class UMLDiagramEditor {
     handleCanvasClick(x, y) {
         if (this.selectedTool === 'select') return;
 
+        console.log('Canvas clicked with tool:', this.selectedTool, 'at', x, y);
+
         switch (this.selectedTool) {
             case 'class':
                 this.createClass(x, y);
+                break;
+            case 'association':
+                // Implementar creación de asociación
+                console.log('Asociación - selecciona dos clases');
+                break;
+            case 'inheritance':
+                // Implementar creación de herencia
+                console.log('Herencia - selecciona clase padre e hija');
+                break;
+            case 'aggregation':
+                // Implementar creación de agregación
+                console.log('Agregación - selecciona dos clases');
+                break;
+            case 'composition':
+                // Implementar creación de composición
+                console.log('Composición - selecciona dos clases');
                 break;
         }
     }
 
     createClass(x, y) {
-        const className = prompt('Nombre de la clase:', 'MiClase') || 'MiClase';
+        try {
+            const className = prompt('Nombre de la clase:', 'MiClase');
+            if (!className) return; // Usuario canceló
 
-        // Usar la nueva función factory para evitar errores
-        const classElement = window.UMLShapes.createClass({
-            position: { x: x - 75, y: y - 60 },
-            size: { width: 150, height: 120 },
-            name: className,
-            attributes: [
-                '- id: int',
-                '- nombre: String',
-                '- email: String'
-            ],
-            methods: [
-                '+ getId(): int',
-                '+ getNombre(): String',
-                '+ setNombre(nombre: String): void'
-            ]
-        });
+            console.log('Creando clase:', className);
 
-        this.graph.addCell(classElement);
-        this.updateCanvasInfo();
+            // Crear clase UML usando JointJS directamente (sin factory)
+            const classElement = new joint.shapes.uml.Class({
+                position: { x: x - 100, y: y - 60 },
+                size: { width: 200, height: 120 },
+                className: className,
+                attributes: [
+                    '- id: int',
+                    '- ' + className.toLowerCase() + 'Name: String'
+                ],
+                methods: [
+                    '+ getId(): int',
+                    '+ get' + className + 'Name(): String',
+                    '+ set' + className + 'Name(name: String): void'
+                ]
+            });
+
+            this.graph.addCell(classElement);
+            this.updateCanvasInfo();
+
+            console.log('Clase creada exitosamente:', className);
+
+        } catch (error) {
+            console.error('Error al crear clase:', error);
+            alert('Error al crear la clase. Revisa la consola para más detalles.');
+        }
     }
 
     selectElement(element) {
@@ -153,6 +187,7 @@ class UMLDiagramEditor {
         }
     }
 
+    // MANTENER FUNCIONALIDAD DE ZOOM ORIGINAL
     zoom(x, y, delta) {
         const oldZoom = this.currentZoom;
         const newZoom = Math.max(0.2, Math.min(3, oldZoom + delta * 0.1));
@@ -193,7 +228,7 @@ class UMLDiagramEditor {
     }
 
     loadDiagramData() {
-        if (window.diagramData) {
+        if (window.diagramData && window.diagramData !== '[]') {
             try {
                 const data = JSON.parse(window.diagramData);
                 if (data.cells && data.cells.length > 0) {
@@ -207,11 +242,17 @@ class UMLDiagramEditor {
     }
 
     saveDiagram() {
-        const diagramData = JSON.stringify(this.graph.toJSON());
+        try {
+            const diagramData = JSON.stringify(this.graph.toJSON());
 
-        // Enviar a Livewire
-        if (window.Livewire) {
-            window.Livewire.dispatch('saveDiagram', diagramData);
+            // Enviar a Livewire
+            if (window.Livewire) {
+                window.Livewire.dispatch('save-diagram', [diagramData]);
+            }
+
+            console.log('Diagrama guardado');
+        } catch (error) {
+            console.error('Error al guardar diagrama:', error);
         }
     }
 
@@ -228,8 +269,12 @@ class UMLDiagramEditor {
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    if (document.getElementById('paper-container')) {
+    const container = document.getElementById('paper-container');
+    if (container) {
+        console.log('Inicializando UMLDiagramEditor...');
         window.DiagramEditor.instance = new UMLDiagramEditor();
+    } else {
+        console.warn('Container #paper-container no encontrado');
     }
 });
 
