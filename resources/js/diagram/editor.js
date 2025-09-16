@@ -54,6 +54,9 @@ export class UMLDiagramEditor {
         this.paper.on('element:pointerdown', this.onElementClick.bind(this));
         this.paper.on('blank:pointerdown', this.onBlankClick.bind(this));
         this.paper.on('element:pointermove', this.updateCanvasInfo.bind(this));
+        this.paper.on('link:pointerdown', this.onLinkClick.bind(this));
+        this.paper.on('element:pointerdblclick', this.onElementDoubleClick.bind(this));
+        this.paper.on('link:pointerdblclick', this.onLinkDoubleClick.bind(this));
     }
 
     setupEventListeners() {
@@ -160,21 +163,104 @@ export class UMLDiagramEditor {
         });
     }
 
-    showToolInstructions(tool) {
-        const instructions = {
-            'select': 'Haz clic en elementos para seleccionar y mover',
-            'class': 'Haz clic en el canvas para crear una nueva clase',
-            'association': 'Selecciona dos clases para crear una asociación',
-            'inheritance': 'Selecciona clase hijo, luego clase padre',
-            'aggregation': 'Selecciona contenedor, luego contenido',
-            'composition': 'Selecciona todo, luego parte'
-        };
-
-        // Mostrar en un elemento de instrucciones si existe
-        const instructionsEl = document.getElementById('tool-instructions');
-        if (instructionsEl) {
-            instructionsEl.textContent = instructions[tool] || '';
+    onLinkClick(linkView, evt, x, y) {
+        if (this.selectedTool === 'select') {
+            this.selectElement(linkView.model);
+        } else if (this.relationshipMode) {
+            // Los links no participan en creación de relaciones
+            return;
         }
+    }
+
+    onElementDoubleClick(elementView, evt) {
+        if (elementView.model.get('type') === 'uml.Class') {
+            this.editClass(elementView.model);
+        }
+    }
+
+    onLinkDoubleClick(linkView, evt) {
+        this.editRelationship(linkView.model);
+    }
+
+    editClass(classElement) {
+        const currentName = classElement.get('className');
+        const currentAttrs = classElement.get('attributes') || [];
+        const currentMethods = classElement.get('methods') || [];
+
+        // Diálogo simplificado para editar clase
+        const newName = prompt('Nombre de la clase:', currentName);
+        if (newName === null) return;
+
+        const attrsString = prompt(
+            'Atributos (uno por línea, formato: visibilidad nombre: tipo):\nEjemplo: - id: int',
+            currentAttrs.join('\n')
+        );
+        if (attrsString === null) return;
+
+        const methodsString = prompt(
+            'Métodos (uno por línea, formato: visibilidad nombre(params): retorno):\nEjemplo: + getId(): int',
+            currentMethods.join('\n')
+        );
+        if (methodsString === null) return;
+
+        // Actualizar la clase
+        const newAttrs = attrsString.split('\n')
+            .map(attr => attr.trim())
+            .filter(attr => attr.length > 0);
+
+        const newMethods = methodsString.split('\n')
+            .map(method => method.trim())
+            .filter(method => method.length > 0);
+
+        classElement.set({
+            className: newName.trim() || currentName,
+            attributes: newAttrs,
+            methods: newMethods
+        });
+
+        console.log('✅ Clase editada:', newName);
+    }
+
+    editRelationship(linkElement) {
+        const relationshipType = linkElement.get('relationshipType');
+
+        if (relationshipType === 'inheritance') {
+            // Solo permitir editar nombre para herencia
+            const currentName = linkElement.get('relationshipName') || '';
+            const newName = prompt('Nombre de la relación de herencia (opcional):', currentName);
+
+            if (newName !== null && linkElement.setRelationshipName) {
+                linkElement.setRelationshipName(newName.trim());
+            }
+        } else {
+            // Editar multiplicidad y nombre para otras relaciones
+            const currentSourceMult = linkElement.get('sourceMultiplicity') || '1';
+            const currentTargetMult = linkElement.get('targetMultiplicity') || '*';
+            const currentName = linkElement.get('relationshipName') || '';
+
+            const sourceMultiplicity = prompt('Multiplicidad origen:', currentSourceMult);
+            if (sourceMultiplicity === null) return;
+
+            const targetMultiplicity = prompt('Multiplicidad destino:', currentTargetMult);
+            if (targetMultiplicity === null) return;
+
+            const name = prompt('Nombre de la relación (opcional):', currentName);
+            if (name === null) return;
+
+            // Actualizar la relación
+            if (linkElement.setMultiplicity) {
+                linkElement.setMultiplicity(
+                    sourceMultiplicity.trim() || '1',
+                    targetMultiplicity.trim() || '*'
+                );
+            }
+
+            if (name.trim() && linkElement.setRelationshipName) {
+                linkElement.setRelationshipName(name.trim());
+            }
+        }
+
+        console.log('✅ Relación editada:', relationshipType);
     }
 
     onElementClick(elementView, evt, x, y) {
@@ -290,7 +376,66 @@ Ejemplo: + getId(): int
         });
 
         this.graph.addCell(link);
+
+        // Mostrar diálogo de configuración para relaciones con multiplicidad
+        if (this.selectedTool !== 'inheritance') {
+            setTimeout(() => {
+                this.showRelationshipConfigDialog(link);
+            }, 100);
+        }
+
         console.log(`✅ Relación ${this.selectedTool} creada`);
+    }
+
+    showRelationshipConfigDialog(link) {
+        const config = this.promptRelationshipConfig(link.get('relationshipType'));
+
+        if (config) {
+            // Configurar multiplicidad si aplica
+            if (config.sourceMultiplicity && config.targetMultiplicity && link.setMultiplicity) {
+                link.setMultiplicity(config.sourceMultiplicity, config.targetMultiplicity);
+            }
+
+            // Configurar nombre de relación si se proporcionó
+            if (config.name && link.setRelationshipName) {
+                link.setRelationshipName(config.name);
+            }
+        }
+    }
+
+    promptRelationshipConfig(type) {
+        let sourcePrompt, targetPrompt;
+
+        switch(type) {
+            case 'association':
+                sourcePrompt = 'Multiplicidad origen (1, 0..1, 1..*, *):';
+                targetPrompt = 'Multiplicidad destino (1, 0..1, 1..*, *):';
+                break;
+            case 'aggregation':
+                sourcePrompt = 'Multiplicidad contenedor (típicamente 1):';
+                targetPrompt = 'Multiplicidad contenido (1, *, etc.):';
+                break;
+            case 'composition':
+                sourcePrompt = 'Multiplicidad todo (típicamente 1):';
+                targetPrompt = 'Multiplicidad parte (1, *, etc.):';
+                break;
+            default:
+                return null;
+        }
+
+        const sourceMultiplicity = prompt(sourcePrompt, '1');
+        if (sourceMultiplicity === null) return null;
+
+        const targetMultiplicity = prompt(targetPrompt, '*');
+        if (targetMultiplicity === null) return null;
+
+        const name = prompt('Nombre de la relación (opcional):');
+
+        return {
+            sourceMultiplicity: sourceMultiplicity.trim() || '1',
+            targetMultiplicity: targetMultiplicity.trim() || '*',
+            name: name ? name.trim() : null
+        };
     }
 
     selectElement(element) {
