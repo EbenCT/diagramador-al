@@ -1,8 +1,13 @@
-// resources/js/diagram/editor.js - VERSIÓN MEJORADA
+// resources/js/diagram/editor.js - VERSIÓN SIN SHAPES PERSONALIZADAS
 import * as joint from 'jointjs';
 
-export class UMLDiagramEditor {
+// Usar las shapes que YA VIENEN con JointJS
+// No definir nuestras propias shapes
+
+class UMLDiagramEditor {
     constructor() {
+        console.log('🚀 Inicializando UMLDiagramEditor...');
+
         this.graph = new joint.dia.Graph();
         this.paper = null;
         this.selectedTool = 'select';
@@ -19,18 +24,19 @@ export class UMLDiagramEditor {
     init() {
         this.createPaper();
         this.setupEventListeners();
-        this.setupToolbar();
         this.loadDiagramData();
 
-        console.log('✅ UMLDiagramEditor inicializado');
+        console.log('✅ UMLDiagramEditor inicializado correctamente');
     }
 
     createPaper() {
-        const container = document.getElementById('paper-container');
+        var container = document.getElementById('paper-container');
         if (!container) {
             console.error('❌ Container #paper-container no encontrado');
             return;
         }
+
+        console.log('📋 Creando paper...');
 
         this.paper = new joint.dia.Paper({
             el: container,
@@ -41,12 +47,11 @@ export class UMLDiagramEditor {
             drawGrid: true,
             background: { color: '#f9fafb' },
 
-            // Interactividad dinámica basada en herramienta seleccionada
-            interactive: (elementView) => {
+            // Interactividad basada en herramienta
+            interactive: function(elementView) {
                 return this.selectedTool === 'select';
-            },
+            }.bind(this),
 
-            // Configuración de zoom con mouse wheel
             mouseWheelZoom: true,
         });
 
@@ -56,14 +61,19 @@ export class UMLDiagramEditor {
         this.paper.on('element:pointermove', this.updateCanvasInfo.bind(this));
         this.paper.on('link:pointerdown', this.onLinkClick.bind(this));
         this.paper.on('element:pointerdblclick', this.onElementDoubleClick.bind(this));
-        this.paper.on('link:pointerdblclick', this.onLinkDoubleClick.bind(this));
+
+        console.log('✅ Paper creado correctamente');
     }
 
     setupEventListeners() {
         // Zoom controls
-        document.getElementById('zoom-in')?.addEventListener('click', () => this.zoomIn());
-        document.getElementById('zoom-out')?.addEventListener('click', () => this.zoomOut());
-        document.getElementById('zoom-fit')?.addEventListener('click', () => this.zoomToFit());
+        var zoomIn = document.getElementById('zoom-in');
+        var zoomOut = document.getElementById('zoom-out');
+        var zoomFit = document.getElementById('zoom-fit');
+
+        if (zoomIn) zoomIn.addEventListener('click', () => this.zoomIn());
+        if (zoomOut) zoomOut.addEventListener('click', () => this.zoomOut());
+        if (zoomFit) zoomFit.addEventListener('click', () => this.zoomToFit());
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -72,8 +82,8 @@ export class UMLDiagramEditor {
                 this.saveDiagram();
             }
 
-            // Herramientas rápidas
-            if (!e.ctrlKey && !e.altKey) {
+            // Herramientas rápidas sin modificadores
+            if (!e.ctrlKey && !e.altKey && !e.metaKey) {
                 switch(e.key) {
                     case '1': this.selectTool('select'); break;
                     case '2': this.selectTool('class'); break;
@@ -84,183 +94,40 @@ export class UMLDiagramEditor {
                 }
             }
         });
-    }
 
-    setupToolbar() {
-        // Crear toolbar nativo en JavaScript (más confiable)
-        const toolbar = this.createNativeToolbar();
-
-        // Si hay un container específico para toolbar, usarlo
-        const toolbarContainer = document.getElementById('js-toolbar');
-        if (toolbarContainer) {
-            toolbarContainer.innerHTML = '';
-            toolbarContainer.appendChild(toolbar);
-        }
-    }
-
-    createNativeToolbar() {
-        const toolbar = document.createElement('div');
-        toolbar.className = 'flex flex-col space-y-2 p-4';
-
-        const tools = [
-            { id: 'select', icon: '👆', label: 'Seleccionar', shortcut: '1' },
-            { id: 'class', icon: '📦', label: 'Clase', shortcut: '2' },
-            { id: 'association', icon: '↔️', label: 'Asociación', shortcut: '3' },
-            { id: 'inheritance', icon: '⬆️', label: 'Herencia', shortcut: '4' },
-            { id: 'aggregation', icon: '◇', label: 'Agregación', shortcut: '5' },
-            { id: 'composition', icon: '♦️', label: 'Composición', shortcut: '6' },
-        ];
-
-        tools.forEach(tool => {
-            const button = document.createElement('button');
-            button.className = `flex items-center space-x-3 p-3 rounded-md border transition-all w-full text-left ${
-                this.selectedTool === tool.id ?
-                'border-blue-500 bg-blue-50 text-blue-700' :
-                'border-gray-200 hover:bg-gray-50'
-            }`;
-
-            button.innerHTML = `
-                <span class="text-lg">${tool.icon}</span>
-                <span class="flex-1">${tool.label}</span>
-                <code class="text-xs bg-gray-100 px-1 rounded">${tool.shortcut}</code>
-            `;
-
-            button.addEventListener('click', () => this.selectTool(tool.id));
-            button.dataset.tool = tool.id;
-
-            toolbar.appendChild(button);
-        });
-
-        return toolbar;
+        console.log('✅ Event listeners configurados');
     }
 
     selectTool(tool) {
-        console.log(`🔧 Herramienta seleccionada: ${tool}`);
+        console.log('🔧 Herramienta seleccionada:', tool);
 
         this.selectedTool = tool;
         this.relationshipMode = ['association', 'inheritance', 'aggregation', 'composition'].includes(tool);
         this.firstElementSelected = null;
 
-        // Actualizar interactividad del paper
+        // Actualizar interactividad
         this.paper.setInteractivity(tool === 'select');
-
-        // Actualizar botones del toolbar
-        this.updateToolbarButtons();
 
         // Mostrar instrucciones
         this.showToolInstructions(tool);
+
+        console.log('✅ Tool cambiado a:', tool);
     }
 
-    updateToolbarButtons() {
-        const buttons = document.querySelectorAll('button[data-tool]');
-        buttons.forEach(button => {
-            const isActive = button.dataset.tool === this.selectedTool;
-            button.className = `flex items-center space-x-3 p-3 rounded-md border transition-all w-full text-left ${
-                isActive ?
-                'border-blue-500 bg-blue-50 text-blue-700' :
-                'border-gray-200 hover:bg-gray-50'
-            }`;
-        });
-    }
+    showToolInstructions(tool) {
+        var instructions = {
+            'select': 'Haz clic para seleccionar • Arrastra para mover • Doble clic para editar',
+            'class': 'Haz clic en el canvas para crear una nueva clase',
+            'association': 'Selecciona dos clases para crear una asociación',
+            'inheritance': 'Selecciona clase hijo, luego clase padre',
+            'aggregation': 'Selecciona contenedor, luego contenido',
+            'composition': 'Selecciona todo, luego parte'
+        };
 
-    onLinkClick(linkView, evt, x, y) {
-        if (this.selectedTool === 'select') {
-            this.selectElement(linkView.model);
-        } else if (this.relationshipMode) {
-            // Los links no participan en creación de relaciones
-            return;
+        var instructionsEl = document.getElementById('tool-instructions');
+        if (instructionsEl) {
+            instructionsEl.textContent = instructions[tool] || '';
         }
-    }
-
-    onElementDoubleClick(elementView, evt) {
-        if (elementView.model.get('type') === 'uml.Class') {
-            this.editClass(elementView.model);
-        }
-    }
-
-    onLinkDoubleClick(linkView, evt) {
-        this.editRelationship(linkView.model);
-    }
-
-    editClass(classElement) {
-        const currentName = classElement.get('className');
-        const currentAttrs = classElement.get('attributes') || [];
-        const currentMethods = classElement.get('methods') || [];
-
-        // Diálogo simplificado para editar clase
-        const newName = prompt('Nombre de la clase:', currentName);
-        if (newName === null) return;
-
-        const attrsString = prompt(
-            'Atributos (uno por línea, formato: visibilidad nombre: tipo):\nEjemplo: - id: int',
-            currentAttrs.join('\n')
-        );
-        if (attrsString === null) return;
-
-        const methodsString = prompt(
-            'Métodos (uno por línea, formato: visibilidad nombre(params): retorno):\nEjemplo: + getId(): int',
-            currentMethods.join('\n')
-        );
-        if (methodsString === null) return;
-
-        // Actualizar la clase
-        const newAttrs = attrsString.split('\n')
-            .map(attr => attr.trim())
-            .filter(attr => attr.length > 0);
-
-        const newMethods = methodsString.split('\n')
-            .map(method => method.trim())
-            .filter(method => method.length > 0);
-
-        classElement.set({
-            className: newName.trim() || currentName,
-            attributes: newAttrs,
-            methods: newMethods
-        });
-
-        console.log('✅ Clase editada:', newName);
-    }
-
-    editRelationship(linkElement) {
-        const relationshipType = linkElement.get('relationshipType');
-
-        if (relationshipType === 'inheritance') {
-            // Solo permitir editar nombre para herencia
-            const currentName = linkElement.get('relationshipName') || '';
-            const newName = prompt('Nombre de la relación de herencia (opcional):', currentName);
-
-            if (newName !== null && linkElement.setRelationshipName) {
-                linkElement.setRelationshipName(newName.trim());
-            }
-        } else {
-            // Editar multiplicidad y nombre para otras relaciones
-            const currentSourceMult = linkElement.get('sourceMultiplicity') || '1';
-            const currentTargetMult = linkElement.get('targetMultiplicity') || '*';
-            const currentName = linkElement.get('relationshipName') || '';
-
-            const sourceMultiplicity = prompt('Multiplicidad origen:', currentSourceMult);
-            if (sourceMultiplicity === null) return;
-
-            const targetMultiplicity = prompt('Multiplicidad destino:', currentTargetMult);
-            if (targetMultiplicity === null) return;
-
-            const name = prompt('Nombre de la relación (opcional):', currentName);
-            if (name === null) return;
-
-            // Actualizar la relación
-            if (linkElement.setMultiplicity) {
-                linkElement.setMultiplicity(
-                    sourceMultiplicity.trim() || '1',
-                    targetMultiplicity.trim() || '*'
-                );
-            }
-
-            if (name.trim() && linkElement.setRelationshipName) {
-                linkElement.setRelationshipName(name.trim());
-            }
-        }
-
-        console.log('✅ Relación editada:', relationshipType);
     }
 
     onElementClick(elementView, evt, x, y) {
@@ -278,8 +145,20 @@ export class UMLDiagramEditor {
         if (this.selectedTool === 'class') {
             this.createClass(x, y);
         } else if (this.selectedTool === 'select' && this.selectedElement) {
-            // Deseleccionar
             this.selectElement(null);
+        }
+    }
+
+    onLinkClick(linkView, evt, x, y) {
+        if (this.selectedTool === 'select') {
+            this.selectElement(linkView.model);
+        }
+    }
+
+    onElementDoubleClick(elementView, evt) {
+        // Editar cualquier shape estándar como si fuera una clase
+        if (elementView.model.get('type') === 'standard.Rectangle') {
+            this.editClass(elementView.model);
         }
     }
 
@@ -287,203 +166,228 @@ export class UMLDiagramEditor {
         if (!this.firstElementSelected) {
             this.firstElementSelected = element;
             this.highlightElement(element, true, 'orange');
-            console.log(`Primera clase seleccionada para ${this.selectedTool}`);
+            console.log('Primera clase seleccionada para', this.selectedTool);
         } else {
             if (this.firstElementSelected.id !== element.id) {
                 this.createRelationship(this.firstElementSelected, element);
             }
 
-            // Reset
             this.highlightElement(this.firstElementSelected, false);
             this.firstElementSelected = null;
         }
     }
 
     createClass(x, y) {
-        const className = prompt('Nombre de la clase:', 'MiClase');
+        var className = prompt('Nombre de la clase:', 'MiClase');
         if (!className) return;
 
-        // Prompt para atributos básicos
-        const attrsPrompt = `Atributos iniciales para "${className}" (opcional, uno por línea):
-Formato: visibilidad nombre: tipo
-Ejemplo: - id: int
-         + nombre: String`;
-
-        const attrsString = prompt(attrsPrompt, `- id: int\n- ${className.toLowerCase()}Name: String`);
-        const attributes = attrsString ?
-            attrsString.split('\n').map(attr => attr.trim()).filter(attr => attr) :
-            [`- id: int`, `- ${className.toLowerCase()}Name: String`];
-
-        // Prompt para métodos básicos
-        const methodsPrompt = `Métodos iniciales para "${className}" (opcional, uno por línea):
-Formato: visibilidad nombre(parámetros): tipoRetorno
-Ejemplo: + getId(): int
-         + setNombre(nombre: String): void`;
-
-        const methodsString = prompt(methodsPrompt, `+ getId(): int\n+ get${className}Name(): String\n+ set${className}Name(name: String): void`);
-        const methods = methodsString ?
-            methodsString.split('\n').map(method => method.trim()).filter(method => method) :
-            [`+ getId(): int`, `+ get${className}Name(): String`, `+ set${className}Name(name: String): void`];
-
-        const classElement = new joint.shapes.uml.Class({
+        // Usar shape básica de JointJS en lugar de UML personalizada
+        var classElement = new joint.shapes.standard.Rectangle({
             position: { x: x - 100, y: y - 60 },
             size: { width: 200, height: 120 },
-            className: className,
-            attributes: attributes,
-            methods: methods
+            attrs: {
+                body: {
+                    fill: '#dbeafe',
+                    stroke: '#2563eb',
+                    strokeWidth: 2
+                },
+                label: {
+                    text: className + '\n\n- id: int\n- name: String\n\n+ getId(): int\n+ getName(): String',
+                    fontSize: 11,
+                    fontFamily: 'Arial, sans-serif',
+                    fill: '#1e40af'
+                }
+            }
         });
 
         this.graph.addCell(classElement);
         this.updateCanvasInfo();
 
-        // Volver a select después de crear
+        // Volver a select
         this.selectTool('select');
 
         console.log('✅ Clase creada:', className);
     }
 
-    showToolInstructions(tool) {
-        const instructions = {
-            'select': 'Haz clic para seleccionar • Arrastra para mover • Doble clic para editar',
-            'class': 'Haz clic en el canvas para crear una nueva clase',
-            'association': 'Selecciona dos clases para crear una asociación',
-            'inheritance': 'Selecciona clase hijo, luego clase padre',
-            'aggregation': 'Selecciona contenedor, luego contenido (diamante vacío)',
-            'composition': 'Selecciona todo, luego parte (diamante lleno)'
-        };
-
-        // Mostrar en un elemento de instrucciones si existe
-        const instructionsEl = document.getElementById('tool-instructions');
-        if (instructionsEl) {
-            instructionsEl.textContent = instructions[tool] || '';
-        }
-    }
-
     createRelationship(source, target) {
-        const relationships = {
-            'association': joint.shapes.uml.Association,
-            'inheritance': joint.shapes.uml.Inheritance,
-            'aggregation': joint.shapes.uml.Aggregation,
-            'composition': joint.shapes.uml.Composition
-        };
+        var link;
 
-        const RelationshipClass = relationships[this.selectedTool];
-        if (!RelationshipClass) return;
+        // Usar shapes estándar de JointJS en lugar de UML personalizadas
+        switch(this.selectedTool) {
+            case 'association':
+                link = new joint.shapes.standard.Link({
+                    source: { id: source.id },
+                    target: { id: target.id },
+                    attrs: {
+                        line: {
+                            stroke: '#2563eb',
+                            strokeWidth: 2
+                        }
+                    },
+                    labels: [{
+                        attrs: { text: { text: '1' } },
+                        position: { distance: 0.1 }
+                    }, {
+                        attrs: { text: { text: '*' } },
+                        position: { distance: 0.9 }
+                    }]
+                });
+                break;
 
-        const link = new RelationshipClass({
-            source: { id: source.id },
-            target: { id: target.id }
-        });
+            case 'inheritance':
+                link = new joint.shapes.standard.Link({
+                    source: { id: source.id },
+                    target: { id: target.id },
+                    attrs: {
+                        line: {
+                            stroke: '#2563eb',
+                            strokeWidth: 2,
+                            targetMarker: {
+                                type: 'path',
+                                d: 'M 10 -5 0 0 10 5 z',
+                                fill: 'white',
+                                stroke: '#2563eb'
+                            }
+                        }
+                    }
+                });
+                break;
+
+            case 'aggregation':
+                link = new joint.shapes.standard.Link({
+                    source: { id: source.id },
+                    target: { id: target.id },
+                    attrs: {
+                        line: {
+                            stroke: '#2563eb',
+                            strokeWidth: 2,
+                            sourceMarker: {
+                                type: 'path',
+                                d: 'M 10 -5 5 0 10 5 15 0 z',
+                                fill: 'white',
+                                stroke: '#2563eb'
+                            }
+                        }
+                    },
+                    labels: [{
+                        attrs: { text: { text: '1' } },
+                        position: { distance: 0.1 }
+                    }, {
+                        attrs: { text: { text: '*' } },
+                        position: { distance: 0.9 }
+                    }]
+                });
+                break;
+
+            case 'composition':
+                link = new joint.shapes.standard.Link({
+                    source: { id: source.id },
+                    target: { id: target.id },
+                    attrs: {
+                        line: {
+                            stroke: '#2563eb',
+                            strokeWidth: 2,
+                            sourceMarker: {
+                                type: 'path',
+                                d: 'M 10 -5 5 0 10 5 15 0 z',
+                                fill: '#2563eb',
+                                stroke: '#2563eb'
+                            }
+                        }
+                    },
+                    labels: [{
+                        attrs: { text: { text: '1' } },
+                        position: { distance: 0.1 }
+                    }, {
+                        attrs: { text: { text: '*' } },
+                        position: { distance: 0.9 }
+                    }]
+                });
+                break;
+
+            default:
+                console.error('Tipo de relación no soportado:', this.selectedTool);
+                return;
+        }
 
         this.graph.addCell(link);
 
-        // Mostrar diálogo de configuración para relaciones con multiplicidad
+        // Configurar multiplicidad para relaciones que no son herencia
         if (this.selectedTool !== 'inheritance') {
             setTimeout(() => {
-                this.showRelationshipConfigDialog(link);
+                this.promptForMultiplicity(link);
             }, 100);
         }
 
-        console.log(`✅ Relación ${this.selectedTool} creada`);
+        console.log('✅ Relación', this.selectedTool, 'creada');
     }
 
-    showRelationshipConfigDialog(link) {
-        const config = this.promptRelationshipConfig(link.get('relationshipType'));
+    promptForMultiplicity(link) {
+        var sourceMultiplicity = prompt('Multiplicidad origen (1, 0..1, 1..*, *):', '1');
+        if (sourceMultiplicity === null) return;
 
-        if (config) {
-            // Configurar multiplicidad si aplica
-            if (config.sourceMultiplicity && config.targetMultiplicity && link.setMultiplicity) {
-                link.setMultiplicity(config.sourceMultiplicity, config.targetMultiplicity);
-            }
+        var targetMultiplicity = prompt('Multiplicidad destino (1, 0..1, 1..*, *):', '*');
+        if (targetMultiplicity === null) return;
 
-            // Configurar nombre de relación si se proporcionó
-            if (config.name && link.setRelationshipName) {
-                link.setRelationshipName(config.name);
-            }
+        // Actualizar las etiquetas
+        this.updateLinkLabels(link, sourceMultiplicity.trim(), targetMultiplicity.trim());
+    }
+
+    updateLinkLabels(link, sourceText, targetText) {
+        var labels = link.get('labels') || [];
+
+        if (labels.length >= 2) {
+            labels[0].attrs.text.text = sourceText;
+            labels[1].attrs.text.text = targetText;
+
+            link.set('labels', labels);
+            console.log('✅ Multiplicidad actualizada:', sourceText, targetText);
         }
     }
 
-    promptRelationshipConfig(type) {
-        let sourcePrompt, targetPrompt;
+    editClass(classElement) {
+        // Obtener texto actual del label
+        var currentText = classElement.attr('label/text') || '';
+        var lines = currentText.split('\n');
 
-        switch(type) {
-            case 'association':
-                sourcePrompt = 'Multiplicidad origen (1, 0..1, 1..*, *):';
-                targetPrompt = 'Multiplicidad destino (1, 0..1, 1..*, *):';
-                break;
-            case 'aggregation':
-                sourcePrompt = 'Multiplicidad contenedor (típicamente 1):';
-                targetPrompt = 'Multiplicidad contenido (1, *, etc.):';
-                break;
-            case 'composition':
-                sourcePrompt = 'Multiplicidad todo (típicamente 1):';
-                targetPrompt = 'Multiplicidad parte (1, *, etc.):';
-                break;
-            default:
-                return null;
-        }
+        var currentName = lines[0] || 'MiClase';
 
-        const sourceMultiplicity = prompt(sourcePrompt, '1');
-        if (sourceMultiplicity === null) return null;
+        var newName = prompt('Nombre de la clase:', currentName);
+        if (newName === null) return;
 
-        const targetMultiplicity = prompt(targetPrompt, '*');
-        if (targetMultiplicity === null) return null;
+        // Crear nuevo texto para la clase
+        var newText = newName + '\n\n- id: int\n- name: String\n\n+ getId(): int\n+ getName(): String';
 
-        const name = prompt('Nombre de la relación (opcional):');
+        // Actualizar el elemento
+        classElement.attr('label/text', newText);
 
-        return {
-            sourceMultiplicity: sourceMultiplicity.trim() || '1',
-            targetMultiplicity: targetMultiplicity.trim() || '*',
-            name: name ? name.trim() : null
-        };
+        console.log('✅ Clase editada:', newName);
     }
 
     selectElement(element) {
-        // Deseleccionar anterior
         if (this.selectedElement) {
             this.highlightElement(this.selectedElement, false);
         }
 
-        // Seleccionar nuevo
         this.selectedElement = element;
         if (element) {
             this.highlightElement(element, true);
         }
     }
 
-    highlightElement(element, highlight, color = 'blue') {
-        const elementView = this.paper.findViewByModel(element);
+    highlightElement(element, highlight, color) {
+        color = color || 'blue';
+        var elementView = this.paper.findViewByModel(element);
         if (elementView) {
             if (highlight) {
-                elementView.highlight(null, {
-                    highlighter: {
-                        name: 'stroke',
-                        options: {
-                            attrs: {
-                                'stroke': color,
-                                'stroke-width': 3
-                            }
-                        }
-                    }
-                });
+                elementView.highlight();
             } else {
                 elementView.unhighlight();
             }
         }
     }
 
-    // Métodos de zoom (mantener los que ya tienes)
-    zoom(x, y, delta) {
-        const oldZoom = this.currentZoom;
-        const newZoom = Math.max(0.2, Math.min(3, oldZoom + delta * 0.1));
-
-        if (newZoom !== oldZoom) {
-            this.currentZoom = newZoom;
-            this.paper.scale(newZoom, newZoom);
-            this.updateCanvasInfo();
-        }
-    }
-
+    // Métodos de zoom
     zoomIn() {
         this.currentZoom = Math.min(3, this.currentZoom + 0.1);
         this.paper.scale(this.currentZoom, this.currentZoom);
@@ -503,34 +407,38 @@ Ejemplo: + getId(): int
     }
 
     updateCanvasInfo() {
-        const elementCount = this.graph.getElements().length;
-        const zoomPercent = Math.round(this.currentZoom * 100);
+        var elementCount = this.graph.getElements().length;
+        var zoomPercent = Math.round(this.currentZoom * 100);
 
-        const infoElement = document.getElementById('canvas-info');
+        var infoElement = document.getElementById('canvas-info');
         if (infoElement) {
-            infoElement.textContent = `Elementos: ${elementCount} | Zoom: ${zoomPercent}%`;
+            infoElement.textContent = 'Elementos: ' + elementCount + ' | Zoom: ' + zoomPercent + '%';
         }
     }
 
-    // Integración con Livewire para persistencia
+    // Persistencia
     saveDiagram() {
         try {
-            const diagramData = JSON.stringify(this.graph.toJSON());
+            var diagramData = JSON.stringify(this.graph.toJSON());
 
-            // Enviar a Livewire
             if (window.Livewire) {
+                console.log('💾 Guardando diagrama...');
                 window.Livewire.dispatch('save-diagram', [diagramData]);
-                console.log('✅ Diagrama enviado a Livewire para guardar');
+                console.log('✅ Datos enviados a Livewire');
+            } else {
+                console.error('❌ Livewire no disponible');
+                alert('Error: Sistema de guardado no disponible');
             }
         } catch (error) {
             console.error('❌ Error al guardar:', error);
+            alert('Error al guardar el diagrama');
         }
     }
 
     loadDiagramData() {
         if (window.diagramData && window.diagramData !== '[]') {
             try {
-                const data = JSON.parse(window.diagramData);
+                var data = JSON.parse(window.diagramData);
                 if (data.cells && data.cells.length > 0) {
                     this.graph.fromJSON(data);
                     this.updateCanvasInfo();
@@ -549,7 +457,6 @@ Ejemplo: + getId(): int
         this.updateCanvasInfo();
     }
 
-    // Método público para debugging
     getState() {
         return {
             selectedTool: this.selectedTool,
@@ -561,18 +468,7 @@ Ejemplo: + getId(): int
     }
 }
 
-// Inicialización global
-document.addEventListener('DOMContentLoaded', () => {
-    const container = document.getElementById('paper-container');
-    if (container) {
-        const editor = new UMLDiagramEditor();
+// Hacer disponible globalmente
+window.UMLDiagramEditor = UMLDiagramEditor;
 
-        // Hacer accesible globalmente para debugging
-        window.DiagramEditor = {
-            instance: editor,
-            debug: () => editor.getState()
-        };
-
-        console.log('🎯 UML Diagram Editor listo! Usa window.DiagramEditor.debug() para ver estado');
-    }
-});
+export { UMLDiagramEditor };
