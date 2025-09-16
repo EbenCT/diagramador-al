@@ -5,6 +5,7 @@ namespace App\Services;
 
 use App\Models\Diagram;
 use App\Models\DiagramSession;
+use App\Models\Collaborator;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
