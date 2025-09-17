@@ -88,7 +88,7 @@ class DiagramEditor extends Component
      * Guardar diagrama - FUNCIÓN PRINCIPAL
      */
     #[On('save-diagram')]
-    public function saveDiagram($diagramData = null, $settings = null)
+    public function saveDiagram($diagramData = null, $title = null)
     {
         try {
             if (!Auth::check()) {
@@ -102,8 +102,9 @@ class DiagramEditor extends Component
                 $this->updateElementCount($diagramData);
             }
 
-            if ($settings) {
-                $this->settings = array_merge($this->settings, $settings);
+            // Actualizar título si se proporciona
+            if ($title) {
+                $this->diagramTitle = $title;
             }
 
             // Crear o actualizar diagrama
@@ -114,6 +115,8 @@ class DiagramEditor extends Component
                     'title' => $this->diagramTitle,
                     'description' => $this->diagramDescription
                 ]);
+
+                $message = 'Diagrama actualizado exitosamente';
             } else {
                 $this->diagram = $this->diagramService->create([
                     'title' => $this->diagramTitle,
@@ -124,18 +127,23 @@ class DiagramEditor extends Component
 
                 $this->diagramId = $this->diagram->id;
                 $success = true;
+                $message = 'Diagrama creado y guardado exitosamente';
 
-                // Actualizar URL sin recarga
-                $this->dispatch('diagram-created', ['id' => $this->diagram->id]);
+                // Actualizar URL sin recarga y notificar a JavaScript
+                $this->dispatch('diagram-created', [
+                    'id' => $this->diagram->id,
+                    'title' => $this->diagram->title
+                ]);
             }
 
             if ($success) {
                 $this->lastSaved = now();
                 $this->isDirty = false;
-                session()->flash('message', 'Diagrama guardado exitosamente');
+                session()->flash('message', $message);
 
                 Log::info("Diagram saved successfully", [
                     'diagram_id' => $this->diagram->id,
+                    'title' => $this->diagramTitle,
                     'elements_count' => $this->elementCount
                 ]);
             } else {
@@ -364,7 +372,10 @@ class DiagramEditor extends Component
             'stats' => $this->getStats(),
             'canExport' => $this->diagram && !empty($this->diagramData) && $this->diagramData !== '[]',
             'hasChanges' => $this->isDirty,
-            'isNewDiagram' => !$this->diagram
+            'isNewDiagram' => !$this->diagram,
+            'diagramId' => $this->diagramId,
+            'diagramData' => $this->diagramData,
+            'diagramTitle' => $this->diagramTitle
         ]);
     }
 }

@@ -13,7 +13,7 @@
                 {{-- Solo botones que SÍ necesitan Livewire --}}
                 <div class="flex items-center space-x-2">
                     <button
-                        wire:click="saveDiagram"
+                        onclick="saveFromButton()"
                         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         💾 Guardar
                     </button>
@@ -59,7 +59,7 @@
             {{-- Container para toolbar generado por JavaScript --}}
             <div id="js-toolbar" class="flex-1">
                 {{-- El JavaScript creará los botones aquí --}}
-                <div class="p-4 text-center text-gray-500 text-sm">
+                <div class="p-4 text-center text-gray-500 text-sm" id="loading-toolbar">
                     <div class="animate-pulse">Cargando herramientas...</div>
                 </div>
             </div>
@@ -160,31 +160,57 @@
         </div>
     @endif
 
-    {{-- Datos para JavaScript - SOLO datos necesarios --}}
+    {{-- Scripts simplificados --}}
     <script>
-        // Datos del servidor para JavaScript
+        // Datos del diagrama para JavaScript
         window.diagramData = @json($diagramData);
+        window.diagramId = {{ $diagramId ?? 'null' }};
+        window.diagramTitle = @json($diagramTitle ?? 'Nuevo Diagrama UML');
 
-        // Estado inicial
-        document.addEventListener('DOMContentLoaded', function() {
-            // Actualizar indicador de herramienta actual
-            const updateCurrentTool = () => {
-                const toolEl = document.getElementById('current-tool');
-                if (toolEl && window.DiagramEditor?.instance) {
-                    toolEl.textContent = window.DiagramEditor.instance.selectedTool;
-                }
-            };
-
-            // Actualizar cada segundo
-            setInterval(updateCurrentTool, 1000);
-
-            // Indicar que JS está cargado
-            setTimeout(() => {
-                const statusEl = document.getElementById('editor-status');
-                if (statusEl) {
-                    statusEl.className = 'w-2 h-2 bg-green-500 rounded-full';
-                }
-            }, 1000);
+        console.log('📊 Datos del template:', {
+            hasData: window.diagramData !== '[]',
+            diagramId: window.diagramId,
+            title: window.diagramTitle,
+            dataLength: window.diagramData.length
         });
+
+        // Función simple para guardar desde botón
+        function saveFromButton() {
+            console.log('💾 Guardado desde botón...');
+
+            if (window.DiagramEditor && window.DiagramEditor.instance) {
+                window.DiagramEditor.instance.saveDiagram();
+            } else {
+                console.error('❌ Editor no disponible');
+                alert('Editor no está listo');
+            }
+        }
+
+        // Función para limpiar desde botón
+        function clearFromButton() {
+            if (window.DiagramEditor && window.DiagramEditor.instance) {
+                if (confirm('¿Estás seguro de limpiar todo el diagrama?')) {
+                    window.DiagramEditor.instance.clearDiagram();
+                }
+            }
+        }
+
+        // Escuchar cuando se crea un diagrama para actualizar la URL
+        window.addEventListener('diagram-created', function(event) {
+            console.log('🆕 Diagrama creado:', event.detail);
+
+            // Actualizar variables globales
+            window.currentDiagramId = event.detail.id;
+            window.currentDiagramTitle = event.detail.title;
+
+            // Actualizar URL sin recargar
+            var newUrl = '/diagrams/editor/' + event.detail.id;
+            window.history.pushState({}, '', newUrl);
+
+            // Actualizar título de la página
+            document.title = event.detail.title + ' - Editor UML';
+        });
+
+        console.log('✅ Template Livewire scripts cargados');
     </script>
 </div>
