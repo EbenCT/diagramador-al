@@ -1,8 +1,8 @@
-// resources/js/diagram/editor.js - VERSIÓN SIN SHAPES PERSONALIZADAS
+// resources/js/diagram/editor.js - VERSIÓN CORREGIDA
 import * as joint from 'jointjs';
 
-// Usar las shapes que YA VIENEN con JointJS
-// No definir nuestras propias shapes
+// Configurar JointJS correctamente
+joint.config.useCSSSelectors = true;
 
 class UMLDiagramEditor {
     constructor() {
@@ -67,167 +67,409 @@ class UMLDiagramEditor {
     }
 
     setupEventListeners() {
-        // Zoom controls
-        var zoomIn = document.getElementById('zoom-in');
-        var zoomOut = document.getElementById('zoom-out');
-        var zoomFit = document.getElementById('zoom-fit');
-
-        if (zoomIn) zoomIn.addEventListener('click', () => this.zoomIn());
-        if (zoomOut) zoomOut.addEventListener('click', () => this.zoomOut());
-        if (zoomFit) zoomFit.addEventListener('click', () => this.zoomToFit());
-
-        // Keyboard shortcuts
+        // Shortcuts de teclado
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 's') {
                 e.preventDefault();
                 this.saveDiagram();
-            }
-
-            // Herramientas rápidas sin modificadores
-            if (!e.ctrlKey && !e.altKey && !e.metaKey) {
-                switch(e.key) {
-                    case '1': this.selectTool('select'); break;
-                    case '2': this.selectTool('class'); break;
-                    case '3': this.selectTool('association'); break;
-                    case '4': this.selectTool('inheritance'); break;
-                    case '5': this.selectTool('aggregation'); break;
-                    case '6': this.selectTool('composition'); break;
-                }
+            } else if (e.key === 'Delete' && this.selectedElement) {
+                this.deleteElement();
+            } else if (e.key === 'Escape') {
+                this.cancelOperation();
             }
         });
 
         console.log('✅ Event listeners configurados');
     }
 
+    // ==================== SELECCIÓN DE HERRAMIENTAS ====================
+
     selectTool(tool) {
-        console.log('🔧 Herramienta seleccionada:', tool);
-
         this.selectedTool = tool;
-        this.relationshipMode = ['association', 'inheritance', 'aggregation', 'composition'].includes(tool);
-        this.firstElementSelected = null;
 
-        // Actualizar interactividad
-        this.paper.setInteractivity(tool === 'select');
-
-        // Actualizar cursor del canvas
-        var paperEl = document.querySelector('.joint-paper');
-        if (paperEl) {
-            paperEl.setAttribute('data-tool', tool);
+        // Resetear estados
+        if (this.firstElementSelected) {
+            this.highlightElement(this.firstElementSelected, false);
+            this.firstElementSelected = null;
         }
 
-        // Mostrar instrucciones
-        this.showToolInstructions(tool);
+        // Cambiar cursor del paper
+        var paperEl = this.paper.el;
+        paperEl.style.cursor = 'default';
 
-        console.log('✅ Tool cambiado a:', tool);
-    }
-
-    showToolInstructions(tool) {
-        var instructions = {
-            'select': 'Haz clic para seleccionar • Arrastra para mover • Doble clic para editar elemento o relación',
-            'class': 'Haz clic en el canvas para crear una nueva clase',
-            'association': 'Selecciona dos clases para crear una asociación • Doble clic en la línea para editar',
-            'inheritance': 'Selecciona clase hijo, luego clase padre • Doble clic en la línea para agregar nombre',
-            'aggregation': 'Selecciona contenedor, luego contenido • Doble clic en la línea para editar',
-            'composition': 'Selecciona todo, luego parte • Doble clic en la línea para editar'
-        };
-
-        var instructionsEl = document.getElementById('tool-instructions');
-        if (instructionsEl) {
-            instructionsEl.textContent = instructions[tool] || '';
+        if (tool === 'class' || tool === 'interface') {
+            paperEl.style.cursor = 'crosshair';
         }
+
+        // Actualizar UI de herramientas
+        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`[data-tool="${tool}"]`)?.classList.add('active');
+
+        console.log('🔧 Herramienta seleccionada:', tool);
     }
 
-    onElementClick(elementView, evt, x, y) {
+    // ==================== EVENTOS DEL PAPER ====================
+
+    onElementClick(elementView, evt) {
+        evt.stopPropagation();
+
         if (this.selectedTool === 'select') {
             this.selectElement(elementView.model);
-            return;
-        }
-
-        if (this.relationshipMode) {
+        } else if (['association', 'aggregation', 'composition', 'inheritance'].includes(this.selectedTool)) {
             this.handleRelationshipClick(elementView.model);
         }
     }
 
-    onBlankClick(evt, x, y) {
+    onBlankClick(evt) {
         if (this.selectedTool === 'class') {
-            this.createClass(x, y);
-        } else if (this.selectedTool === 'select' && this.selectedElement) {
-            this.selectElement(null);
+            var point = this.paper.clientToLocalPoint(evt.clientX, evt.clientY);
+            this.createClass(point.x, point.y);
+        } else if (this.selectedTool === 'interface') {
+            var point = this.paper.clientToLocalPoint(evt.clientX, evt.clientY);
+            this.createInterface(point.x, point.y);
+        }
+
+        // Deseleccionar elemento
+        this.selectElement(null);
+    }
+
+    onElementDoubleClick(elementView, evt) {
+        // Editar clase/interface
+        if (elementView.model.get('type') === 'standard.Rectangle') {
+            this.editClass(elementView.model);
         }
     }
 
-    onLinkClick(linkView, evt, x, y) {
+    onLinkClick(linkView, evt) {
+        evt.stopPropagation();
         if (this.selectedTool === 'select') {
             this.selectElement(linkView.model);
         }
     }
 
     onLinkDoubleClick(linkView, evt) {
-        // Editar relación al hacer doble click
+        // Editar relación
         this.editRelationship(linkView.model);
     }
 
-    editRelationship(link) {
-        console.log('✏️ Editando relación...');
+    // ==================== CREACIÓN DE ELEMENTOS ====================
 
-        // Obtener datos actuales de la relación
-        var relationData = link.get('relationData') || {};
-        var currentType = relationData.type || 'association';
+    createClass(x, y) {
+        var className = prompt('Nombre de la clase:', 'MiClase');
+        if (!className) return;
 
-        // Obtener multiplicidad actual de las etiquetas
-        var labels = link.get('labels') || [];
-        var sourceMultiplicity = '1';
-        var targetMultiplicity = '*';
-        var relationName = relationData.name || '';
+        // Prompts para atributos y métodos
+        var attributes = prompt(
+            'Atributos (uno por línea, formato: visibilidad nombre: tipo)\nEjemplo: - id: int',
+            '- id: int\n- ' + className.toLowerCase() + 'Name: String'
+        );
 
-        if (labels.length >= 2) {
-            sourceMultiplicity = labels[0].attrs.text.text || '1';
-            targetMultiplicity = labels[1].attrs.text.text || '*';
+        var methods = prompt(
+            'Métodos (uno por línea, formato: visibilidad nombre(params): retorno)\nEjemplo: + getId(): int',
+            '+ getId(): int\n+ get' + className + 'Name(): String\n+ set' + className + 'Name(name: String): void'
+        );
+
+        // Procesar líneas
+        var attrLines = attributes ?
+            attributes.split('\n').filter(line => line.trim()) : [];
+        var methodLines = methods ?
+            methods.split('\n').filter(line => line.trim()) : [];
+
+        // Construir el texto completo de la clase
+        var classText = className;
+        if (attrLines.length > 0) {
+            classText += '\n\n' + attrLines.join('\n');
+        }
+        if (methodLines.length > 0) {
+            classText += '\n\n' + methodLines.join('\n');
         }
 
-        // Si hay nombre de relación, está en la etiqueta del medio
-        if (labels.length >= 3) {
-            relationName = labels[2].attrs.text.text || '';
-        }
-
-        console.log('📊 Datos actuales:', {
-            type: currentType,
-            source: sourceMultiplicity,
-            target: targetMultiplicity,
-            name: relationName
+        // USAR LA FORMA CORRECTA DE CREAR ELEMENTOS JOINTJS
+        var classElement = new joint.shapes.standard.Rectangle({
+            position: { x: x - 110, y: y - 60 },
+            size: {
+                width: 220,
+                height: Math.max(120, 40 + (attrLines.length + methodLines.length) * 15)
+            },
+            attrs: {
+                body: {
+                    stroke: '#2563eb',
+                    fill: '#f8fafc',
+                    strokeWidth: 2,
+                    rx: 3,
+                    ry: 3
+                },
+                label: {
+                    text: classText,
+                    fontSize: 11,
+                    fontFamily: 'Consolas, monospace',
+                    fill: '#1e40af',
+                    textVerticalAnchor: 'top',
+                    textAnchor: 'start',
+                    x: 10,
+                    y: 10
+                }
+            },
+            // Datos custom para edición
+            umlData: {
+                className: className,
+                attributes: attrLines,
+                methods: methodLines,
+                type: 'class'
+            }
         });
 
-        // Prompts para editar (solo multiplicidad para herencia no tiene sentido)
-        if (currentType !== 'inheritance') {
-            var newSourceMult = prompt('Multiplicidad origen (1, 0..1, 1..*, *):', sourceMultiplicity);
-            if (newSourceMult === null) return;
+        this.graph.addCell(classElement);
+        this.updateCanvasInfo();
 
-            var newTargetMult = prompt('Multiplicidad destino (1, 0..1, 1..*, *):', targetMultiplicity);
-            if (newTargetMult === null) return;
+        // Volver a select
+        this.selectTool('select');
 
-            // Actualizar multiplicidad
-            this.updateLinkLabels(link, newSourceMult.trim(), newTargetMult.trim());
-        }
-
-        // Prompt para nombre de relación (para todos los tipos)
-        var newName = prompt('Nombre de la relación (opcional):', relationName);
-        if (newName !== null) {
-            this.setRelationshipName(link, newName.trim());
-        }
-
-        console.log('✅ Relación editada');
+        console.log('✅ Clase creada:', className, 'con', attrLines.length, 'atributos y', methodLines.length, 'métodos');
     }
 
-    setRelationshipName(link, name) {
-        var labels = link.get('labels') || [];
+    createInterface(x, y) {
+        var interfaceName = prompt('Nombre de la interfaz:', 'IInterfaz');
+        if (!interfaceName) return;
 
-        // Quitar etiqueta de nombre anterior si existe
-        labels = labels.filter(function(label, index) {
-            return index < 2; // Mantener solo multiplicidad (primeras 2 etiquetas)
+        var methods = prompt(
+            'Métodos (uno por línea, solo declaraciones)\nEjemplo: + metodo(): tipo',
+            '+ ' + interfaceName.toLowerCase().replace('i', '') + '(): void'
+        );
+
+        var methodLines = methods ?
+            methods.split('\n').filter(line => line.trim()) : [];
+
+        var interfaceText = '<<interface>>\n' + interfaceName;
+        if (methodLines.length > 0) {
+            interfaceText += '\n\n' + methodLines.join('\n');
+        }
+
+        var interfaceElement = new joint.shapes.standard.Rectangle({
+            position: { x: x - 110, y: y - 60 },
+            size: {
+                width: 220,
+                height: Math.max(120, 60 + methodLines.length * 15)
+            },
+            attrs: {
+                body: {
+                    stroke: '#7c3aed',
+                    fill: '#faf5ff',
+                    strokeWidth: 2,
+                    strokeDasharray: '5,5',
+                    rx: 3,
+                    ry: 3
+                },
+                label: {
+                    text: interfaceText,
+                    fontSize: 11,
+                    fontFamily: 'Consolas, monospace',
+                    fill: '#7c3aed',
+                    textVerticalAnchor: 'top',
+                    textAnchor: 'start',
+                    x: 10,
+                    y: 10
+                }
+            },
+            umlData: {
+                className: interfaceName,
+                attributes: [],
+                methods: methodLines,
+                type: 'interface'
+            }
         });
 
-        // Agregar nueva etiqueta de nombre si se proporciona
-        if (name && name.length > 0) {
+        this.graph.addCell(interfaceElement);
+        this.updateCanvasInfo();
+        this.selectTool('select');
+
+        console.log('✅ Interfaz creada:', interfaceName);
+    }
+
+    // ==================== CREACIÓN DE RELACIONES ====================
+
+    handleRelationshipClick(element) {
+        if (!this.firstElementSelected) {
+            this.firstElementSelected = element;
+            this.highlightElement(element, true, 'orange');
+            console.log('Primera clase seleccionada para', this.selectedTool);
+        } else {
+            if (this.firstElementSelected.id !== element.id) {
+                this.createRelationship(this.firstElementSelected, element);
+            }
+
+            this.highlightElement(this.firstElementSelected, false);
+            this.firstElementSelected = null;
+            this.selectTool('select');
+        }
+    }
+
+    createRelationship(source, target) {
+        var link;
+
+        switch(this.selectedTool) {
+            case 'association':
+                // Prompts para multiplicidad y nombre
+                var sourceMultiplicity = prompt('Multiplicidad origen (1, 0..1, 1..*, *):', '1');
+                if (sourceMultiplicity === null) return;
+
+                var targetMultiplicity = prompt('Multiplicidad destino (1, 0..1, 1..*, *):', '1..*');
+                if (targetMultiplicity === null) return;
+
+                var relationName = prompt('Nombre de la relación (opcional):', 'posee');
+
+                link = new joint.shapes.standard.Link({
+                    source: { id: source.id },
+                    target: { id: target.id },
+                    attrs: {
+                        line: {
+                            stroke: '#2563eb',
+                            strokeWidth: 2
+                        }
+                    },
+                    labels: this.createRelationLabels(sourceMultiplicity, targetMultiplicity, relationName),
+                    relationData: {
+                        type: 'association',
+                        sourceMultiplicity: sourceMultiplicity,
+                        targetMultiplicity: targetMultiplicity,
+                        name: relationName
+                    }
+                });
+                break;
+
+            case 'inheritance':
+                link = new joint.shapes.standard.Link({
+                    source: { id: source.id },
+                    target: { id: target.id },
+                    attrs: {
+                        line: {
+                            stroke: '#2563eb',
+                            strokeWidth: 2,
+                            targetMarker: {
+                                type: 'path',
+                                d: 'M 10 -5 0 0 10 5 z',
+                                fill: 'white',
+                                stroke: '#2563eb',
+                                strokeWidth: 2
+                            }
+                        }
+                    },
+                    relationData: { type: 'inheritance' }
+                });
+                break;
+
+            case 'aggregation':
+                var sourceMultiplicity = prompt('Multiplicidad origen (1, 0..1, 1..*, *):', '1');
+                if (sourceMultiplicity === null) return;
+                var targetMultiplicity = prompt('Multiplicidad destino (1, 0..1, 1..*, *):', '*');
+                if (targetMultiplicity === null) return;
+                var relationName = prompt('Nombre de la relación (opcional):', 'tiene');
+
+                link = new joint.shapes.standard.Link({
+                    source: { id: source.id },
+                    target: { id: target.id },
+                    attrs: {
+                        line: {
+                            stroke: '#2563eb',
+                            strokeWidth: 2,
+                            sourceMarker: {
+                                type: 'path',
+                                d: 'M 15 -6 8 0 15 6 22 0 z',
+                                fill: 'white',
+                                stroke: '#2563eb',
+                                strokeWidth: 2
+                            }
+                        }
+                    },
+                    labels: this.createRelationLabels(sourceMultiplicity, targetMultiplicity, relationName),
+                    relationData: {
+                        type: 'aggregation',
+                        sourceMultiplicity: sourceMultiplicity,
+                        targetMultiplicity: targetMultiplicity,
+                        name: relationName
+                    }
+                });
+                break;
+
+            case 'composition':
+                var sourceMultiplicity = prompt('Multiplicidad origen (1, 0..1, 1..*, *):', '1');
+                if (sourceMultiplicity === null) return;
+                var targetMultiplicity = prompt('Multiplicidad destino (1, 0..1, 1..*, *):', '*');
+                if (targetMultiplicity === null) return;
+                var relationName = prompt('Nombre de la relación (opcional):', 'contiene');
+
+                link = new joint.shapes.standard.Link({
+                    source: { id: source.id },
+                    target: { id: target.id },
+                    attrs: {
+                        line: {
+                            stroke: '#2563eb',
+                            strokeWidth: 2,
+                            sourceMarker: {
+                                type: 'path',
+                                d: 'M 15 -6 8 0 15 6 22 0 z',
+                                fill: '#2563eb',
+                                stroke: '#2563eb',
+                                strokeWidth: 2
+                            }
+                        }
+                    },
+                    labels: this.createRelationLabels(sourceMultiplicity, targetMultiplicity, relationName),
+                    relationData: {
+                        type: 'composition',
+                        sourceMultiplicity: sourceMultiplicity,
+                        targetMultiplicity: targetMultiplicity,
+                        name: relationName
+                    }
+                });
+                break;
+
+            default:
+                console.error('Tipo de relación no soportado:', this.selectedTool);
+                return;
+        }
+
+        this.graph.addCell(link);
+        this.updateCanvasInfo();
+
+        console.log('✅ Relación', this.selectedTool, 'creada');
+    }
+
+    createRelationLabels(sourceMultiplicity, targetMultiplicity, name) {
+        var labels = [];
+
+        // Multiplicidad origen
+        if (sourceMultiplicity) {
+            labels.push({
+                attrs: {
+                    text: {
+                        text: sourceMultiplicity,
+                        fill: '#2563eb',
+                        fontSize: 12,
+                        fontWeight: 'bold'
+                    }
+                },
+                position: { distance: 0.1, offset: 15 }
+            });
+        }
+
+        // Multiplicidad destino
+        if (targetMultiplicity) {
+            labels.push({
+                attrs: {
+                    text: {
+                        text: targetMultiplicity,
+                        fill: '#2563eb',
+                        fontSize: 12,
+                        fontWeight: 'bold'
+                    }
+                },
+                position: { distance: 0.9, offset: 15 }
+            });
+        }
+
+        // Nombre de la relación
+        if (name && name.trim()) {
             labels.push({
                 attrs: {
                     text: {
@@ -249,377 +491,151 @@ class UMLDiagramEditor {
             });
         }
 
-        link.set('labels', labels);
-
-        // Guardar datos de la relación
-        var relationData = link.get('relationData') || {};
-        relationData.name = name;
-        link.set('relationData', relationData);
-
-        console.log('✅ Nombre de relación actualizado:', name);
+        return labels;
     }
 
-    onElementDoubleClick(elementView, evt) {
-        // Editar cualquier shape estándar como si fuera una clase
-        if (elementView.model.get('type') === 'standard.Rectangle') {
-            this.editClass(elementView.model);
-        }
-    }
+    // ==================== EDICIÓN DE ELEMENTOS ====================
 
-    handleRelationshipClick(element) {
-        if (!this.firstElementSelected) {
-            this.firstElementSelected = element;
-            this.highlightElement(element, true, 'orange');
-            console.log('Primera clase seleccionada para', this.selectedTool);
-        } else {
-            if (this.firstElementSelected.id !== element.id) {
-                this.createRelationship(this.firstElementSelected, element);
-            }
+    editClass(element) {
+        var umlData = element.get('umlData') || {};
+        var currentName = umlData.className || 'Clase';
+        var currentAttrs = umlData.attributes || [];
+        var currentMethods = umlData.methods || [];
 
-            this.highlightElement(this.firstElementSelected, false);
-            this.firstElementSelected = null;
-        }
-    }
-
-    createClass(x, y) {
-        var className = prompt('Nombre de la clase:', 'MiClase');
-        if (!className) return;
-
-        // Prompts para atributos y métodos
-        var attributes = prompt(
-            'Atributos (uno por línea, formato: visibilidad nombre: tipo)\nEjemplo: - id: int',
-            '- id: int\n- ' + className.toLowerCase() + 'Name: String'
-        );
-
-        var methods = prompt(
-            'Métodos (uno por línea, formato: visibilidad nombre(params): retorno)\nEjemplo: + getId(): int',
-            '+ getId(): int\n+ get' + className + 'Name(): String\n+ set' + className + 'Name(name: String): void'
-        );
-
-        // Procesar atributos y métodos
-        var attrLines = attributes ? attributes.split('\n').filter(line => line.trim()) : [];
-        var methodLines = methods ? methods.split('\n').filter(line => line.trim()) : [];
-
-        // Construir el texto completo de la clase
-        var classText = className;
-        if (attrLines.length > 0) {
-            classText += '\n\n' + attrLines.join('\n');
-        }
-        if (methodLines.length > 0) {
-            classText += '\n\n' + methodLines.join('\n');
-        }
-
-        // Usar shape estándar con mejor apariencia UML
-        var classElement = new joint.shapes.standard.Rectangle({
-            position: { x: x - 100, y: y - 60 },
-            size: { width: 220, height: Math.max(120, 40 + (attrLines.length + methodLines.length) * 15) },
-            attrs: {
-                body: {
-                    fill: '#f8fafc',
-                    stroke: '#2563eb',
-                    strokeWidth: 2,
-                    rx: 3,
-                    ry: 3
-                },
-                label: {
-                    text: classText,
-                    fontSize: 11,
-                    fontFamily: 'Consolas, monospace',
-                    fill: '#1e40af',
-                    textVerticalAnchor: 'top',
-                    textAnchor: 'start',
-                    x: 10,
-                    y: 10
-                }
-            },
-            // Datos custom para edición
-            umlData: {
-                className: className,
-                attributes: attrLines,
-                methods: methodLines
-            }
-        });
-
-        this.graph.addCell(classElement);
-        this.updateCanvasInfo();
-
-        // Volver a select
-        this.selectTool('select');
-
-        console.log('✅ Clase creada:', className, 'con', attrLines.length, 'atributos y', methodLines.length, 'métodos');
-    }
-
-    createRelationship(source, target) {
-        var link;
-
-        // Usar shapes estándar de JointJS con mejor apariencia
-        switch(this.selectedTool) {
-            case 'association':
-                link = new joint.shapes.standard.Link({
-                    source: { id: source.id },
-                    target: { id: target.id },
-                    attrs: {
-                        line: {
-                            stroke: '#2563eb',
-                            strokeWidth: 2
-                        }
-                    },
-                    labels: [{
-                        attrs: { text: { text: '1', fill: '#2563eb', fontSize: 12, fontWeight: 'bold' } },
-                        position: { distance: 0.1, offset: 15 }
-                    }, {
-                        attrs: { text: { text: '*', fill: '#2563eb', fontSize: 12, fontWeight: 'bold' } },
-                        position: { distance: 0.9, offset: 15 }
-                    }],
-                    relationData: { type: 'association' }
-                });
-                break;
-
-            case 'inheritance':
-                link = new joint.shapes.standard.Link({
-                    source: { id: source.id },
-                    target: { id: target.id },
-                    attrs: {
-                        line: {
-                            stroke: '#2563eb',
-                            strokeWidth: 2,
-                            targetMarker: {
-                                type: 'path',
-                                d: 'M 15 -8 0 0 15 8 z',
-                                fill: 'white',
-                                stroke: '#2563eb',
-                                strokeWidth: 2
-                            }
-                        }
-                    },
-                    relationData: { type: 'inheritance' }
-                });
-                break;
-
-            case 'aggregation':
-                link = new joint.shapes.standard.Link({
-                    source: { id: source.id },
-                    target: { id: target.id },
-                    attrs: {
-                        line: {
-                            stroke: '#2563eb',
-                            strokeWidth: 2,
-                            sourceMarker: {
-                                type: 'path',
-                                d: 'M 15 -6 8 0 15 6 22 0 z',
-                                fill: 'white',
-                                stroke: '#2563eb',
-                                strokeWidth: 2
-                            }
-                        }
-                    },
-                    labels: [{
-                        attrs: { text: { text: '1', fill: '#2563eb', fontSize: 12, fontWeight: 'bold' } },
-                        position: { distance: 0.1, offset: 15 }
-                    }, {
-                        attrs: { text: { text: '*', fill: '#2563eb', fontSize: 12, fontWeight: 'bold' } },
-                        position: { distance: 0.9, offset: 15 }
-                    }],
-                    relationData: { type: 'aggregation' }
-                });
-                break;
-
-            case 'composition':
-                link = new joint.shapes.standard.Link({
-                    source: { id: source.id },
-                    target: { id: target.id },
-                    attrs: {
-                        line: {
-                            stroke: '#2563eb',
-                            strokeWidth: 2,
-                            sourceMarker: {
-                                type: 'path',
-                                d: 'M 15 -6 8 0 15 6 22 0 z',
-                                fill: '#2563eb',
-                                stroke: '#2563eb',
-                                strokeWidth: 2
-                            }
-                        }
-                    },
-                    labels: [{
-                        attrs: { text: { text: '1', fill: '#2563eb', fontSize: 12, fontWeight: 'bold' } },
-                        position: { distance: 0.1, offset: 15 }
-                    }, {
-                        attrs: { text: { text: '*', fill: '#2563eb', fontSize: 12, fontWeight: 'bold' } },
-                        position: { distance: 0.9, offset: 15 }
-                    }],
-                    relationData: { type: 'composition' }
-                });
-                break;
-
-            default:
-                console.error('Tipo de relación no soportado:', this.selectedTool);
-                return;
-        }
-
-        this.graph.addCell(link);
-
-        // Configurar multiplicidad para relaciones que no son herencia
-        if (this.selectedTool !== 'inheritance') {
-            setTimeout(() => {
-                this.promptForMultiplicity(link);
-            }, 100);
-        }
-
-        console.log('✅ Relación', this.selectedTool, 'creada');
-    }
-
-    promptForMultiplicity(link) {
-        var sourceMultiplicity = prompt('Multiplicidad origen (1, 0..1, 1..*, *):', '1');
-        if (sourceMultiplicity === null) return;
-
-        var targetMultiplicity = prompt('Multiplicidad destino (1, 0..1, 1..*, *):', '*');
-        if (targetMultiplicity === null) return;
-
-        var relationName = prompt('Nombre de la relación (opcional):', '');
-
-        // Actualizar las etiquetas
-        this.updateLinkLabels(link, sourceMultiplicity.trim(), targetMultiplicity.trim());
-
-        // Agregar nombre si se proporcionó
-        if (relationName && relationName.trim()) {
-            this.setRelationshipName(link, relationName.trim());
-        }
-
-        console.log('✅ Relación configurada con multiplicidad y nombre');
-    }
-
-    updateLinkLabels(link, sourceText, targetText) {
-        var labels = link.get('labels') || [];
-
-        // Mantener solo las primeras 2 etiquetas (multiplicidad) y cualquier etiqueta de nombre
-        var nameLabel = null;
-        if (labels.length >= 3) {
-            nameLabel = labels[2]; // Guardar etiqueta de nombre si existe
-        }
-
-        // Crear nuevas etiquetas de multiplicidad
-        var newLabels = [{
-            attrs: { text: { text: sourceText, fill: '#2563eb', fontSize: 12, fontWeight: 'bold' } },
-            position: { distance: 0.1, offset: 15 }
-        }, {
-            attrs: { text: { text: targetText, fill: '#2563eb', fontSize: 12, fontWeight: 'bold' } },
-            position: { distance: 0.9, offset: 15 }
-        }];
-
-        // Agregar etiqueta de nombre si existía
-        if (nameLabel) {
-            newLabels.push(nameLabel);
-        }
-
-        link.set('labels', newLabels);
-
-        // Guardar datos de multiplicidad
-        var relationData = link.get('relationData') || {};
-        relationData.sourceMultiplicity = sourceText;
-        relationData.targetMultiplicity = targetText;
-        link.set('relationData', relationData);
-
-        console.log('✅ Multiplicidad actualizada:', sourceText, '←→', targetText);
-    }
-
-    editClass(classElement) {
-        // Obtener datos UML guardados o extraer del texto actual
-        var umlData = classElement.get('umlData');
-        var currentName, currentAttrs, currentMethods;
-
-        if (umlData) {
-            currentName = umlData.className;
-            currentAttrs = umlData.attributes || [];
-            currentMethods = umlData.methods || [];
-        } else {
-            // Extraer del texto actual (para compatibilidad)
-            var currentText = classElement.attr('label/text') || '';
-            var lines = currentText.split('\n');
-            currentName = lines[0] || 'MiClase';
-            currentAttrs = ['- id: int', '- name: String'];
-            currentMethods = ['+ getId(): int', '+ getName(): String'];
-        }
-
-        // Prompts de edición
         var newName = prompt('Nombre de la clase:', currentName);
-        if (newName === null) return;
+        if (!newName) return;
 
-        var attrsString = prompt(
-            'Atributos (uno por línea):\nFormato: visibilidad nombre: tipo\nEjemplo: - id: int',
+        var newAttrs = prompt(
+            'Atributos (uno por línea):',
             currentAttrs.join('\n')
         );
-        if (attrsString === null) return;
 
-        var methodsString = prompt(
-            'Métodos (uno por línea):\nFormato: visibilidad nombre(params): retorno\nEjemplo: + getId(): int',
+        var newMethods = prompt(
+            'Métodos (uno por línea):',
             currentMethods.join('\n')
         );
-        if (methodsString === null) return;
 
-        // Procesar nuevos datos
-        var newAttrs = attrsString.split('\n').map(line => line.trim()).filter(line => line);
-        var newMethods = methodsString.split('\n').map(line => line.trim()).filter(line => line);
-
-        // Construir nuevo texto
-        var newText = newName;
-        if (newAttrs.length > 0) {
-            newText += '\n\n' + newAttrs.join('\n');
-        }
-        if (newMethods.length > 0) {
-            newText += '\n\n' + newMethods.join('\n');
-        }
+        // Procesar líneas
+        var attrLines = newAttrs ?
+            newAttrs.split('\n').filter(line => line.trim()) : [];
+        var methodLines = newMethods ?
+            newMethods.split('\n').filter(line => line.trim()) : [];
 
         // Actualizar elemento
-        classElement.attr('label/text', newText);
+        var newText = newName;
+        if (attrLines.length > 0) {
+            newText += '\n\n' + attrLines.join('\n');
+        }
+        if (methodLines.length > 0) {
+            newText += '\n\n' + methodLines.join('\n');
+        }
 
-        // Ajustar tamaño basado en contenido
-        var newHeight = Math.max(120, 40 + (newAttrs.length + newMethods.length) * 15);
-        classElement.resize(220, newHeight);
+        // Actualizar altura según contenido
+        var newHeight = Math.max(120, 40 + (attrLines.length + methodLines.length) * 15);
 
-        // Guardar datos UML para futuras ediciones
-        classElement.set('umlData', {
+        element.attr('label/text', newText);
+        element.resize(220, newHeight);
+
+        // Actualizar datos UML
+        element.set('umlData', {
             className: newName,
-            attributes: newAttrs,
-            methods: newMethods
+            attributes: attrLines,
+            methods: methodLines,
+            type: umlData.type || 'class'
         });
 
-        console.log('✅ Clase editada:', newName, 'con', newAttrs.length, 'atributos y', newMethods.length, 'métodos');
+        console.log('✅ Clase editada:', newName);
     }
 
+    editRelationship(link) {
+        var relationData = link.get('relationData') || {};
+        var currentSource = relationData.sourceMultiplicity || '1';
+        var currentTarget = relationData.targetMultiplicity || '*';
+        var currentName = relationData.name || '';
+
+        if (relationData.type === 'inheritance') {
+            alert('Las relaciones de herencia no tienen multiplicidad editable');
+            return;
+        }
+
+        var newSource = prompt('Multiplicidad origen:', currentSource);
+        if (newSource === null) return;
+
+        var newTarget = prompt('Multiplicidad destino:', currentTarget);
+        if (newTarget === null) return;
+
+        var newName = prompt('Nombre de la relación:', currentName);
+        if (newName === null) return;
+
+        // Actualizar labels
+        var newLabels = this.createRelationLabels(newSource, newTarget, newName);
+        link.set('labels', newLabels);
+
+        // Actualizar datos
+        relationData.sourceMultiplicity = newSource;
+        relationData.targetMultiplicity = newTarget;
+        relationData.name = newName;
+        link.set('relationData', relationData);
+
+        console.log('✅ Relación editada');
+    }
+
+    // ==================== SELECCIÓN Y ELIMINACIÓN ====================
+
     selectElement(element) {
+        // Remover selección anterior
         if (this.selectedElement) {
             this.highlightElement(this.selectedElement, false);
         }
 
         this.selectedElement = element;
+
         if (element) {
             this.highlightElement(element, true);
+            console.log('Elemento seleccionado:', element.get('type'));
         }
     }
 
-    highlightElement(element, highlight, color) {
-        color = color || 'blue';
-        var elementView = this.paper.findViewByModel(element);
-        if (elementView) {
-            if (highlight) {
-                elementView.highlight();
-            } else {
-                elementView.unhighlight();
-            }
+    highlightElement(element, highlight, color = '#4f46e5') {
+        if (element.isLink && element.isLink()) {
+            // Resaltar enlaces
+            element.attr('line/strokeWidth', highlight ? 3 : 2);
+            element.attr('line/stroke', highlight ? color : '#2563eb');
+        } else {
+            // Resaltar elementos
+            element.attr('body/strokeWidth', highlight ? 3 : 2);
+            element.attr('body/stroke', highlight ? color : '#2563eb');
         }
     }
 
-    // Métodos de zoom
+    deleteElement() {
+        if (this.selectedElement) {
+            this.selectedElement.remove();
+            this.selectedElement = null;
+            this.updateCanvasInfo();
+            console.log('Elemento eliminado');
+        }
+    }
+
+    cancelOperation() {
+        if (this.firstElementSelected) {
+            this.highlightElement(this.firstElementSelected, false);
+            this.firstElementSelected = null;
+        }
+        this.selectTool('select');
+    }
+
+    // ==================== ZOOM Y NAVEGACIÓN ====================
+
     zoomIn() {
-        this.currentZoom = Math.min(3, this.currentZoom + 0.1);
-        this.paper.scale(this.currentZoom, this.currentZoom);
+        this.currentZoom = Math.min(this.currentZoom * 1.2, 3);
+        this.paper.scale(this.currentZoom);
         this.updateCanvasInfo();
     }
 
     zoomOut() {
-        this.currentZoom = Math.max(0.2, this.currentZoom - 0.1);
-        this.paper.scale(this.currentZoom, this.currentZoom);
+        this.currentZoom = Math.max(this.currentZoom / 1.2, 0.3);
+        this.paper.scale(this.currentZoom);
         this.updateCanvasInfo();
     }
 
@@ -629,54 +645,42 @@ class UMLDiagramEditor {
         this.updateCanvasInfo();
     }
 
+    // ==================== INFORMACIÓN DEL CANVAS ====================
+
     updateCanvasInfo() {
         var elements = this.graph.getElements();
         var links = this.graph.getLinks();
-        var elementCount = elements.length;
-        var linkCount = links.length;
-        var zoomPercent = Math.round(this.currentZoom * 100);
+        var zoom = Math.round(this.currentZoom * 100);
+
+        var info = `📦 ${elements.length} clases | 🔗 ${links.length} relaciones | 🔍 ${zoom}%`;
 
         var infoElement = document.getElementById('canvas-info');
         if (infoElement) {
-            infoElement.textContent = `📦 ${elementCount} clases | 🔗 ${linkCount} relaciones | 🔍 ${zoomPercent}%`;
-        }
-
-        // Actualizar título del diagrama si está disponible
-        if (window.currentDiagramTitle) {
-            var titleNav = document.getElementById('diagram-title-nav');
-            if (titleNav) {
-                titleNav.textContent = window.currentDiagramTitle;
-            }
-
-            // Actualizar título de la página
-            document.title = window.currentDiagramTitle + ' - Editor UML';
+            infoElement.textContent = info;
         }
     }
 
-    // Persistencia con nombre
+    // ==================== GUARDADO Y CARGA ====================
+
     saveDiagram() {
         try {
-            var diagramData = JSON.stringify(this.graph.toJSON());
+            var jsonData = JSON.stringify(this.graph.toJSON());
 
-            // Si es un diagrama nuevo, pedir título
-            if (!window.currentDiagramId) {
-                var title = prompt('Título del diagrama:', 'Mi Diagrama UML');
-                if (!title) {
-                    console.log('❌ Guardado cancelado por el usuario');
-                    return;
-                }
+            // Obtener título si no existe
+            var title = window.currentDiagramTitle;
+            if (!title) {
+                title = prompt('Título del diagrama:', 'Mi Diagrama UML');
+                if (!title) return;
                 window.currentDiagramTitle = title;
             }
 
+            // Llamar a Livewire para guardar
             if (window.Livewire) {
-                console.log('💾 Guardando diagrama...');
-                if (window.currentDiagramTitle) {
-                    // Enviar título junto con los datos
-                    window.Livewire.dispatch('save-diagram', [diagramData, window.currentDiagramTitle]);
-                } else {
-                    window.Livewire.dispatch('save-diagram', [diagramData]);
-                }
-                console.log('✅ Datos enviados a Livewire');
+                console.log('💾 Guardando diagrama:', title);
+                window.Livewire.dispatch('save-diagram', {
+                    diagramData: jsonData,
+                    title: title
+                });
             } else {
                 console.error('❌ Livewire no disponible');
                 alert('Error: Sistema de guardado no disponible');
@@ -697,7 +701,11 @@ class UMLDiagramEditor {
                 console.log('📋 Datos parseados:', data);
 
                 if (data.cells && data.cells.length > 0) {
-                    this.graph.fromJSON(data);
+                    // Limpiar graph antes de cargar
+                    this.graph.clear();
+
+                    // RECREAR ELEMENTOS EN LUGAR DE USAR fromJSON()
+                    this.recreateElementsFromData(data.cells);
                     this.updateCanvasInfo();
 
                     // Ajustar zoom para mostrar todo el diagrama
@@ -712,6 +720,8 @@ class UMLDiagramEditor {
             } catch (e) {
                 console.error('❌ Error cargando diagrama:', e);
                 console.error('📊 Datos que causaron error:', window.diagramData);
+                // Limpiar datos corruptos
+                this.graph.clear();
             }
         } else {
             console.log('ℹ️ No hay datos de diagrama para cargar');
@@ -729,17 +739,157 @@ class UMLDiagramEditor {
         }
     }
 
+    // ==================== RECREACIÓN DE ELEMENTOS ====================
+
+    recreateElementsFromData(cells) {
+        var elements = [];
+        var links = [];
+
+        // Separar elementos y enlaces
+        cells.forEach(cell => {
+            if (cell.type === 'standard.Rectangle') {
+                elements.push(cell);
+            } else if (cell.type === 'standard.Link') {
+                links.push(cell);
+            }
+        });
+
+        console.log('🔄 Recreando', elements.length, 'elementos y', links.length, 'enlaces');
+
+        // Recrear elementos primero
+        elements.forEach(elementData => {
+            this.recreateElement(elementData);
+        });
+
+        // Recrear enlaces después (necesitan que los elementos ya existan)
+        links.forEach(linkData => {
+            this.recreateLink(linkData);
+        });
+    }
+
+    recreateElement(elementData) {
+        try {
+            var umlData = elementData.umlData || {};
+            var position = elementData.position || { x: 100, y: 100 };
+            var size = elementData.size || { width: 220, height: 120 };
+            var attrs = elementData.attrs || {};
+
+            // Recrear elemento con markup correcto
+            var newElement = new joint.shapes.standard.Rectangle({
+                id: elementData.id, // Mantener el ID original
+                position: position,
+                size: size,
+                attrs: {
+                    body: attrs.body || {
+                        stroke: '#2563eb',
+                        fill: '#f8fafc',
+                        strokeWidth: 2,
+                        rx: 3,
+                        ry: 3
+                    },
+                    label: attrs.label || {
+                        text: this.buildClassText(umlData),
+                        fontSize: 11,
+                        fontFamily: 'Consolas, monospace',
+                        fill: '#1e40af',
+                        textVerticalAnchor: 'top',
+                        textAnchor: 'start',
+                        x: 10,
+                        y: 10
+                    }
+                },
+                umlData: umlData
+            });
+
+            this.graph.addCell(newElement);
+            console.log('✅ Elemento recreado:', umlData.className || 'Sin nombre');
+
+        } catch (e) {
+            console.error('❌ Error recreando elemento:', e, elementData);
+        }
+    }
+
+    recreateLink(linkData) {
+        try {
+            var relationData = linkData.relationData || {};
+            var source = linkData.source || {};
+            var target = linkData.target || {};
+            var attrs = linkData.attrs || {};
+            var labels = linkData.labels || [];
+
+            // Verificar que los elementos fuente y destino existen
+            var sourceElement = this.graph.getCell(source.id);
+            var targetElement = this.graph.getCell(target.id);
+
+            if (!sourceElement || !targetElement) {
+                console.warn('⚠️ No se pudo recrear enlace: elementos fuente/destino no encontrados');
+                return;
+            }
+
+            // Recrear enlace con markup correcto
+            var newLink = new joint.shapes.standard.Link({
+                id: linkData.id, // Mantener el ID original
+                source: source,
+                target: target,
+                attrs: attrs,
+                labels: labels,
+                relationData: relationData
+            });
+
+            this.graph.addCell(newLink);
+            console.log('✅ Enlace recreado:', relationData.type || 'Sin tipo');
+
+        } catch (e) {
+            console.error('❌ Error recreando enlace:', e, linkData);
+        }
+    }
+
+    buildClassText(umlData) {
+        if (!umlData || !umlData.className) {
+            return 'Clase Sin Nombre';
+        }
+
+        var text = umlData.className;
+
+        // Agregar estereotipo para interfaces
+        if (umlData.type === 'interface') {
+            text = '<<interface>>\n' + text;
+        }
+
+        // Agregar atributos
+        if (umlData.attributes && umlData.attributes.length > 0) {
+            text += '\n\n' + umlData.attributes.join('\n');
+        }
+
+        // Agregar métodos
+        if (umlData.methods && umlData.methods.length > 0) {
+            text += '\n\n' + umlData.methods.join('\n');
+        }
+
+        return text;
+    }
+
+    // ==================== UTILIDADES ====================
+
     clearDiagram() {
         this.graph.clear();
         this.selectedElement = null;
         this.firstElementSelected = null;
         this.updateCanvasInfo();
+        console.log('🧹 Diagrama limpiado');
+    }
+
+    exportToPNG() {
+        // Esta funcionalidad se puede implementar más tarde
+        console.log('📸 Export a PNG no implementado aún');
+        alert('Export a PNG será implementado en próxima versión');
     }
 
     getState() {
         return {
             selectedTool: this.selectedTool,
             elementCount: this.graph.getElements().length,
+            linkCount: this.graph.getLinks().length,
             zoom: this.currentZoom,
             relationshipMode: this.relationshipMode,
             hasSelection: !!this.selectedElement
