@@ -1,0 +1,582 @@
+/* resources/css/uml-editor.css - ESTILOS UML 2.5 MEJORADOS */
+
+/* ==================== FUENTES PROFESIONALES ==================== */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ==================== VARIABLES CSS ==================== */
+:root {
+    /* Colores principales */
+    --uml-primary: #1e40af;
+    --uml-secondary: #3b82f6;
+    --uml-accent: #6366f1;
+    --uml-success: #10b981;
+    --uml-warning: #f59e0b;
+    --uml-error: #ef4444;
+
+    /* Colores de fondo */
+    --uml-bg-primary: #ffffff;
+    --uml-bg-secondary: #f8fafc;
+    --uml-bg-canvas: #fdfdfe;
+
+    /* Colores de clase */
+    --uml-class-bg: #fefefe;
+    --uml-class-border: #1e40af;
+    --uml-class-text: #1e40af;
+    --uml-class-shadow: rgba(30, 64, 175, 0.1);
+
+    /* Colores de interfaz */
+    --uml-interface-bg: #faf5ff;
+    --uml-interface-border: #7c3aed;
+    --uml-interface-text: #7c3aed;
+
+    /* Relaciones */
+    --uml-relation-color: #1e40af;
+    --uml-relation-width: 2px;
+
+    /* Sombras */
+    --uml-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --uml-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --uml-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+    /* Espaciado */
+    --uml-spacing-xs: 4px;
+    --uml-spacing-sm: 8px;
+    --uml-spacing-md: 16px;
+    --uml-spacing-lg: 24px;
+    --uml-spacing-xl: 32px;
+
+    /* Tipografía */
+    --uml-font-mono: 'Fira Code', 'Consolas', 'Monaco', monospace;
+    --uml-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ==================== CANVAS Y CONTENEDOR PRINCIPAL ==================== */
+#paper-container {
+    background: var(--uml-bg-canvas);
+    background-image:
+        radial-gradient(circle at 1px 1px, rgba(30, 64, 175, 0.08) 1px, transparent 0);
+    background-size: 20px 20px;
+    border-radius: 12px;
+    box-shadow: var(--uml-shadow-lg);
+    overflow: hidden;
+    position: relative;
+}
+
+#paper-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg,
+        rgba(99, 102, 241, 0.02) 0%,
+        rgba(30, 64, 175, 0.02) 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ==================== TOOLBAR MEJORADO ==================== */
+.toolbar-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(30, 64, 175, 0.1);
+    border-radius: 16px;
+    padding: var(--uml-spacing-md);
+    box-shadow: var(--uml-shadow-md);
+}
+
+.tool-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    height: 48px;
+    padding: var(--uml-spacing-sm) var(--uml-spacing-md);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    background: rgba(248, 250, 252, 0.8);
+    color: var(--uml-primary);
+    font-family: var(--uml-font-sans);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.tool-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: left 0.5s ease;
+}
+
+.tool-btn:hover {
+    background: rgba(30, 64, 175, 0.05);
+    border-color: rgba(30, 64, 175, 0.2);
+    transform: translateY(-1px);
+    box-shadow: var(--uml-shadow-md);
+}
+
+.tool-btn:hover::before {
+    left: 100%;
+}
+
+.tool-btn.active {
+    background: var(--uml-primary);
+    color: white;
+    border-color: var(--uml-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -8px var(--uml-primary);
+}
+
+.tool-btn:active {
+    transform: translateY(0);
+}
+
+/* ==================== ELEMENTOS UML MEJORADOS ==================== */
+
+/* Clases UML */
+.joint-element .joint-highlight-stroke {
+    stroke: var(--uml-accent) !important;
+    stroke-width: 3 !important;
+    stroke-dasharray: 8,4 !important;
+    animation: uml-selection-pulse 2s infinite;
+}
+
+@keyframes uml-selection-pulse {
+    0%, 100% { stroke-opacity: 1; }
+    50% { stroke-opacity: 0.6; }
+}
+
+/* Mejoras para el texto de las clases */
+.joint-element text {
+    font-family: var(--uml-font-mono) !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    user-select: none;
+}
+
+/* Texto de estereotipos */
+.joint-element text tspan[font-style="italic"] {
+    font-weight: 600;
+    fill: var(--uml-accent) !important;
+}
+
+/* ==================== RELACIONES UML MEJORADAS ==================== */
+
+/* Enlaces/Relaciones */
+.joint-link .connection {
+    stroke: var(--uml-relation-color) !important;
+    stroke-width: var(--uml-relation-width) !important;
+    fill: none !important;
+}
+
+/* Marcadores de flecha mejorados */
+.joint-link .marker-target,
+.joint-link .marker-source {
+    fill: var(--uml-relation-color) !important;
+    stroke: var(--uml-relation-color) !important;
+}
+
+/* Etiquetas de multiplicidad */
+.joint-link .joint-label rect {
+    fill: rgba(255, 255, 255, 0.95) !important;
+    stroke: var(--uml-primary) !important;
+    stroke-width: 1 !important;
+    rx: 4 !important;
+    ry: 2 !important;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)) !important;
+}
+
+.joint-link .joint-label text {
+    font-family: var(--uml-font-mono) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    fill: var(--uml-primary) !important;
+}
+
+/* Nombres de relaciones */
+.joint-link .joint-label text[font-style="italic"] {
+    font-family: var(--uml-font-sans) !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    fill: #374151 !important;
+}
+
+/* ==================== INFORMACIÓN DEL CANVAS ==================== */
+#canvas-info {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(30, 64, 175, 0.1);
+    border-radius: 8px;
+    padding: var(--uml-spacing-sm) var(--uml-spacing-md);
+    font-family: var(--uml-font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--uml-primary);
+    box-shadow: var(--uml-shadow-sm);
+}
+
+/* ==================== CONTROLES DE ZOOM ==================== */
+.zoom-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--uml-spacing-xs);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(30, 64, 175, 0.1);
+    border-radius: 12px;
+    padding: var(--uml-spacing-sm);
+    box-shadow: var(--uml-shadow-md);
+}
+
+.zoom-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(248, 250, 252, 0.8);
+    color: var(--uml-primary);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.zoom-btn:hover {
+    background: var(--uml-primary);
+    color: white;
+    transform: scale(1.05);
+}
+
+/* ==================== NOTIFICACIONES ==================== */
+.uml-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: var(--uml-spacing-md) var(--uml-spacing-lg);
+    border-radius: 12px;
+    font-family: var(--uml-font-sans);
+    font-weight: 500;
+    box-shadow: var(--uml-shadow-lg);
+    z-index: 1000;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px);
+}
+
+.uml-notification.success {
+    background: rgba(16, 185, 129, 0.95);
+    color: white;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.uml-notification.error {
+    background: rgba(239, 68, 68, 0.95);
+    color: white;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.uml-notification.show {
+    transform: translateX(0);
+}
+
+/* ==================== TOOLTIP DE AYUDA ==================== */
+#relationship-tooltip {
+    background: rgba(30, 64, 175, 0.95) !important;
+    color: white !important;
+    border: 1px solid rgba(30, 64, 175, 0.3) !important;
+    border-radius: 8px !important;
+    padding: var(--uml-spacing-sm) var(--uml-spacing-md) !important;
+    font-family: var(--uml-font-sans) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    backdrop-filter: blur(10px) !important;
+    box-shadow: var(--uml-shadow-md) !important;
+    animation: tooltip-fade-in 0.3s ease;
+}
+
+@keyframes tooltip-fade-in {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* ==================== PROMPTS Y MODALES ==================== */
+.uml-dialog {
+    font-family: var(--uml-font-sans) !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    color: #374151 !important;
+}
+
+/* ==================== RESPONSIVIDAD ==================== */
+@media (max-width: 768px) {
+    .toolbar-container {
+        padding: var(--uml-spacing-sm);
+        border-radius: 12px;
+    }
+
+    .tool-btn {
+        min-width: 40px;
+        height: 40px;
+        padding: var(--uml-spacing-xs);
+        font-size: 12px;
+    }
+
+    #canvas-info {
+        font-size: 10px;
+        padding: var(--uml-spacing-xs) var(--uml-spacing-sm);
+    }
+
+    .zoom-controls {
+        gap: 2px;
+    }
+
+    .zoom-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+}
+
+/* ==================== ANIMACIONES SUAVES ==================== */
+* {
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Animación de entrada para elementos */
+.joint-element {
+    animation: element-fade-in 0.3s ease;
+}
+
+@keyframes element-fade-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Animación para enlaces */
+.joint-link {
+    animation: link-draw-in 0.5s ease;
+}
+
+@keyframes link-draw-in {
+    from {
+        stroke-dasharray: 1000;
+        stroke-dashoffset: 1000;
+    }
+    to {
+        stroke-dasharray: 0;
+        stroke-dashoffset: 0;
+    }
+}
+
+/* ==================== ESTADOS DE CARGA ==================== */
+.uml-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--uml-spacing-xl);
+    font-family: var(--uml-font-sans);
+    color: var(--uml-primary);
+}
+
+.uml-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(30, 64, 175, 0.1);
+    border-top: 3px solid var(--uml-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: var(--uml-spacing-sm);
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==================== MEJORAS DE ACCESIBILIDAD ==================== */
+.tool-btn:focus {
+    outline: 2px solid var(--uml-accent);
+    outline-offset: 2px;
+}
+
+.zoom-btn:focus {
+    outline: 2px solid var(--uml-accent);
+    outline-offset: 2px;
+}
+
+/* ==================== TEMA OSCURO (OPCIONAL) ==================== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --uml-bg-primary: #1f2937;
+        --uml-bg-secondary: #111827;
+        --uml-bg-canvas: #1a1f2e;
+
+        --uml-class-bg: #374151;
+        --uml-class-text: #e5e7eb;
+        --uml-class-border: #60a5fa;
+
+        --uml-interface-bg: #312e81;
+        --uml-interface-text: #c4b5fd;
+        --uml-interface-border: #a78bfa;
+    }
+
+    .toolbar-container {
+        background: rgba(31, 41, 55, 0.95);
+        border-color: rgba(96, 165, 250, 0.2);
+    }
+
+    .tool-btn {
+        background: rgba(55, 65, 81, 0.8);
+        color: #e5e7eb;
+    }
+
+    .tool-btn:hover {
+        background: rgba(96, 165, 250, 0.1);
+        border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    #canvas-info {
+        background: rgba(31, 41, 55, 0.95);
+        color: #e5e7eb;
+        border-color: rgba(96, 165, 250, 0.2);
+    }
+}
+
+/* ==================== ESTILOS PARA ELEMENTOS ESPECÍFICOS ==================== */
+
+/* Clases abstractas */
+.uml-abstract-class text {
+    font-style: italic !important;
+    font-weight: 500 !important;
+}
+
+/* Métodos estáticos */
+.uml-static-method {
+    text-decoration: underline !important;
+}
+
+/* Atributos privados */
+.uml-private-attribute {
+    color: #dc2626 !important;
+}
+
+/* Atributos públicos */
+.uml-public-attribute {
+    color: #059669 !important;
+}
+
+/* Atributos protegidos */
+.uml-protected-attribute {
+    color: #d97706 !important;
+}
+
+/* ==================== EFECTOS ESPECIALES ==================== */
+
+/* Efecto de brillo para elementos seleccionados */
+.joint-element.selected {
+    filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.4));
+}
+
+/* Efecto de hover para elementos */
+.joint-element:hover {
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+/* ==================== GRID PERSONALIZADO ==================== */
+.joint-paper {
+    background-image:
+        linear-gradient(rgba(30, 64, 175, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 64, 175, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Grid más sutil para zoom alto */
+.joint-paper[transform*="scale(2)"] {
+    background-image:
+        linear-gradient(rgba(30, 64, 175, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 64, 175, 0.02) 1px, transparent 1px);
+}
+
+/* ==================== UTILIDADES ==================== */
+.uml-hidden {
+    display: none !important;
+}
+
+.uml-fade-in {
+    animation: fade-in 0.3s ease-in-out;
+}
+
+.uml-fade-out {
+    animation: fade-out 0.3s ease-in-out;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.uml-scale-in {
+    animation: scale-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ==================== PRINT STYLES ==================== */
+@media print {
+    .toolbar-container,
+    .zoom-controls,
+    #canvas-info {
+        display: none !important;
+    }
+
+    #paper-container {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+    }
+
+    .joint-element,
+    .joint-link {
+        print-color-adjust: exact !important;
+    }
+}
