@@ -187,33 +187,190 @@
     transform: translateY(0);
 }
 
-/* ==================== ELEMENTOS UML MEJORADOS ==================== */
+/* ==================== CLASES UML CON EDICIÓN DIRECTA ==================== */
 
-/* Clases UML */
-.joint-element .joint-highlight-stroke {
-    stroke: var(--uml-accent) !important;
-    stroke-width: 3 !important;
-    stroke-dasharray: 8,4 !important;
-    animation: uml-selection-pulse 2s infinite;
-}
-
-@keyframes uml-selection-pulse {
-    0%, 100% { stroke-opacity: 1; }
-    50% { stroke-opacity: 0.6; }
-}
-
-/* Mejoras para el texto de las clases */
-.joint-element text {
-    font-family: var(--uml-font-mono) !important;
-    font-size: 12px !important;
-    line-height: 1.4 !important;
+.uml-class-overlay {
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 2px solid #1e40af;
+    overflow: hidden;
+    font-family: var(--uml-font-mono);
+    font-size: 12px;
+    line-height: 1.4;
     user-select: none;
+    transition: all 0.2s ease;
 }
 
-/* Texto de estereotipos */
-.joint-element text tspan[font-style="italic"] {
-    font-weight: 600;
-    fill: var(--uml-accent) !important;
+.uml-class-overlay:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Secciones de la clase */
+.uml-class-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-bottom: 2px solid #1e40af;
+    text-align: center;
+    font-weight: bold;
+    color: #1e40af;
+}
+
+.uml-class-attributes {
+    background: #fefefe;
+    border-bottom: 1px solid #e5e7eb;
+    color: #374151;
+}
+
+.uml-class-methods {
+    background: #fefefe;
+    color: #374151;
+}
+
+/* Inputs editables */
+.uml-editable {
+    transition: all 0.2s ease;
+    border-radius: 2px;
+}
+
+.uml-editable:hover {
+    background: rgba(30, 64, 175, 0.05) !important;
+}
+
+.uml-editable:focus {
+    background: rgba(30, 64, 175, 0.1) !important;
+    box-shadow: inset 0 0 0 1px #1e40af;
+}
+
+/* Inputs del header */
+.uml-header {
+    font-weight: bold;
+    color: #1e40af;
+    text-align: center;
+}
+
+/* Diferenciación por tipo de visibilidad */
+.uml-editable[value*="+ "] {
+    color: #059669; /* Verde para público */
+}
+
+.uml-editable[value*="- "] {
+    color: #dc2626; /* Rojo para privado */
+}
+
+.uml-editable[value*="# "] {
+    color: #d97706; /* Naranja para protegido */
+}
+
+.uml-editable[value*="~ "] {
+    color: #7c3aed; /* Púrpura para paquete */
+}
+
+/* Botones de agregar */
+.uml-add-btn {
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.uml-class-overlay:hover .uml-add-btn {
+    opacity: 1;
+}
+
+.uml-add-btn:hover {
+    background: rgba(30, 64, 175, 0.2) !important;
+    transform: scale(1.02);
+}
+
+/* Interfaces - estilo diferenciado */
+.uml-class-overlay[data-type="interface"] {
+    border: 2px dashed #7c3aed;
+    background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+}
+
+.uml-class-overlay[data-type="interface"] .uml-class-header {
+    background: linear-gradient(135deg, #faf5ff 0%, #e9d5ff 100%);
+    border-bottom-color: #7c3aed;
+    color: #7c3aed;
+}
+
+.uml-class-overlay[data-type="interface"] .uml-header {
+    color: #7c3aed;
+}
+
+/* Efectos de selección */
+.joint-element.selected + .uml-class-overlay,
+.uml-class-overlay.selected {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+}
+
+/* Animaciones */
+.uml-class-overlay {
+    animation: class-fade-in 0.3s ease;
+}
+
+@keyframes class-fade-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Eliminación suave */
+.uml-class-overlay.removing {
+    animation: class-fade-out 0.3s ease forwards;
+}
+
+@keyframes class-fade-out {
+    to {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+}
+
+/* Tooltip para instrucciones */
+.uml-class-overlay::before {
+    content: 'Doble clic para editar';
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1001;
+}
+
+.uml-class-overlay:hover::before {
+    opacity: 1;
+}
+
+/* Responsive - pantallas pequeñas */
+@media (max-width: 768px) {
+    .uml-class-overlay {
+        font-size: 10px;
+        min-width: 150px;
+    }
+
+    .uml-editable {
+        padding: 1px 0;
+    }
+
+    .uml-add-btn {
+        font-size: 9px;
+        padding: 2px 4px;
+    }
 }
 
 /* ==================== RELACIONES UML MEJORADAS ==================== */
