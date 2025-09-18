@@ -60,6 +60,32 @@
     box-shadow: var(--uml-shadow-lg);
     overflow: hidden;
     position: relative;
+    cursor: grab;
+}
+
+#paper-container:active {
+    cursor: grabbing;
+}
+
+/* Estados del cursor según la herramienta */
+#paper-container[data-tool="select"] {
+    cursor: grab;
+}
+
+#paper-container[data-tool="select"]:active {
+    cursor: grabbing;
+}
+
+#paper-container[data-tool="class"],
+#paper-container[data-tool="interface"] {
+    cursor: crosshair;
+}
+
+#paper-container[data-tool="association"],
+#paper-container[data-tool="inheritance"],
+#paper-container[data-tool="aggregation"],
+#paper-container[data-tool="composition"] {
+    cursor: crosshair;
 }
 
 #paper-container::before {
@@ -74,6 +100,26 @@
         rgba(30, 64, 175, 0.02) 100%);
     pointer-events: none;
     z-index: 0;
+}
+
+/* Indicador visual durante pan */
+#paper-container.panning {
+    cursor: grabbing !important;
+}
+
+#paper-container.panning::after {
+    content: '👋 Arrastrando...';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(30, 64, 175, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 10;
+    animation: fade-in 0.2s ease;
 }
 
 /* ==================== TOOLBAR MEJORADO ==================== */
@@ -225,7 +271,7 @@
     box-shadow: var(--uml-shadow-sm);
 }
 
-/* ==================== CONTROLES DE ZOOM ==================== */
+/* ==================== CONTROLES DE ZOOM MEJORADOS ==================== */
 .zoom-controls {
     display: flex;
     flex-direction: column;
@@ -236,6 +282,7 @@
     border-radius: 12px;
     padding: var(--uml-spacing-sm);
     box-shadow: var(--uml-shadow-md);
+    position: relative;
 }
 
 .zoom-btn {
@@ -252,12 +299,76 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.zoom-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: left 0.5s ease;
 }
 
 .zoom-btn:hover {
     background: var(--uml-primary);
     color: white;
     transform: scale(1.05);
+    box-shadow: var(--uml-shadow-md);
+}
+
+.zoom-btn:hover::before {
+    left: 100%;
+}
+
+.zoom-btn:active {
+    transform: scale(0.95);
+}
+
+.zoom-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.zoom-btn:disabled:hover {
+    background: rgba(248, 250, 252, 0.8);
+    color: var(--uml-primary);
+    transform: none;
+}
+
+/* Indicador de zoom actual */
+.zoom-indicator {
+    background: var(--uml-primary);
+    color: white;
+    padding: var(--uml-spacing-xs);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    font-family: var(--uml-font-mono);
+    min-width: 40px;
+}
+
+/* Tooltips para controles */
+.zoom-btn[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    right: 50px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--uml-primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 1000;
+    animation: tooltip-fade-in 0.3s ease;
 }
 
 /* ==================== NOTIFICACIONES ==================== */

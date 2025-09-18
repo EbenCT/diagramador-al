@@ -38,9 +38,151 @@ class UMLDiagramEditor {
     init() {
         this.createPaper();
         this.setupEventListeners();
+        this.setupZoomButtons();
+        this.setupPanNavigation();
         this.loadDiagramData();
 
         console.log('✅ UMLDiagramEditor inicializado correctamente');
+    }
+
+    // ==================== CONFIGURACIÓN DE BOTONES DE ZOOM ====================
+
+    setupZoomButtons() {
+        // Buscar botones de zoom
+        var zoomInBtn = document.getElementById('zoom-in');
+        var zoomOutBtn = document.getElementById('zoom-out');
+        var zoomFitBtn = document.getElementById('zoom-fit');
+        var zoom100Btn = document.getElementById('zoom-100');
+
+        // Configurar eventos
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => {
+                this.zoomIn();
+            });
+            console.log('✅ Botón Zoom In configurado');
+        }
+
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => {
+                this.zoomOut();
+            });
+            console.log('✅ Botón Zoom Out configurado');
+        }
+
+        if (zoomFitBtn) {
+            zoomFitBtn.addEventListener('click', () => {
+                this.zoomToFit();
+            });
+            console.log('✅ Botón Zoom Fit configurado');
+        }
+
+        if (zoom100Btn) {
+            zoom100Btn.addEventListener('click', () => {
+                this.setZoom(1);
+            });
+            console.log('✅ Botón Zoom 100% configurado');
+        }
+
+        // También buscar por clases CSS alternativas
+        document.querySelectorAll('.zoom-in-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.zoomIn());
+        });
+
+        document.querySelectorAll('.zoom-out-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.zoomOut());
+        });
+
+        document.querySelectorAll('.zoom-fit-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.zoomToFit());
+        });
+
+        console.log('✅ Botones de zoom configurados');
+    }
+
+    // ==================== NAVEGACIÓN PAN CON MOUSE ====================
+
+    setupPanNavigation() {
+        var paperEl = this.paper.el;
+        var isDragging = false;
+        var dragStartPoint = null;
+        var dragStartTranslate = null;
+
+        // Variables para rastrear el estado del paper
+        var currentTranslate = { x: 0, y: 0 };
+
+        paperEl.addEventListener('mousedown', (e) => {
+            // Solo iniciar pan si no hay elemento seleccionado y es click del botón izquierdo
+            if (e.button !== 0) return; // Solo botón izquierdo
+
+            var target = e.target;
+            var isElement = target.closest('.joint-element') || target.closest('.joint-link');
+
+            // Si clicked en elemento, no hacer pan
+            if (isElement) return;
+
+            // Si herramienta de creación está activa, no hacer pan
+            if (this.selectedTool !== 'select') return;
+
+            isDragging = true;
+            dragStartPoint = { x: e.clientX, y: e.clientY };
+
+            // Obtener transformación actual
+            var currentTransform = this.paper.matrix();
+            dragStartTranslate = {
+                x: currentTransform.e || 0,
+                y: currentTransform.f || 0
+            };
+
+            paperEl.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            var dx = e.clientX - dragStartPoint.x;
+            var dy = e.clientY - dragStartPoint.y;
+
+            // Calcular nueva posición
+            var newX = dragStartTranslate.x + dx;
+            var newY = dragStartTranslate.y + dy;
+
+            // Aplicar traslación
+            this.paper.translate(newX, newY);
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (isDragging) {
+                isDragging = false;
+                dragStartPoint = null;
+                dragStartTranslate = null;
+                paperEl.style.cursor = this.selectedTool === 'select' ? 'default' : 'crosshair';
+            }
+        });
+
+        // Cambiar cursor cuando hover sobre canvas vacío
+        paperEl.addEventListener('mousemove', (e) => {
+            if (isDragging) return;
+
+            var target = e.target;
+            var isElement = target.closest('.joint-element') || target.closest('.joint-link');
+
+            if (this.selectedTool === 'select' && !isElement) {
+                paperEl.style.cursor = 'grab';
+            } else if (this.selectedTool !== 'select') {
+                paperEl.style.cursor = 'crosshair';
+            } else {
+                paperEl.style.cursor = 'default';
+            }
+        });
+
+        paperEl.addEventListener('mouseleave', () => {
+            paperEl.style.cursor = 'default';
+        });
+
+        console.log('✅ Navegación pan configurada');
     }
 
     createPaper() {
@@ -71,16 +213,26 @@ class UMLDiagramEditor {
                 image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNSIgY3k9IjUiIHI9IjAuNSIgZmlsbD0iI2Q2ZDNkMSIvPgo8L3N2Zz4K'
             },
 
-            // Interactividad basada en herramienta
+            // Configuración para interactividad con pan
             interactive: function(elementView) {
+                // Los elementos son interactivos solo en modo select
                 return this.selectedTool === 'select';
             }.bind(this),
 
             // DESHABILITAR zoom con rueda nativo para usar el personalizado
             mouseWheelZoom: false,
-            restrictTranslate: false,
+            restrictTranslate: false, // Permitir movimiento libre
             snapLabels: true,
-            markAvailable: true
+            markAvailable: true,
+
+            // Permitir que el paper se mueva fuera de los límites
+            defaultRouter: { name: 'orthogonal' },
+            defaultConnector: { name: 'rounded' },
+
+            // Configuración de viewport
+            async: true,
+            frozen: false,
+            sorting: joint.dia.Paper.sorting.APPROX
         });
 
         // Eventos del paper
@@ -94,7 +246,7 @@ class UMLDiagramEditor {
         // Configurar zoom personalizado con rueda del mouse
         this.setupMouseWheelZoom();
 
-        console.log('✅ Paper creado correctamente');
+        console.log('✅ Paper creado correctamente con pan support');
     }
 
     setupEventListeners() {
@@ -122,9 +274,29 @@ class UMLDiagramEditor {
                 e.preventDefault();
                 this.zoomToFit();
             }
+            // Shortcuts de navegación
+            else if (e.key === 'Home') {
+                e.preventDefault();
+                this.centerView();
+            } else if (e.ctrlKey && e.key === 'h') {
+                e.preventDefault();
+                this.resetViewport();
+            }
+            // Shortcuts de herramientas (solo si no hay input focus)
+            else if (!document.activeElement || document.activeElement.tagName !== 'INPUT') {
+                switch(e.key) {
+                    case '1': e.preventDefault(); this.selectTool('select'); break;
+                    case '2': e.preventDefault(); this.selectTool('class'); break;
+                    case '3': e.preventDefault(); this.selectTool('interface'); break;
+                    case '4': e.preventDefault(); this.selectTool('association'); break;
+                    case '5': e.preventDefault(); this.selectTool('inheritance'); break;
+                    case '6': e.preventDefault(); this.selectTool('aggregation'); break;
+                    case '7': e.preventDefault(); this.selectTool('composition'); break;
+                }
+            }
         });
 
-        console.log('✅ Event listeners configurados (incluyendo zoom shortcuts)');
+        console.log('✅ Event listeners configurados (incluyendo zoom shortcuts y pan)');
     }
 
     // ==================== SELECCIÓN DE HERRAMIENTAS ====================
@@ -894,7 +1066,7 @@ Formato: + nombre(parámetros): tipoRetorno`;
             var links = this.graph.getLinks();
 
             if (elements.length === 0 && links.length === 0) {
-                // Si no hay elementos, resetear zoom
+                // Si no hay elementos, resetear zoom y centrar
                 this.currentZoom = 1;
                 this.paper.scale(1, 1);
                 this.paper.translate(0, 0);
@@ -910,7 +1082,9 @@ Formato: + nombre(parámetros): tipoRetorno`;
                 scaleGrid: 0.1,
                 minScale: 0.2,
                 maxScale: 3,
-                useModelGeometry: true
+                useModelGeometry: true,
+                // Centrar después del ajuste
+                center: true
             });
 
             // Actualizar zoom actual
@@ -922,11 +1096,51 @@ Formato: + nombre(parámetros): tipoRetorno`;
 
         } catch (error) {
             console.error('❌ Error en zoom to fit:', error);
-            // Fallback: zoom manual
+            // Fallback: zoom manual centrado
             this.currentZoom = 1;
             this.paper.scale(1, 1);
+            this.paper.translate(0, 0);
             this.updateCanvasInfo();
         }
+    }
+
+    // Método para centrar la vista
+    centerView() {
+        try {
+            var elements = this.graph.getElements();
+            if (elements.length === 0) return;
+
+            // Calcular centro de todos los elementos
+            var bbox = this.graph.getBBox();
+            if (!bbox) return;
+
+            var containerRect = this.paper.el.getBoundingClientRect();
+            var centerX = containerRect.width / 2;
+            var centerY = containerRect.height / 2;
+
+            var modelCenterX = bbox.x + bbox.width / 2;
+            var modelCenterY = bbox.y + bbox.height / 2;
+
+            // Calcular traslación para centrar
+            var translateX = centerX - modelCenterX * this.currentZoom;
+            var translateY = centerY - modelCenterY * this.currentZoom;
+
+            this.paper.translate(translateX, translateY);
+
+            console.log('🎯 Vista centrada');
+
+        } catch (error) {
+            console.error('❌ Error centrando vista:', error);
+        }
+    }
+
+    // Método para resetear zoom y pan
+    resetViewport() {
+        this.currentZoom = 1;
+        this.paper.scale(1, 1);
+        this.paper.translate(0, 0);
+        console.log('🔄 Viewport reseteado');
+        this.updateCanvasInfo();
     }
 
     // Método adicional para zoom específico
