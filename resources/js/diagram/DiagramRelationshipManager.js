@@ -386,7 +386,7 @@ export class DiagramRelationshipManager {
                             strokeWidth: 2.5, // Más gruesa
                             targetMarker: {
                                 type: 'path',
-                                d: 'M 15 0 L 0 8 L 15 16 z', // Flecha triangular más grande
+                                d: 'M 20 -12 L 0 0 L 20 12 Z', // Triángulo MÁS GRANDE
                                 fill: 'white',
                                 stroke: '#1e40af',
                                 strokeWidth: 2.5
@@ -435,7 +435,7 @@ export class DiagramRelationshipManager {
                             strokeWidth: 2.5, // Más gruesa
                             sourceMarker: {
                                 type: 'path',
-                                d: 'M 20 -8 10 0 20 8 30 0 z', // Diamante más grande
+                                d: 'M 24 -10 12 0 24 10 36 0 z', // Rombo MÁS GRANDE
                                 fill: 'white',
                                 stroke: '#1e40af',
                                 strokeWidth: 2.5
@@ -481,7 +481,7 @@ export class DiagramRelationshipManager {
                             strokeWidth: 2.5, // Más gruesa
                             sourceMarker: {
                                 type: 'path',
-                                d: 'M 20 -8 10 0 20 8 30 0 z', // Diamante más grande
+                                d: 'M 24 -10 12 0 24 10 36 0 z', // Rombo MÁS GRANDE
                                 fill: '#1e40af',
                                 stroke: '#1e40af',
                                 strokeWidth: 2.5

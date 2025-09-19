@@ -327,38 +327,111 @@ export class DiagramSaveManager {
         return '#374151';
     }
 
-    recreateLink(linkData) {
-        try {
-            var relationData = linkData.relationData || {};
-            var source = linkData.source || {};
-            var target = linkData.target || {};
-            var attrs = linkData.attrs || {};
-            var labels = linkData.labels || [];
+// En DiagramSaveManager.js - Reemplaza el método recreateLink completo:
 
-            var sourceElement = this.editor.graph.getCell(source.id);
-            var targetElement = this.editor.graph.getCell(target.id);
+recreateLink(linkData) {
+    try {
+        var relationData = linkData.relationData || {};
+        var source = linkData.source || {};
+        var target = linkData.target || {};
+        var labels = linkData.labels || [];
 
-            if (!sourceElement || !targetElement) {
-                console.warn('⚠️ No se pudo recrear enlace: elementos fuente/destino no encontrados');
-                return;
-            }
+        var sourceElement = this.editor.graph.getCell(source.id);
+        var targetElement = this.editor.graph.getCell(target.id);
 
-            var newLink = new joint.shapes.standard.Link({
-                id: linkData.id,
-                source: source,
-                target: target,
-                attrs: attrs,
-                labels: labels,
-                relationData: relationData
-            });
-
-            this.editor.graph.addCell(newLink);
-            console.log('✅ Enlace recreado:', relationData.type || 'Sin tipo');
-
-        } catch (e) {
-            console.error('❌ Error recreando enlace:', e, linkData);
+        if (!sourceElement || !targetElement) {
+            console.warn('⚠️ No se pudo recrear enlace: elementos fuente/destino no encontrados');
+            return;
         }
+
+        // APLICAR MARKERS MEJORADOS según el tipo
+        var attrs = this.getImprovedLinkAttrs(relationData.type);
+
+        var newLink = new joint.shapes.standard.Link({
+            id: linkData.id,
+            source: source,
+            target: target,
+            attrs: attrs,
+            labels: labels,
+            relationData: relationData
+        });
+
+        this.editor.graph.addCell(newLink);
+        console.log('✅ Enlace recreado con markers mejorados:', relationData.type || 'Sin tipo');
+
+    } catch (e) {
+        console.error('❌ Error recreando enlace:', e, linkData);
     }
+}
+
+// NUEVO MÉTODO - Agrega después de recreateLink:
+getImprovedLinkAttrs(type) {
+    const baseAttrs = {
+        line: {
+            stroke: '#1e40af',
+            strokeWidth: 2.5
+        }
+    };
+
+    switch(type) {
+        case 'inheritance':
+            baseAttrs.line.targetMarker = {
+                type: 'path',
+                d: 'M 20 -12 L 0 0 L 20 12 Z', // Triángulo MÁS GRANDE
+                fill: 'white',
+                stroke: '#1e40af',
+                strokeWidth: 2.5
+            };
+            break;
+
+        case 'aggregation':
+            baseAttrs.line.sourceMarker = {
+                type: 'path',
+                d: 'M 24 -10 12 0 24 10 36 0 z', // Rombo MÁS GRANDE
+                fill: 'white',
+                stroke: '#1e40af',
+                strokeWidth: 2.5
+            };
+            baseAttrs.line.targetMarker = {
+                type: 'path',
+                d: 'M 12 -6 0 0 12 6',
+                stroke: '#1e40af',
+                fill: 'none',
+                strokeWidth: 2.5
+            };
+            break;
+
+        case 'composition':
+            baseAttrs.line.sourceMarker = {
+                type: 'path',
+                d: 'M 24 -10 12 0 24 10 36 0 z', // Rombo MÁS GRANDE
+                fill: '#1e40af',
+                stroke: '#1e40af',
+                strokeWidth: 2.5
+            };
+            baseAttrs.line.targetMarker = {
+                type: 'path',
+                d: 'M 12 -6 0 0 12 6',
+                stroke: '#1e40af',
+                fill: 'none',
+                strokeWidth: 2.5
+            };
+            break;
+
+        case 'association':
+        default:
+            baseAttrs.line.targetMarker = {
+                type: 'path',
+                d: 'M 12 -6 0 0 12 6',
+                stroke: '#1e40af',
+                fill: 'none',
+                strokeWidth: 2.5
+            };
+            break;
+    }
+
+    return baseAttrs;
+}
 
     showSaveNotification(message, type) {
         var notification = document.createElement('div');
