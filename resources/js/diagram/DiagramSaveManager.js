@@ -1,11 +1,15 @@
-// resources/js/diagram/DiagramSaveManager.js
-// VERSIÓN CON LÍNEAS SVG REALES QUE OCUPAN TODO EL ANCHO Y NOMBRE CENTRADO
+// resources/js/diagram/DiagramSaveManager.js - COMPATIBLE CON UML 2.5
+// Mantiene retrocompatibilidad completa y soporte para características UML 2.5
 
 import * as joint from 'jointjs';
+import { DiagramElementFactory } from './DiagramElementFactory.js';
 
 export class DiagramSaveManager {
     constructor(editor) {
         this.editor = editor;
+
+        // Usar la factory factorizada con soporte UML 2.5
+        this.elementFactory = new DiagramElementFactory();
     }
 
     saveDiagram() {
@@ -21,12 +25,24 @@ export class DiagramSaveManager {
 
             console.log('💾 Guardando diagrama...');
 
+            // Análisis de contenido para logging
+            const data = JSON.parse(jsonData);
+            const uml25Elements = data.cells ?
+                data.cells.filter(cell => cell.umlData?.uml25).length : 0;
+
+            if (uml25Elements > 0) {
+                console.log(`📊 Guardando ${uml25Elements} elementos con características UML 2.5`);
+            }
+
             if (window.Livewire) {
                 window.Livewire.dispatch('save-diagram', [jsonData, title]);
             }
 
             window.currentDiagramTitle = title;
-            this.showSaveNotification('💾 Diagrama guardado correctamente', 'success');
+            this.showSaveNotification(
+                `💾 Diagrama guardado correctamente${uml25Elements > 0 ? ' (UML 2.5)' : ''}`,
+                'success'
+            );
 
             console.log('💾 Diagrama guardado exitosamente');
 
@@ -54,7 +70,10 @@ export class DiagramSaveManager {
                         this.editor.zoomManager.zoomToFit();
                     }, 500);
 
-                    console.log('✅ Diagrama cargado con', data.cells.length, 'elementos');
+                    // Análisis de contenido cargado
+                    const uml25Elements = data.cells.filter(cell => cell.umlData?.uml25).length;
+                    console.log(`✅ Diagrama cargado con ${data.cells.length} elementos` +
+                               (uml25Elements > 0 ? ` (${uml25Elements} con UML 2.5)` : ''));
                 } else {
                     console.log('ℹ️ No hay elementos en el diagrama');
                 }
@@ -92,10 +111,12 @@ export class DiagramSaveManager {
 
         console.log('🔄 Recreando', elements.length, 'elementos y', links.length, 'enlaces');
 
+        // Recrear elementos primero
         elements.forEach(elementData => {
             this.recreateElement(elementData);
         });
 
+        // Luego recrear enlaces
         links.forEach(linkData => {
             this.recreateLink(linkData);
         });
@@ -105,226 +126,44 @@ export class DiagramSaveManager {
         try {
             var umlData = elementData.umlData || {};
             var position = elementData.position || { x: 100, y: 100 };
-            var size = elementData.size || { width: 200, height: 120 };
             var type = umlData.type || 'class';
             var className = umlData.className || 'Clase';
             var attributes = umlData.attributes || [];
             var methods = umlData.methods || [];
 
-            const maxLineLength = Math.max(
-                className.length,
-                ...attributes.map(attr => attr.length),
-                ...methods.map(method => method.length)
-            );
-            const width = Math.max(200, maxLineLength * 8 + 30);
-
-            const totalLines = 1 +
-                               (type === 'interface' ? 1 : 0) +
-                               attributes.length +
-                               methods.length;
-            const height = Math.max(120, totalLines * 16 + 50);
-
-            const textElements = this.buildTextElements(className, attributes, methods, type, width);
-
-            const colors = type === 'interface' ? {
-                fill: '#faf5ff',
-                stroke: '#7c3aed',
-                strokeDasharray: '8,4'
-            } : {
-                fill: '#ffffff',
-                stroke: '#333333',
-                strokeDasharray: 'none'
-            };
-
-            // Crear elemento con markup que incluye líneas SVG
-            const classElement = new joint.shapes.standard.Rectangle({
-                id: elementData.id,
-                position: position,
-                size: { width: width, height: height },
-                attrs: {
-                    body: {
-                        fill: colors.fill,
-                        stroke: colors.stroke,
-                        strokeWidth: 2,
-                        strokeDasharray: colors.strokeDasharray,
-                        rx: 4,
-                        ry: 4,
-                        filter: {
-                            name: 'dropShadow',
-                            args: {
-                                dx: 2,
-                                dy: 2,
-                                blur: 4,
-                                color: 'rgba(0,0,0,0.15)'
-                            }
-                        }
-                    },
-                    label: {
-                        text: '',
-                        display: 'none'
-                    }
-                },
-                markup: [
-                    {
-                        tagName: 'rect',
-                        selector: 'body'
-                    },
-                    {
-                        tagName: 'text',
-                        selector: 'classText',
-                        children: textElements
-                    },
-                    {
-                        tagName: 'line',
-                        selector: 'divider1'
-                    },
-                    {
-                        tagName: 'line',
-                        selector: 'divider2'
-                    }
-                ],
-                umlData: umlData
-            });
-
-            // Configurar texto - MANTENER POSICIÓN ORIGINAL
-            classElement.attr('classText', {
-                x: 15,  // Mantener posición original
-                y: 20,
-                fontSize: 12,
-                fontFamily: '"Fira Code", "Consolas", monospace',
-                fill: type === 'interface' ? '#7c3aed' : '#1e40af',
-                textAnchor: 'start',  // Mantener alineación original
-                dominantBaseline: 'hanging'
-            });
-
-            // Calcular posiciones Y para las líneas divisorias
-            const lineHeight = 16;
-            let currentY = 20;
-
-            // Saltar el estereotipo si existe
-            if (type === 'interface') {
-                currentY += lineHeight;
+            // NUEVO: Extraer configuración UML 2.5 si existe
+            var uml25Config = null;
+            if (umlData.uml25) {
+                uml25Config = this.elementFactory.getUML25Config(umlData);
+                console.log(`🚀 Recreando elemento UML 2.5: ${className}`, uml25Config);
             }
 
-            // Saltar el nombre de la clase
-            currentY += lineHeight;
+            // Usar la factory factorizada para crear el elemento (con soporte UML 2.5)
+            const element = this.elementFactory.createClassElement(
+                className,
+                attributes,
+                methods,
+                position.x,
+                position.y,
+                type,
+                null, // No agregar al graph automáticamente
+                uml25Config // NUEVO: Pasar configuración UML 2.5
+            );
 
-            // Primera línea divisoria (después del nombre)
-            const line1Y = currentY + 5;
+            // Establecer ID original si existe
+            if (elementData.id) {
+                element.set('id', elementData.id);
+            }
 
-            // Segunda línea divisoria (después de atributos, si existen)
-            const line2Y = attributes.length > 0 ?
-                line1Y + (attributes.length * lineHeight) + lineHeight :
-                -100; // Fuera de vista si no hay atributos
+            // Agregar al graph
+            this.editor.graph.addCell(element);
 
-            // Configurar líneas divisorias que ocupen TODO EL ANCHO
-            classElement.attr({
-                'divider1': {
-                    x1: 5,
-                    y1: line1Y,
-                    x2: width - 5,  // Todo el ancho del rectángulo
-                    y2: line1Y,
-                    stroke: type === 'interface' ? '#7c3aed' : '#333333',
-                    strokeWidth: 1
-                },
-                'divider2': {
-                    x1: 5,
-                    y1: line2Y,
-                    x2: width - 5,  // Todo el ancho del rectángulo
-                    y2: line2Y,
-                    stroke: type === 'interface' ? '#7c3aed' : '#333333',
-                    strokeWidth: 1,
-                    display: attributes.length > 0 ? 'block' : 'none'
-                }
-            });
-
-            this.editor.graph.addCell(classElement);
-            console.log('✅ Elemento recreado:', umlData.className || 'Sin nombre');
+            console.log(`✅ Elemento recreado: ${className}` +
+                       (uml25Config ? ' (UML 2.5)' : ''));
 
         } catch (error) {
             console.error('❌ Error recreando elemento:', error);
         }
-    }
-
-    // Construcción de texto CON NOMBRE CENTRADO PERO SIN CAMBIAR EL PUNTO DE REFERENCIA
-    buildTextElements(className, attributes, methods, type, width) {
-        const elements = [];
-        let currentY = 0;
-        const lineHeight = 16;
-
-        // Estereotipo para interfaces - CENTRADO
-        if (type === 'interface') {
-            elements.push({
-                tagName: 'tspan',
-                attributes: {
-                    x: width / 2,  // Centrar en el ancho del rectángulo
-                    dy: currentY === 0 ? 0 : lineHeight,
-                    'font-style': 'italic',
-                    'font-size': '10px',
-                    'text-anchor': 'middle'  // Centrado
-                },
-                textContent: '<<interface>>'
-            });
-            currentY += lineHeight;
-        }
-
-        // Nombre de la clase - CENTRADO
-        elements.push({
-            tagName: 'tspan',
-            attributes: {
-                x: width / 2,  // Centrar en el ancho del rectángulo
-                dy: currentY === 0 ? 0 : lineHeight,
-                'font-weight': 'bold',
-                'font-size': '14px',
-                'text-anchor': 'middle'  // Centrado
-            },
-            textContent: className
-        });
-        currentY += lineHeight;
-
-        // Atributos - ALINEACIÓN IZQUIERDA CON ESPACIADO EXTRA PARA COMPENSAR LA LÍNEA SVG
-        if (attributes.length > 0) {
-            attributes.forEach((attr, index) => {
-                elements.push({
-                    tagName: 'tspan',
-                    attributes: {
-                        x: 15,  // Mantener posición izquierda normal
-                        dy: index === 0 ? lineHeight * 2 : lineHeight,  // Doble espaciado en el primer atributo
-                        fill: this.getColorByVisibility(attr),
-                        'text-anchor': 'start'  // Alineación izquierda
-                    },
-                    textContent: attr
-                });
-                currentY += lineHeight;
-            });
-        }
-
-        // Métodos - ALINEACIÓN IZQUIERDA CON ESPACIADO EXTRA PARA COMPENSAR LA LÍNEA SVG
-        if (methods.length > 0) {
-            methods.forEach((method, index) => {
-                elements.push({
-                    tagName: 'tspan',
-                    attributes: {
-                        x: 15,  // Mantener posición izquierda normal
-                        dy: index === 0 ? (attributes.length > 0 ? lineHeight * 2 : lineHeight * 2) : lineHeight,  // Doble espaciado en el primer método
-                        fill: this.getColorByVisibility(method),
-                        'text-anchor': 'start'  // Alineación izquierda
-                    },
-                    textContent: method
-                });
-                currentY += lineHeight;
-            });
-        }
-
-        return elements;
-    }
-
-    getColorByVisibility(text) {
-        if (text.startsWith('+')) return '#059669';
-        if (text.startsWith('-')) return '#dc2626';
-        if (text.startsWith('#')) return '#d97706';
-        if (text.startsWith('~')) return '#7c3aed';
-        return '#374151';
     }
 
     recreateLink(linkData) {
@@ -332,7 +171,6 @@ export class DiagramSaveManager {
             var relationData = linkData.relationData || {};
             var source = linkData.source || {};
             var target = linkData.target || {};
-            var attrs = linkData.attrs || {};
             var labels = linkData.labels || [];
 
             var sourceElement = this.editor.graph.getCell(source.id);
@@ -342,6 +180,9 @@ export class DiagramSaveManager {
                 console.warn('⚠️ No se pudo recrear enlace: elementos fuente/destino no encontrados');
                 return;
             }
+
+            // Usar el método factorizado para obtener atributos de relación
+            var attrs = this.elementFactory.getRelationshipAttrs(relationData.type);
 
             var newLink = new joint.shapes.standard.Link({
                 id: linkData.id,
@@ -391,12 +232,147 @@ export class DiagramSaveManager {
         console.log('📸 Export a PNG no implementado aún');
         this.showSaveNotification('📸 Export a PNG será implementado próximamente', 'info');
     }
+
+    // ==================== NUEVOS MÉTODOS PARA UML 2.5 ====================
+
+    /**
+     * Obtiene estadísticas del diagrama incluyendo características UML 2.5
+     */
+    getDiagramStats() {
+        const elements = this.editor.graph.getElements();
+        const links = this.editor.graph.getLinks();
+
+        let uml25Count = 0;
+        let stereotypeCount = {};
+        let derivedAttributesCount = 0;
+        let responsibilitiesCount = 0;
+        let constraintsCount = 0;
+
+        elements.forEach(element => {
+            const umlData = element.get('umlData');
+            if (umlData?.uml25) {
+                uml25Count++;
+
+                if (umlData.uml25.stereotype) {
+                    stereotypeCount[umlData.uml25.stereotype] =
+                        (stereotypeCount[umlData.uml25.stereotype] || 0) + 1;
+                }
+
+                derivedAttributesCount += umlData.uml25.derivedAttributes?.length || 0;
+                responsibilitiesCount += umlData.uml25.responsibilities?.length || 0;
+                constraintsCount += umlData.uml25.constraints?.length || 0;
+            }
+        });
+
+        return {
+            totalElements: elements.length,
+            totalLinks: links.length,
+            uml25Elements: uml25Count,
+            stereotypes: stereotypeCount,
+            derivedAttributes: derivedAttributesCount,
+            responsibilities: responsibilitiesCount,
+            constraints: constraintsCount
+        };
+    }
+
+    /**
+     * Convierte elementos UML 2.5 a formato legacy (para compatibilidad hacia atrás)
+     */
+    convertToLegacy() {
+        if (!confirm('¿Convertir elementos UML 2.5 a formato legacy?\n\nEsto eliminará las características avanzadas.')) {
+            return;
+        }
+
+        const elements = this.editor.graph.getElements();
+        let convertedCount = 0;
+
+        elements.forEach(element => {
+            const umlData = element.get('umlData');
+            if (umlData?.uml25) {
+                // Remover configuración UML 2.5
+                const newUmlData = { ...umlData };
+                delete newUmlData.uml25;
+                element.set('umlData', newUmlData);
+
+                // Recrear elemento sin características UML 2.5
+                this.elementFactory.updateClassElement(
+                    element,
+                    umlData.className,
+                    umlData.attributes,
+                    umlData.methods,
+                    umlData.type,
+                    null // Sin configuración UML 2.5
+                );
+
+                convertedCount++;
+            }
+        });
+
+        this.showSaveNotification(`🔄 ${convertedCount} elementos convertidos a legacy`, 'success');
+        console.log(`🔄 Convertidos ${convertedCount} elementos a formato legacy`);
+    }
+
+    /**
+     * Exporta solo las características UML 2.5 para análisis
+     */
+    exportUML25Features() {
+        const elements = this.editor.graph.getElements();
+        const uml25Data = [];
+
+        elements.forEach(element => {
+            const umlData = element.get('umlData');
+            if (umlData?.uml25) {
+                uml25Data.push({
+                    className: umlData.className,
+                    type: umlData.type,
+                    uml25Features: umlData.uml25
+                });
+            }
+        });
+
+        if (uml25Data.length === 0) {
+            this.showSaveNotification('ℹ️ No hay elementos UML 2.5 para exportar', 'info');
+            return;
+        }
+
+        // Crear y descargar archivo JSON
+        const blob = new Blob([JSON.stringify(uml25Data, null, 2)],
+                             { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `uml25-features-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        this.showSaveNotification(`📄 Exportadas ${uml25Data.length} características UML 2.5`, 'success');
+    }
 }
 
+// Función global para compatibilidad
 window.saveFromButton = function() {
     if (window.DiagramEditor?.instance?.saveManager) {
         window.DiagramEditor.instance.saveManager.saveDiagram();
     } else {
         console.error('❌ Save Manager no disponible');
+    }
+};
+
+// Funciones globales adicionales para UML 2.5
+window.exportUML25Features = function() {
+    if (window.DiagramEditor?.instance?.saveManager) {
+        window.DiagramEditor.instance.saveManager.exportUML25Features();
+    }
+};
+
+window.convertToLegacy = function() {
+    if (window.DiagramEditor?.instance?.saveManager) {
+        window.DiagramEditor.instance.saveManager.convertToLegacy();
+    }
+};
+
+window.getDiagramStats = function() {
+    if (window.DiagramEditor?.instance?.saveManager) {
+        return window.DiagramEditor.instance.saveManager.getDiagramStats();
     }
 };
