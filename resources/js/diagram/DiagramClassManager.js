@@ -1,15 +1,14 @@
 // resources/js/diagram/DiagramClassManager.js
-// VERSIÓN SIMPLE Y FUNCIONAL - Solo usando JointJS nativo con texto estructurado
+// VERSIÓN CON LÍNEAS SVG REALES QUE OCUPAN TODO EL ANCHO Y NOMBRE CENTRADO
 
 import * as joint from 'jointjs';
 
 export class DiagramClassManager {
     constructor(editor) {
         this.editor = editor;
-        this.classCounter = 1; // Contador para nombres automáticos
-        this.interfaceCounter = 1; // Contador para interfaces
+        this.classCounter = 1;
+        this.interfaceCounter = 1;
 
-        // Templates UML
         this.umlTemplates = {
             visibility: {
                 '+': 'public',
@@ -24,58 +23,45 @@ export class DiagramClassManager {
         };
     }
 
-    // ==================== CREACIÓN DIRECTA SIN PROMPTS ====================
-
     createClassImproved(x, y) {
-        // Crear clase directamente con nombre por defecto
         const className = `Class ${this.classCounter++}`;
         const attributes = ['- attribute1: String', '- attribute2: int'];
         const methods = ['+ method1(): void', '+ method2(): String'];
 
-        this.createClassElement(className, attributes, methods, x, y, 'class');
+        const element = this.createClassElement(className, attributes, methods, x, y, 'class');
+
+        setTimeout(() => {
+            this.showEditDialog(element, className, attributes, methods, 'class');
+        }, 100);
     }
 
     createInterface(x, y) {
-        // Crear interfaz directamente con nombre por defecto
         const interfaceName = `Interface ${this.interfaceCounter++}`;
         const methods = ['+ method1(): void', '+ method2(): String'];
 
-        this.createClassElement(interfaceName, [], methods, x, y, 'interface');
+        const element = this.createClassElement(interfaceName, [], methods, x, y, 'interface');
+
+        setTimeout(() => {
+            this.showEditDialog(element, interfaceName, [], methods, 'interface');
+        }, 100);
     }
 
     createClassElement(className, attributes, methods, x, y, type) {
-        // Construir texto UML formateado
-        let classText = '';
-
-        // Agregar estereotipo para interfaces
-        if (type === 'interface') {
-            classText += '<<interface>>\n';
-        }
-
-        // Nombre de la clase
-        classText += className + '\n';
-
-        // Línea separadora
-        classText += '─'.repeat(Math.max(className.length + 4, 20)) + '\n';
-
-        // Atributos
-        if (attributes.length > 0) {
-            classText += attributes.join('\n') + '\n';
-            classText += '─'.repeat(Math.max(className.length + 4, 20)) + '\n';
-        }
-
-        // Métodos
-        if (methods.length > 0) {
-            classText += methods.join('\n');
-        }
-
-        // Calcular dimensiones dinámicas basadas en el contenido
-        const lines = classText.split('\n').filter(line => line.trim());
-        const maxLineLength = Math.max(...lines.map(line => line.length));
+        const maxLineLength = Math.max(
+            className.length,
+            ...attributes.map(attr => attr.length),
+            ...methods.map(method => method.length)
+        );
         const width = Math.max(200, maxLineLength * 8 + 30);
-        const height = Math.max(120, lines.length * 18 + 30);
 
-        // Colores según tipo
+        const totalLines = 1 +
+                           (type === 'interface' ? 1 : 0) +
+                           attributes.length +
+                           methods.length;
+        const height = Math.max(120, totalLines * 16 + 50);
+
+        const textElements = this.buildTextElements(className, attributes, methods, type, width);
+
         const colors = type === 'interface' ? {
             fill: '#faf5ff',
             stroke: '#7c3aed',
@@ -86,7 +72,7 @@ export class DiagramClassManager {
             strokeDasharray: 'none'
         };
 
-        // Crear elemento JointJS con estilo UML profesional
+        // Crear elemento con markup que incluye líneas SVG
         const classElement = new joint.shapes.standard.Rectangle({
             position: { x: x - width/2, y: y - height/2 },
             size: { width: width, height: height },
@@ -109,17 +95,29 @@ export class DiagramClassManager {
                     }
                 },
                 label: {
-                    text: classText,
-                    fontSize: 12,
-                    fontFamily: '"Fira Code", "Consolas", monospace',
-                    fill: type === 'interface' ? '#7c3aed' : '#1e40af',
-                    textVerticalAnchor: 'top',
-                    textAnchor: 'start',
-                    x: 10,
-                    y: 10,
-                    lineHeight: 1.4
+                    text: '',
+                    display: 'none'
                 }
             },
+            markup: [
+                {
+                    tagName: 'rect',
+                    selector: 'body'
+                },
+                {
+                    tagName: 'text',
+                    selector: 'classText',
+                    children: textElements
+                },
+                {
+                    tagName: 'line',
+                    selector: 'divider1'
+                },
+                {
+                    tagName: 'line',
+                    selector: 'divider2'
+                }
+            ],
             umlData: {
                 className: className,
                 attributes: attributes,
@@ -128,28 +126,154 @@ export class DiagramClassManager {
             }
         });
 
-        // Agregar al graph
+        // Configurar texto - MANTENER POSICIÓN ORIGINAL
+        classElement.attr('classText', {
+            x: 15,  // Mantener posición original
+            y: 20,
+            fontSize: 12,
+            fontFamily: '"Fira Code", "Consolas", monospace',
+            fill: type === 'interface' ? '#7c3aed' : '#1e40af',
+            textAnchor: 'start',  // Mantener alineación original
+            dominantBaseline: 'hanging'
+        });
+
+        // Calcular posiciones Y para las líneas divisorias
+        const lineHeight = 16;
+        let currentY = 20;
+
+        // Saltar el estereotipo si existe
+        if (type === 'interface') {
+            currentY += lineHeight;
+        }
+
+        // Saltar el nombre de la clase
+        currentY += lineHeight;
+
+        // Primera línea divisoria (después del nombre)
+        const line1Y = currentY + 5;
+
+        // Segunda línea divisoria (después de atributos, si existen)
+        const line2Y = attributes.length > 0 ?
+            line1Y + (attributes.length * lineHeight) + lineHeight :
+            -100; // Fuera de vista si no hay atributos
+
+        // Configurar líneas divisorias que ocupen TODO EL ANCHO
+        classElement.attr({
+            'divider1': {
+                x1: 5,
+                y1: line1Y,
+                x2: width - 5,  // Todo el ancho del rectángulo
+                y2: line1Y,
+                stroke: type === 'interface' ? '#7c3aed' : '#333333',
+                strokeWidth: 1
+            },
+            'divider2': {
+                x1: 5,
+                y1: line2Y,
+                x2: width - 5,  // Todo el ancho del rectángulo
+                y2: line2Y,
+                stroke: type === 'interface' ? '#7c3aed' : '#333333',
+                strokeWidth: 1,
+                display: attributes.length > 0 ? 'block' : 'none'
+            }
+        });
+
         this.editor.graph.addCell(classElement);
-
-        // Hacer que sea editable con doble clic
         this.makeElementEditable(classElement);
-
         this.editor.updateCanvasInfo();
         this.editor.selectTool('select');
 
-        console.log(`✅ ${type} creada:`, className);
+        console.log(`${type} creada:`, className);
+
+        return classElement;
     }
 
-    // ==================== HACER ELEMENTOS EDITABLES ====================
+    // Construcción de texto CON NOMBRE CENTRADO PERO SIN CAMBIAR EL PUNTO DE REFERENCIA
+    buildTextElements(className, attributes, methods, type, width) {
+        const elements = [];
+        let currentY = 0;
+        const lineHeight = 16;
+
+        // Estereotipo para interfaces - CENTRADO
+        if (type === 'interface') {
+            elements.push({
+                tagName: 'tspan',
+                attributes: {
+                    x: width / 2,  // Centrar en el ancho del rectángulo
+                    dy: currentY === 0 ? 0 : lineHeight,
+                    'font-style': 'italic',
+                    'font-size': '10px',
+                    'text-anchor': 'middle'  // Centrado
+                },
+                textContent: '<<interface>>'
+            });
+            currentY += lineHeight;
+        }
+
+        // Nombre de la clase - CENTRADO
+        elements.push({
+            tagName: 'tspan',
+            attributes: {
+                x: width / 2,  // Centrar en el ancho del rectángulo
+                dy: currentY === 0 ? 0 : lineHeight,
+                'font-weight': 'bold',
+                'font-size': '14px',
+                'text-anchor': 'middle'  // Centrado
+            },
+            textContent: className
+        });
+        currentY += lineHeight;
+
+        // Atributos - ALINEACIÓN IZQUIERDA CON ESPACIADO EXTRA PARA COMPENSAR LA LÍNEA SVG
+        if (attributes.length > 0) {
+            attributes.forEach((attr, index) => {
+                elements.push({
+                    tagName: 'tspan',
+                    attributes: {
+                        x: 15,  // Mantener posición izquierda normal
+                        dy: index === 0 ? lineHeight * 2 : lineHeight,  // Doble espaciado en el primer atributo
+                        fill: this.getColorByVisibility(attr),
+                        'text-anchor': 'start'  // Alineación izquierda
+                    },
+                    textContent: attr
+                });
+                currentY += lineHeight;
+            });
+        }
+
+        // Métodos - ALINEACIÓN IZQUIERDA CON ESPACIADO EXTRA PARA COMPENSAR LA LÍNEA SVG
+        if (methods.length > 0) {
+            methods.forEach((method, index) => {
+                elements.push({
+                    tagName: 'tspan',
+                    attributes: {
+                        x: 15,  // Mantener posición izquierda normal
+                        dy: index === 0 ? (attributes.length > 0 ? lineHeight * 2 : lineHeight * 2) : lineHeight,  // Doble espaciado en el primer método
+                        fill: this.getColorByVisibility(method),
+                        'text-anchor': 'start'  // Alineación izquierda
+                    },
+                    textContent: method
+                });
+                currentY += lineHeight;
+            });
+        }
+
+        return elements;
+    }
+
+    getColorByVisibility(text) {
+        if (text.startsWith('+')) return '#059669';
+        if (text.startsWith('-')) return '#dc2626';
+        if (text.startsWith('#')) return '#d97706';
+        if (text.startsWith('~')) return '#7c3aed';
+        return '#374151';
+    }
 
     makeElementEditable(element) {
-        // Escuchar eventos de doble clic para edición
         element.on('change:position', () => {
             // Mantener sincronizado si se mueve
         });
     }
-
-    // ==================== EDICIÓN MEJORADA CON PROMPTS ====================
 
     editClassImproved(element) {
         const umlData = element.get('umlData') || {};
@@ -158,12 +282,10 @@ export class DiagramClassManager {
         const currentMethods = umlData.methods || [];
         const currentType = umlData.type || 'class';
 
-        // Crear interfaz de edición más amigable
         this.showEditDialog(element, currentName, currentAttrs, currentMethods, currentType);
     }
 
     showEditDialog(element, currentName, currentAttrs, currentMethods, currentType) {
-        // Crear un div modal para edición
         const modal = document.createElement('div');
         modal.style.cssText = `
             position: fixed;
@@ -239,13 +361,11 @@ export class DiagramClassManager {
         modal.appendChild(dialog);
         document.body.appendChild(modal);
 
-        // Enfocar en el nombre
         setTimeout(() => {
             document.getElementById('className').focus();
             document.getElementById('className').select();
         }, 100);
 
-        // Event listeners
         document.getElementById('cancelBtn').onclick = () => {
             document.body.removeChild(modal);
         };
@@ -272,7 +392,6 @@ export class DiagramClassManager {
             }
         };
 
-        // Cerrar con ESC
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
                 document.body.removeChild(modal);
@@ -282,39 +401,91 @@ export class DiagramClassManager {
         document.addEventListener('keydown', handleKeyDown);
     }
 
-    // ==================== ACTUALIZAR ELEMENTO ====================
-
     updateClassElement(element, className, attributes, methods, type) {
-        // Construir nuevo texto
-        let classText = '';
-
-        if (type === 'interface') {
-            classText += '<<interface>>\n';
-        }
-
-        classText += className + '\n';
-        classText += '─'.repeat(Math.max(className.length + 4, 20)) + '\n';
-
-        if (attributes.length > 0) {
-            classText += attributes.join('\n') + '\n';
-            classText += '─'.repeat(Math.max(className.length + 4, 20)) + '\n';
-        }
-
-        if (methods.length > 0) {
-            classText += methods.join('\n');
-        }
-
-        // Calcular nuevas dimensiones
-        const lines = classText.split('\n').filter(line => line.trim());
-        const maxLineLength = Math.max(...lines.map(line => line.length));
+        const maxLineLength = Math.max(
+            className.length,
+            ...attributes.map(attr => attr.length),
+            ...methods.map(method => method.length)
+        );
         const newWidth = Math.max(200, maxLineLength * 8 + 30);
-        const newHeight = Math.max(120, lines.length * 18 + 30);
 
-        // Actualizar elemento
-        element.attr('label/text', classText);
+        const totalLines = 1 +
+                           (type === 'interface' ? 1 : 0) +
+                           attributes.length +
+                           methods.length;
+        const newHeight = Math.max(120, totalLines * 16 + 50);
+
+        const textElements = this.buildTextElements(className, attributes, methods, type, newWidth);
+
         element.resize(newWidth, newHeight);
 
-        // Actualizar datos UML
+        // Actualizar markup con nuevo texto
+        element.set('markup', [
+            {
+                tagName: 'rect',
+                selector: 'body'
+            },
+            {
+                tagName: 'text',
+                selector: 'classText',
+                children: textElements
+            },
+            {
+                tagName: 'line',
+                selector: 'divider1'
+            },
+            {
+                tagName: 'line',
+                selector: 'divider2'
+            }
+        ]);
+
+        // MANTENER configuración del texto original
+        element.attr('classText', {
+            x: 15,  // Mantener posición original
+            y: 20,
+            fontSize: 12,
+            fontFamily: '"Fira Code", "Consolas", monospace',
+            fill: type === 'interface' ? '#7c3aed' : '#1e40af',
+            textAnchor: 'start',  // Mantener alineación original
+            dominantBaseline: 'hanging'
+        });
+
+        // Recalcular posiciones de líneas
+        const lineHeight = 16;
+        let currentY = 20;
+
+        if (type === 'interface') {
+            currentY += lineHeight;
+        }
+
+        currentY += lineHeight;
+        const line1Y = currentY + 5;
+        const line2Y = attributes.length > 0 ?
+            line1Y + (attributes.length * lineHeight) + lineHeight :
+            -100;
+
+        // Actualizar líneas divisorias con nuevo ancho
+        element.attr({
+            'divider1': {
+                x1: 5,
+                y1: line1Y,
+                x2: newWidth - 5,
+                y2: line1Y,
+                stroke: type === 'interface' ? '#7c3aed' : '#333333',
+                strokeWidth: 1
+            },
+            'divider2': {
+                x1: 5,
+                y1: line2Y,
+                x2: newWidth - 5,
+                y2: line2Y,
+                stroke: type === 'interface' ? '#7c3aed' : '#333333',
+                strokeWidth: 1,
+                display: attributes.length > 0 ? 'block' : 'none'
+            }
+        });
+
         element.set('umlData', {
             className: className,
             attributes: attributes,
@@ -322,6 +493,6 @@ export class DiagramClassManager {
             type: type
         });
 
-        console.log('✅ Clase actualizada:', className);
+        console.log('Clase actualizada:', className);
     }
 }

@@ -8,7 +8,7 @@ import { DiagramClassManager } from './DiagramClassManager.js';
 import { DiagramRelationshipManager } from './DiagramRelationshipManager.js';
 
 // Configurar JointJS correctamente
-joint.config.useCSSSelectors = true;
+joint.config.useCSSSelectors = false;
 
 class UMLDiagramEditor {
     constructor() {
@@ -82,7 +82,7 @@ class UMLDiagramEditor {
             },
             background: {
                 color: 'transparent',
-                image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNSIgY3k9IjUiIHI9IjAuNSIgZmlsbD0iI2Q2ZDNkMSIvPgo8L3N2Zz4K'
+               // image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNSIgY3k9IjUiIHI9IjAuNSIgZmlsbD0iI2Q2ZDNkMSIvPgo8L3N2Zz4K'
             },
 
             // Configuración para interactividad con pan

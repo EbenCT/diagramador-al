@@ -1,5 +1,5 @@
 // resources/js/diagram/DiagramSaveManager.js
-// Módulo encargado del guardado y carga de diagramas - TAL COMO ESTABA EN EL EDITOR ORIGINAL
+// VERSIÓN CON LÍNEAS SVG REALES QUE OCUPAN TODO EL ANCHO Y NOMBRE CENTRADO
 
 import * as joint from 'jointjs';
 
@@ -8,13 +8,9 @@ export class DiagramSaveManager {
         this.editor = editor;
     }
 
-    // ==================== GUARDADO Y CARGA MEJORADOS ====================
-
     saveDiagram() {
         try {
             var jsonData = JSON.stringify(this.editor.graph.toJSON());
-
-            // Obtener título si no está disponible
             var title = window.currentDiagramTitle ||
                        prompt('📝 Título del diagrama:', 'Mi Diagrama UML');
 
@@ -25,12 +21,10 @@ export class DiagramSaveManager {
 
             console.log('💾 Guardando diagrama...');
 
-            // Aquí iría la lógica de guardado al servidor via Livewire/AJAX
             if (window.Livewire) {
                 window.Livewire.dispatch('save-diagram', [jsonData, title]);
             }
 
-            // Actualizar estado local
             window.currentDiagramTitle = title;
             this.showSaveNotification('💾 Diagrama guardado correctamente', 'success');
 
@@ -52,14 +46,10 @@ export class DiagramSaveManager {
                 console.log('📋 Datos parseados:', data);
 
                 if (data.cells && data.cells.length > 0) {
-                    // Limpiar graph antes de cargar
                     this.editor.graph.clear();
-
-                    // RECREAR ELEMENTOS EN LUGAR DE USAR fromJSON()
                     this.recreateElementsFromData(data.cells);
                     this.editor.updateCanvasInfo();
 
-                    // Ajustar zoom para mostrar todo el diagrama
                     setTimeout(() => {
                         this.editor.zoomManager.zoomToFit();
                     }, 500);
@@ -71,14 +61,12 @@ export class DiagramSaveManager {
             } catch (e) {
                 console.error('❌ Error cargando diagrama:', e);
                 console.error('📊 Datos que causaron error:', window.diagramData);
-                // Limpiar datos corruptos
                 this.editor.graph.clear();
             }
         } else {
             console.log('ℹ️ No hay datos de diagrama para cargar');
         }
 
-        // Establecer ID del diagrama si está disponible
         if (window.diagramId) {
             window.currentDiagramId = window.diagramId;
             console.log('🆔 ID del diagrama establecido:', window.currentDiagramId);
@@ -90,13 +78,10 @@ export class DiagramSaveManager {
         }
     }
 
-    // ==================== RECREACIÓN DE ELEMENTOS ====================
-
     recreateElementsFromData(cells) {
         var elements = [];
         var links = [];
 
-        // Separar elementos y enlaces
         cells.forEach(cell => {
             if (cell.type === 'standard.Rectangle') {
                 elements.push(cell);
@@ -107,12 +92,10 @@ export class DiagramSaveManager {
 
         console.log('🔄 Recreando', elements.length, 'elementos y', links.length, 'enlaces');
 
-        // Recrear elementos primero
         elements.forEach(elementData => {
             this.recreateElement(elementData);
         });
 
-        // Recrear enlaces después (necesitan que los elementos ya existan)
         links.forEach(linkData => {
             this.recreateLink(linkData);
         });
@@ -122,20 +105,48 @@ export class DiagramSaveManager {
         try {
             var umlData = elementData.umlData || {};
             var position = elementData.position || { x: 100, y: 100 };
-            var size = elementData.size || { width: 220, height: 120 };
-            var attrs = elementData.attrs || {};
+            var size = elementData.size || { width: 200, height: 120 };
+            var type = umlData.type || 'class';
+            var className = umlData.className || 'Clase';
+            var attributes = umlData.attributes || [];
+            var methods = umlData.methods || [];
 
-            // Recrear elemento con markup correcto y estilo mejorado
-            var newElement = new joint.shapes.standard.Rectangle({
-                id: elementData.id, // Mantener el ID original
+            const maxLineLength = Math.max(
+                className.length,
+                ...attributes.map(attr => attr.length),
+                ...methods.map(method => method.length)
+            );
+            const width = Math.max(200, maxLineLength * 8 + 30);
+
+            const totalLines = 1 +
+                               (type === 'interface' ? 1 : 0) +
+                               attributes.length +
+                               methods.length;
+            const height = Math.max(120, totalLines * 16 + 50);
+
+            const textElements = this.buildTextElements(className, attributes, methods, type, width);
+
+            const colors = type === 'interface' ? {
+                fill: '#faf5ff',
+                stroke: '#7c3aed',
+                strokeDasharray: '8,4'
+            } : {
+                fill: '#ffffff',
+                stroke: '#333333',
+                strokeDasharray: 'none'
+            };
+
+            // Crear elemento con markup que incluye líneas SVG
+            const classElement = new joint.shapes.standard.Rectangle({
+                id: elementData.id,
                 position: position,
-                size: size,
+                size: { width: width, height: height },
                 attrs: {
                     body: {
-                        stroke: attrs.body?.stroke || '#1e40af',
-                        fill: attrs.body?.fill || '#fefefe',
+                        fill: colors.fill,
+                        stroke: colors.stroke,
                         strokeWidth: 2,
-                        strokeDasharray: attrs.body?.strokeDasharray || 'none',
+                        strokeDasharray: colors.strokeDasharray,
                         rx: 4,
                         ry: 4,
                         filter: {
@@ -143,32 +154,177 @@ export class DiagramSaveManager {
                             args: {
                                 dx: 2,
                                 dy: 2,
-                                blur: 3,
-                                color: 'rgba(0,0,0,0.1)'
+                                blur: 4,
+                                color: 'rgba(0,0,0,0.15)'
                             }
                         }
                     },
                     label: {
-                        text: this.buildClassTextImproved(umlData),
-                        fontSize: 12,
-                        fontFamily: '"Fira Code", "Consolas", monospace',
-                        fill: attrs.label?.fill || '#1e40af',
-                        textVerticalAnchor: 'top',
-                        textAnchor: 'start',
-                        x: 12,
-                        y: 12,
-                        lineHeight: 1.3
+                        text: '',
+                        display: 'none'
                     }
                 },
+                markup: [
+                    {
+                        tagName: 'rect',
+                        selector: 'body'
+                    },
+                    {
+                        tagName: 'text',
+                        selector: 'classText',
+                        children: textElements
+                    },
+                    {
+                        tagName: 'line',
+                        selector: 'divider1'
+                    },
+                    {
+                        tagName: 'line',
+                        selector: 'divider2'
+                    }
+                ],
                 umlData: umlData
             });
 
-            this.editor.graph.addCell(newElement);
+            // Configurar texto - MANTENER POSICIÓN ORIGINAL
+            classElement.attr('classText', {
+                x: 15,  // Mantener posición original
+                y: 20,
+                fontSize: 12,
+                fontFamily: '"Fira Code", "Consolas", monospace',
+                fill: type === 'interface' ? '#7c3aed' : '#1e40af',
+                textAnchor: 'start',  // Mantener alineación original
+                dominantBaseline: 'hanging'
+            });
+
+            // Calcular posiciones Y para las líneas divisorias
+            const lineHeight = 16;
+            let currentY = 20;
+
+            // Saltar el estereotipo si existe
+            if (type === 'interface') {
+                currentY += lineHeight;
+            }
+
+            // Saltar el nombre de la clase
+            currentY += lineHeight;
+
+            // Primera línea divisoria (después del nombre)
+            const line1Y = currentY + 5;
+
+            // Segunda línea divisoria (después de atributos, si existen)
+            const line2Y = attributes.length > 0 ?
+                line1Y + (attributes.length * lineHeight) + lineHeight :
+                -100; // Fuera de vista si no hay atributos
+
+            // Configurar líneas divisorias que ocupen TODO EL ANCHO
+            classElement.attr({
+                'divider1': {
+                    x1: 5,
+                    y1: line1Y,
+                    x2: width - 5,  // Todo el ancho del rectángulo
+                    y2: line1Y,
+                    stroke: type === 'interface' ? '#7c3aed' : '#333333',
+                    strokeWidth: 1
+                },
+                'divider2': {
+                    x1: 5,
+                    y1: line2Y,
+                    x2: width - 5,  // Todo el ancho del rectángulo
+                    y2: line2Y,
+                    stroke: type === 'interface' ? '#7c3aed' : '#333333',
+                    strokeWidth: 1,
+                    display: attributes.length > 0 ? 'block' : 'none'
+                }
+            });
+
+            this.editor.graph.addCell(classElement);
             console.log('✅ Elemento recreado:', umlData.className || 'Sin nombre');
 
         } catch (error) {
             console.error('❌ Error recreando elemento:', error);
         }
+    }
+
+    // Construcción de texto CON NOMBRE CENTRADO PERO SIN CAMBIAR EL PUNTO DE REFERENCIA
+    buildTextElements(className, attributes, methods, type, width) {
+        const elements = [];
+        let currentY = 0;
+        const lineHeight = 16;
+
+        // Estereotipo para interfaces - CENTRADO
+        if (type === 'interface') {
+            elements.push({
+                tagName: 'tspan',
+                attributes: {
+                    x: width / 2,  // Centrar en el ancho del rectángulo
+                    dy: currentY === 0 ? 0 : lineHeight,
+                    'font-style': 'italic',
+                    'font-size': '10px',
+                    'text-anchor': 'middle'  // Centrado
+                },
+                textContent: '<<interface>>'
+            });
+            currentY += lineHeight;
+        }
+
+        // Nombre de la clase - CENTRADO
+        elements.push({
+            tagName: 'tspan',
+            attributes: {
+                x: width / 2,  // Centrar en el ancho del rectángulo
+                dy: currentY === 0 ? 0 : lineHeight,
+                'font-weight': 'bold',
+                'font-size': '14px',
+                'text-anchor': 'middle'  // Centrado
+            },
+            textContent: className
+        });
+        currentY += lineHeight;
+
+        // Atributos - ALINEACIÓN IZQUIERDA CON ESPACIADO EXTRA PARA COMPENSAR LA LÍNEA SVG
+        if (attributes.length > 0) {
+            attributes.forEach((attr, index) => {
+                elements.push({
+                    tagName: 'tspan',
+                    attributes: {
+                        x: 15,  // Mantener posición izquierda normal
+                        dy: index === 0 ? lineHeight * 2 : lineHeight,  // Doble espaciado en el primer atributo
+                        fill: this.getColorByVisibility(attr),
+                        'text-anchor': 'start'  // Alineación izquierda
+                    },
+                    textContent: attr
+                });
+                currentY += lineHeight;
+            });
+        }
+
+        // Métodos - ALINEACIÓN IZQUIERDA CON ESPACIADO EXTRA PARA COMPENSAR LA LÍNEA SVG
+        if (methods.length > 0) {
+            methods.forEach((method, index) => {
+                elements.push({
+                    tagName: 'tspan',
+                    attributes: {
+                        x: 15,  // Mantener posición izquierda normal
+                        dy: index === 0 ? (attributes.length > 0 ? lineHeight * 2 : lineHeight * 2) : lineHeight,  // Doble espaciado en el primer método
+                        fill: this.getColorByVisibility(method),
+                        'text-anchor': 'start'  // Alineación izquierda
+                    },
+                    textContent: method
+                });
+                currentY += lineHeight;
+            });
+        }
+
+        return elements;
+    }
+
+    getColorByVisibility(text) {
+        if (text.startsWith('+')) return '#059669';
+        if (text.startsWith('-')) return '#dc2626';
+        if (text.startsWith('#')) return '#d97706';
+        if (text.startsWith('~')) return '#7c3aed';
+        return '#374151';
     }
 
     recreateLink(linkData) {
@@ -179,7 +335,6 @@ export class DiagramSaveManager {
             var attrs = linkData.attrs || {};
             var labels = linkData.labels || [];
 
-            // Verificar que los elementos fuente y destino existen
             var sourceElement = this.editor.graph.getCell(source.id);
             var targetElement = this.editor.graph.getCell(target.id);
 
@@ -188,9 +343,8 @@ export class DiagramSaveManager {
                 return;
             }
 
-            // Recrear enlace con markup correcto
             var newLink = new joint.shapes.standard.Link({
-                id: linkData.id, // Mantener el ID original
+                id: linkData.id,
                 source: source,
                 target: target,
                 attrs: attrs,
@@ -206,43 +360,7 @@ export class DiagramSaveManager {
         }
     }
 
-    buildClassTextImproved(umlData) {
-        if (!umlData || !umlData.className) {
-            return 'Clase Sin Nombre';
-        }
-
-        var text = '';
-
-        // Agregar estereotipo para interfaces
-        if (umlData.type === 'interface') {
-            text = '<<interface>>\n';
-        }
-
-        text += umlData.className;
-
-        // Separador visual mejorado
-        if (umlData.attributes && umlData.attributes.length > 0) {
-            text += '\n' + '─'.repeat(Math.max(umlData.className.length, 20)) + '\n';
-            text += umlData.attributes.join('\n');
-        }
-
-        // Separador de métodos
-        if (umlData.methods && umlData.methods.length > 0) {
-            if (umlData.attributes && umlData.attributes.length > 0) {
-                text += '\n' + '─'.repeat(Math.max(umlData.className.length, 20)) + '\n';
-            } else {
-                text += '\n' + '─'.repeat(Math.max(umlData.className.length, 20)) + '\n';
-            }
-            text += umlData.methods.join('\n');
-        }
-
-        return text;
-    }
-
-    // ==================== UTILIDADES DE GUARDADO ====================
-
     showSaveNotification(message, type) {
-        // Crear notificación visual simple
         var notification = document.createElement('div');
         notification.className = `fixed top-4 right-4 px-4 py-2 rounded-md text-white z-50 transition-opacity duration-300 ${
             type === 'error' ? 'bg-red-600' : 'bg-green-600'
@@ -251,7 +369,6 @@ export class DiagramSaveManager {
 
         document.body.appendChild(notification);
 
-        // Remover después de 3 segundos
         setTimeout(() => {
             notification.style.opacity = '0';
             setTimeout(() => {
@@ -276,7 +393,6 @@ export class DiagramSaveManager {
     }
 }
 
-// Función global para compatibilidad hacia atrás
 window.saveFromButton = function() {
     if (window.DiagramEditor?.instance?.saveManager) {
         window.DiagramEditor.instance.saveManager.saveDiagram();

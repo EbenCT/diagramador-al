@@ -1,4 +1,4 @@
-/* resources/css/uml-editor.css - ESTILOS UML 2.5 MEJORADOS */
+/* resources/css/uml-editor.css - VERSIÓN LIMPIA Y FUNCIONAL */
 
 /* ==================== FUENTES PROFESIONALES ==================== */
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
@@ -17,17 +17,6 @@
     --uml-bg-primary: #ffffff;
     --uml-bg-secondary: #f8fafc;
     --uml-bg-canvas: #fdfdfe;
-
-    /* Colores de clase */
-    --uml-class-bg: #fefefe;
-    --uml-class-border: #1e40af;
-    --uml-class-text: #1e40af;
-    --uml-class-shadow: rgba(30, 64, 175, 0.1);
-
-    /* Colores de interfaz */
-    --uml-interface-bg: #faf5ff;
-    --uml-interface-border: #7c3aed;
-    --uml-interface-text: #7c3aed;
 
     /* Relaciones */
     --uml-relation-color: #1e40af;
@@ -88,38 +77,32 @@
     cursor: crosshair;
 }
 
-#paper-container::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg,
-        rgba(99, 102, 241, 0.02) 0%,
-        rgba(30, 64, 175, 0.02) 100%);
-    pointer-events: none;
-    z-index: 0;
+/* ==================== ELEMENTOS JOINTJS MEJORADOS ==================== */
+
+/* CRÍTICO: Configuración correcta del texto */
+.joint-element text {
+    font-family: 'Fira Code', 'Consolas', monospace !important;
+    font-size: 12px !important;
+    dominant-baseline: hanging !important;
+    text-anchor: start !important;
 }
 
-/* Indicador visual durante pan */
-#paper-container.panning {
-    cursor: grabbing !important;
+/* Efectos de selección */
+.joint-element.selected rect {
+    stroke: #007bff !important;
+    stroke-width: 3px !important;
+    filter: drop-shadow(0 0 8px rgba(0, 123, 255, 0.4)) !important;
 }
 
-#paper-container.panning::after {
-    content: '👋 Arrastrando...';
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(30, 64, 175, 0.9);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    z-index: 10;
-    animation: fade-in 0.2s ease;
+/* Hover effects */
+.joint-element:hover rect {
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15)) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Cursor para elementos */
+.joint-element {
+    cursor: move;
 }
 
 /* ==================== TOOLBAR MEJORADO ==================== */
@@ -153,26 +136,11 @@
     overflow: hidden;
 }
 
-.tool-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-    transition: left 0.5s ease;
-}
-
 .tool-btn:hover {
     background: rgba(30, 64, 175, 0.05);
     border-color: rgba(30, 64, 175, 0.2);
     transform: translateY(-1px);
     box-shadow: var(--uml-shadow-md);
-}
-
-.tool-btn:hover::before {
-    left: 100%;
 }
 
 .tool-btn.active {
@@ -183,197 +151,7 @@
     box-shadow: 0 8px 25px -8px var(--uml-primary);
 }
 
-.tool-btn:active {
-    transform: translateY(0);
-}
-
-/* ==================== CLASES UML CON EDICIÓN DIRECTA ==================== */
-
-.uml-class-overlay {
-    border-radius: 8px;
-    background: white;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border: 2px solid #1e40af;
-    overflow: hidden;
-    font-family: var(--uml-font-mono);
-    font-size: 12px;
-    line-height: 1.4;
-    user-select: none;
-    transition: all 0.2s ease;
-}
-
-.uml-class-overlay:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-    transform: translateY(-1px);
-}
-
-/* Secciones de la clase */
-.uml-class-header {
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    border-bottom: 2px solid #1e40af;
-    text-align: center;
-    font-weight: bold;
-    color: #1e40af;
-}
-
-.uml-class-attributes {
-    background: #fefefe;
-    border-bottom: 1px solid #e5e7eb;
-    color: #374151;
-}
-
-.uml-class-methods {
-    background: #fefefe;
-    color: #374151;
-}
-
-/* Inputs editables */
-.uml-editable {
-    transition: all 0.2s ease;
-    border-radius: 2px;
-}
-
-.uml-editable:hover {
-    background: rgba(30, 64, 175, 0.05) !important;
-}
-
-.uml-editable:focus {
-    background: rgba(30, 64, 175, 0.1) !important;
-    box-shadow: inset 0 0 0 1px #1e40af;
-}
-
-/* Inputs del header */
-.uml-header {
-    font-weight: bold;
-    color: #1e40af;
-    text-align: center;
-}
-
-/* Diferenciación por tipo de visibilidad */
-.uml-editable[value*="+ "] {
-    color: #059669; /* Verde para público */
-}
-
-.uml-editable[value*="- "] {
-    color: #dc2626; /* Rojo para privado */
-}
-
-.uml-editable[value*="# "] {
-    color: #d97706; /* Naranja para protegido */
-}
-
-.uml-editable[value*="~ "] {
-    color: #7c3aed; /* Púrpura para paquete */
-}
-
-/* Botones de agregar */
-.uml-add-btn {
-    opacity: 0;
-    transition: all 0.2s ease;
-}
-
-.uml-class-overlay:hover .uml-add-btn {
-    opacity: 1;
-}
-
-.uml-add-btn:hover {
-    background: rgba(30, 64, 175, 0.2) !important;
-    transform: scale(1.02);
-}
-
-/* Interfaces - estilo diferenciado */
-.uml-class-overlay[data-type="interface"] {
-    border: 2px dashed #7c3aed;
-    background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
-}
-
-.uml-class-overlay[data-type="interface"] .uml-class-header {
-    background: linear-gradient(135deg, #faf5ff 0%, #e9d5ff 100%);
-    border-bottom-color: #7c3aed;
-    color: #7c3aed;
-}
-
-.uml-class-overlay[data-type="interface"] .uml-header {
-    color: #7c3aed;
-}
-
-/* Efectos de selección */
-.joint-element.selected + .uml-class-overlay,
-.uml-class-overlay.selected {
-    border-color: #f59e0b;
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
-}
-
-/* Animaciones */
-.uml-class-overlay {
-    animation: class-fade-in 0.3s ease;
-}
-
-@keyframes class-fade-in {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-/* Eliminación suave */
-.uml-class-overlay.removing {
-    animation: class-fade-out 0.3s ease forwards;
-}
-
-@keyframes class-fade-out {
-    to {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-}
-
-/* Tooltip para instrucciones */
-.uml-class-overlay::before {
-    content: 'Doble clic para editar';
-    position: absolute;
-    top: -25px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-    z-index: 1001;
-}
-
-.uml-class-overlay:hover::before {
-    opacity: 1;
-}
-
-/* Responsive - pantallas pequeñas */
-@media (max-width: 768px) {
-    .uml-class-overlay {
-        font-size: 10px;
-        min-width: 150px;
-    }
-
-    .uml-editable {
-        padding: 1px 0;
-    }
-
-    .uml-add-btn {
-        font-size: 9px;
-        padding: 2px 4px;
-    }
-}
-
-/* ==================== RELACIONES UML MEJORADAS ==================== */
+/* ==================== RELACIONES UML ==================== */
 
 /* Enlaces/Relaciones */
 .joint-link .connection {
@@ -382,36 +160,11 @@
     fill: none !important;
 }
 
-/* Marcadores de flecha mejorados */
+/* Marcadores de flecha */
 .joint-link .marker-target,
 .joint-link .marker-source {
     fill: var(--uml-relation-color) !important;
     stroke: var(--uml-relation-color) !important;
-}
-
-/* Etiquetas de multiplicidad */
-.joint-link .joint-label rect {
-    fill: rgba(255, 255, 255, 0.95) !important;
-    stroke: var(--uml-primary) !important;
-    stroke-width: 1 !important;
-    rx: 4 !important;
-    ry: 2 !important;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)) !important;
-}
-
-.joint-link .joint-label text {
-    font-family: var(--uml-font-mono) !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    fill: var(--uml-primary) !important;
-}
-
-/* Nombres de relaciones */
-.joint-link .joint-label text[font-style="italic"] {
-    font-family: var(--uml-font-sans) !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    fill: #374151 !important;
 }
 
 /* ==================== INFORMACIÓN DEL CANVAS ==================== */
@@ -428,7 +181,7 @@
     box-shadow: var(--uml-shadow-sm);
 }
 
-/* ==================== CONTROLES DE ZOOM MEJORADOS ==================== */
+/* ==================== CONTROLES DE ZOOM ==================== */
 .zoom-controls {
     display: flex;
     flex-direction: column;
@@ -439,7 +192,6 @@
     border-radius: 12px;
     padding: var(--uml-spacing-sm);
     box-shadow: var(--uml-shadow-md);
-    position: relative;
 }
 
 .zoom-btn {
@@ -456,19 +208,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    overflow: hidden;
-}
-
-.zoom-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-    transition: left 0.5s ease;
 }
 
 .zoom-btn:hover {
@@ -478,123 +217,26 @@
     box-shadow: var(--uml-shadow-md);
 }
 
-.zoom-btn:hover::before {
-    left: 100%;
+/* ==================== ANIMACIONES ==================== */
+
+/* Animación de aparición */
+.joint-element {
+    animation: element-appear 0.3s ease;
 }
 
-.zoom-btn:active {
-    transform: scale(0.95);
-}
-
-.zoom-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.zoom-btn:disabled:hover {
-    background: rgba(248, 250, 252, 0.8);
-    color: var(--uml-primary);
-    transform: none;
-}
-
-/* Indicador de zoom actual */
-.zoom-indicator {
-    background: var(--uml-primary);
-    color: white;
-    padding: var(--uml-spacing-xs);
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    text-align: center;
-    font-family: var(--uml-font-mono);
-    min-width: 40px;
-}
-
-/* Tooltips para controles */
-.zoom-btn[title]:hover::after {
-    content: attr(title);
-    position: absolute;
-    right: 50px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--uml-primary);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    white-space: nowrap;
-    z-index: 1000;
-    animation: tooltip-fade-in 0.3s ease;
-}
-
-/* ==================== NOTIFICACIONES ==================== */
-.uml-notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: var(--uml-spacing-md) var(--uml-spacing-lg);
-    border-radius: 12px;
-    font-family: var(--uml-font-sans);
-    font-weight: 500;
-    box-shadow: var(--uml-shadow-lg);
-    z-index: 1000;
-    transform: translateX(100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(10px);
-}
-
-.uml-notification.success {
-    background: rgba(16, 185, 129, 0.95);
-    color: white;
-    border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.uml-notification.error {
-    background: rgba(239, 68, 68, 0.95);
-    color: white;
-    border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.uml-notification.show {
-    transform: translateX(0);
-}
-
-/* ==================== TOOLTIP DE AYUDA ==================== */
-#relationship-tooltip {
-    background: rgba(30, 64, 175, 0.95) !important;
-    color: white !important;
-    border: 1px solid rgba(30, 64, 175, 0.3) !important;
-    border-radius: 8px !important;
-    padding: var(--uml-spacing-sm) var(--uml-spacing-md) !important;
-    font-family: var(--uml-font-sans) !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    backdrop-filter: blur(10px) !important;
-    box-shadow: var(--uml-shadow-md) !important;
-    animation: tooltip-fade-in 0.3s ease;
-}
-
-@keyframes tooltip-fade-in {
+@keyframes element-appear {
     from {
         opacity: 0;
-        transform: translateX(-50%) translateY(10px);
+        transform: scale(0.95);
     }
     to {
         opacity: 1;
-        transform: translateX(-50%) translateY(0);
+        transform: scale(1);
     }
 }
 
-/* ==================== PROMPTS Y MODALES ==================== */
-.uml-dialog {
-    font-family: var(--uml-font-sans) !important;
-    font-size: 14px !important;
-    line-height: 1.5 !important;
-    color: #374151 !important;
-}
+/* ==================== RESPONSIVE ==================== */
 
-/* ==================== RESPONSIVIDAD ==================== */
 @media (max-width: 768px) {
     .toolbar-container {
         padding: var(--uml-spacing-sm);
@@ -608,13 +250,13 @@
         font-size: 12px;
     }
 
+    .joint-element text {
+        font-size: 10px !important;
+    }
+
     #canvas-info {
         font-size: 10px;
         padding: var(--uml-spacing-xs) var(--uml-spacing-sm);
-    }
-
-    .zoom-controls {
-        gap: 2px;
     }
 
     .zoom-btn {
@@ -624,93 +266,28 @@
     }
 }
 
-/* ==================== ANIMACIONES SUAVES ==================== */
-* {
-    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
-}
-
-/* Animación de entrada para elementos */
-.joint-element {
-    animation: element-fade-in 0.3s ease;
-}
-
-@keyframes element-fade-in {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-/* Animación para enlaces */
-.joint-link {
-    animation: link-draw-in 0.5s ease;
-}
-
-@keyframes link-draw-in {
-    from {
-        stroke-dasharray: 1000;
-        stroke-dashoffset: 1000;
-    }
-    to {
-        stroke-dasharray: 0;
-        stroke-dashoffset: 0;
-    }
-}
-
-/* ==================== ESTADOS DE CARGA ==================== */
-.uml-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--uml-spacing-xl);
-    font-family: var(--uml-font-sans);
-    color: var(--uml-primary);
-}
-
-.uml-spinner {
-    width: 24px;
-    height: 24px;
-    border: 3px solid rgba(30, 64, 175, 0.1);
-    border-top: 3px solid var(--uml-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-right: var(--uml-spacing-sm);
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* ==================== MEJORAS DE ACCESIBILIDAD ==================== */
-.tool-btn:focus {
-    outline: 2px solid var(--uml-accent);
-    outline-offset: 2px;
-}
-
-.zoom-btn:focus {
-    outline: 2px solid var(--uml-accent);
-    outline-offset: 2px;
-}
-
 /* ==================== TEMA OSCURO (OPCIONAL) ==================== */
+
 @media (prefers-color-scheme: dark) {
     :root {
         --uml-bg-primary: #1f2937;
         --uml-bg-secondary: #111827;
         --uml-bg-canvas: #1a1f2e;
+    }
 
-        --uml-class-bg: #374151;
-        --uml-class-text: #e5e7eb;
-        --uml-class-border: #60a5fa;
+    #paper-container {
+        background-color: #1a1f2e;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(96, 165, 250, 0.1) 1px, transparent 0);
+    }
 
-        --uml-interface-bg: #312e81;
-        --uml-interface-text: #c4b5fd;
-        --uml-interface-border: #a78bfa;
+    .joint-element text {
+        fill: #e5e7eb !important;
+    }
+
+    .joint-element rect {
+        fill: #374151 !important;
+        stroke: #60a5fa !important;
     }
 
     .toolbar-container {
@@ -735,99 +312,24 @@
     }
 }
 
-/* ==================== ESTILOS PARA ELEMENTOS ESPECÍFICOS ==================== */
+/* ==================== LIMPIAR ESTILOS ANTIGUOS ==================== */
 
-/* Clases abstractas */
-.uml-abstract-class text {
-    font-style: italic !important;
-    font-weight: 500 !important;
-}
-
-/* Métodos estáticos */
-.uml-static-method {
-    text-decoration: underline !important;
-}
-
-/* Atributos privados */
-.uml-private-attribute {
-    color: #dc2626 !important;
-}
-
-/* Atributos públicos */
-.uml-public-attribute {
-    color: #059669 !important;
-}
-
-/* Atributos protegidos */
-.uml-protected-attribute {
-    color: #d97706 !important;
-}
-
-/* ==================== EFECTOS ESPECIALES ==================== */
-
-/* Efecto de brillo para elementos seleccionados */
-.joint-element.selected {
-    filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.4));
-}
-
-/* Efecto de hover para elementos */
-.joint-element:hover {
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
-    transform: translateY(-1px);
-    transition: all 0.2s ease;
-}
-
-/* ==================== GRID PERSONALIZADO ==================== */
-.joint-paper {
-    background-image:
-        linear-gradient(rgba(30, 64, 175, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(30, 64, 175, 0.05) 1px, transparent 1px);
-    background-size: 20px 20px;
-}
-
-/* Grid más sutil para zoom alto */
-.joint-paper[transform*="scale(2)"] {
-    background-image:
-        linear-gradient(rgba(30, 64, 175, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(30, 64, 175, 0.02) 1px, transparent 1px);
-}
-
-/* ==================== UTILIDADES ==================== */
-.uml-hidden {
+/* Eliminar cualquier overlay o elemento conflictivo */
+.class-box,
+.uml-class-overlay,
+.editable,
+.delete-btn,
+.class-header,
+.class-attributes,
+.class-methods {
     display: none !important;
 }
 
-.uml-fade-in {
-    animation: fade-in 0.3s ease-in-out;
-}
-
-.uml-fade-out {
-    animation: fade-out 0.3s ease-in-out;
-}
-
-@keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes fade-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
-}
-
-.uml-scale-in {
-    animation: scale-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@keyframes scale-in {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+/* Asegurar calidad del texto */
+.joint-viewport {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* ==================== PRINT STYLES ==================== */
@@ -847,508 +349,4 @@
     .joint-link {
         print-color-adjust: exact !important;
     }
-}
-/* NUEVOS ESTILOS PARA CLASES UML EDITABLES INLINE */
-
-/* ==================== CONTENEDOR PRINCIPAL DE CLASE ==================== */
-.class-box {
-    position: absolute;
-    background: #fff;
-    border: 2px solid #333;
-    min-width: 150px;
-    min-height: 120px;
-    cursor: move;
-    user-select: none;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    z-index: 10;
-    font-family: 'Fira Code', 'Consolas', monospace;
-    font-size: 12px;
-    overflow: hidden;
-    transition: all 0.2s ease;
-}
-
-/* Estado cuando la clase está seleccionada */
-.class-box.selected {
-    border-color: #007bff;
-    box-shadow: 0 0 10px rgba(0,123,255,0.5);
-    z-index: 15;
-}
-
-/* Estado hover */
-.class-box:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    transform: translateY(-1px);
-}
-
-/* Interfaces - estilo diferenciado */
-.class-box.interface {
-    border: 2px dashed #7c3aed;
-    background: #faf5ff;
-}
-
-.class-box.interface .class-header {
-    background: linear-gradient(135deg, #faf5ff 0%, #e9d5ff 100%);
-    border-bottom-color: #7c3aed;
-}
-
-/* ==================== BOTÓN DE ELIMINAR ==================== */
-.delete-btn {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 1px solid #dc2626;
-    background: #dc2626;
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: all 0.2s ease;
-    z-index: 20;
-}
-
-.class-box:hover .delete-btn {
-    opacity: 1;
-}
-
-.delete-btn:hover {
-    background: #b91c1c;
-    transform: scale(1.1);
-}
-
-/* ==================== CABECERA DE LA CLASE (NOMBRE) ==================== */
-.class-header {
-    background: #f8f9fa;
-    border-bottom: 1px solid #333;
-    padding: 8px;
-    text-align: center;
-    font-weight: bold;
-    font-size: 14px;
-    position: relative;
-}
-
-/* Estereotipo para interfaces */
-.stereotype {
-    font-size: 10px;
-    font-style: italic;
-    color: #666;
-    margin-bottom: 2px;
-}
-
-/* ==================== SECCIONES DE ATRIBUTOS Y MÉTODOS ==================== */
-.class-attributes,
-.class-methods {
-    padding: 6px 8px;
-    font-size: 12px;
-    line-height: 1.6;
-    border-bottom: 1px solid #ddd;
-    min-height: 40px;
-    display: flex;
-    flex-direction: column;
-}
-
-.class-methods {
-    border-bottom: none;
-}
-
-/* ==================== CAMPOS DE TEXTO EDITABLES ==================== */
-.editable {
-    background: transparent;
-    border: none;
-    outline: none;
-    width: 100%;
-    font-family: inherit;
-    font-size: inherit;
-    font-weight: inherit;
-    margin: 2px 0;
-    padding: 2px 4px;
-    border-radius: 3px;
-    transition: all 0.2s ease;
-}
-
-/* Estados de interacción de los campos editables */
-.editable:hover {
-    background: rgba(0, 123, 255, 0.05);
-}
-
-.editable:focus {
-    background: rgba(0, 123, 255, 0.1);
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
-}
-
-/* Campo del nombre de la clase */
-.class-name {
-    font-weight: bold;
-    text-align: center;
-    font-size: 14px;
-}
-
-/* ==================== ESTILOS SEGÚN VISIBILIDAD ==================== */
-
-/* Métodos y atributos públicos (+) */
-.editable[value*="+ "],
-.editable[placeholder*="+ "] {
-    color: #059669;
-}
-
-/* Métodos y atributos privados (-) */
-.editable[value*="- "],
-.editable[placeholder*="- "] {
-    color: #dc2626;
-}
-
-/* Métodos y atributos protegidos (#) */
-.editable[value*="# "] {
-    color: #d97706;
-}
-
-/* Métodos y atributos de paquete (~) */
-.editable[value*="~ "] {
-    color: #7c3aed;
-}
-
-/* ==================== PLACEHOLDERS ==================== */
-.editable::placeholder {
-    color: #9ca3af;
-    font-style: italic;
-    opacity: 0.7;
-}
-
-.editable:focus::placeholder {
-    opacity: 0.5;
-}
-
-/* ==================== ANIMACIONES ==================== */
-
-/* Animación de aparición */
-.class-box {
-    animation: class-fade-in 0.3s ease;
-}
-
-@keyframes class-fade-in {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-/* Animación de eliminación */
-.class-box.removing {
-    animation: class-fade-out 0.3s ease forwards;
-}
-
-@keyframes class-fade-out {
-    to {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-}
-
-/* ==================== TOOLTIP DE AYUDA ==================== */
-.class-box::before {
-    content: 'Haz clic en cualquier texto para editar';
-    position: absolute;
-    top: -30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-    z-index: 100;
-}
-
-.class-box:hover::before {
-    opacity: 1;
-}
-
-/* ==================== ESTADOS RESPONSIVE ==================== */
-@media (max-width: 768px) {
-    .class-box {
-        font-size: 10px;
-        min-width: 120px;
-        min-height: 100px;
-    }
-
-    .class-header {
-        padding: 6px;
-        font-size: 12px;
-    }
-
-    .class-attributes,
-    .class-methods {
-        padding: 4px 6px;
-        font-size: 10px;
-        min-height: 30px;
-    }
-
-    .editable {
-        margin: 1px 0;
-        padding: 1px 2px;
-    }
-
-    .delete-btn {
-        width: 16px;
-        height: 16px;
-        font-size: 10px;
-        top: -6px;
-        right: -6px;
-    }
-}
-
-/* ==================== MEJORAS DE ACCESIBILIDAD ==================== */
-.editable:focus {
-    outline: 2px solid #007bff;
-    outline-offset: 1px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .class-box,
-    .editable,
-    .delete-btn {
-        transition: none;
-        animation: none;
-    }
-}
-
-/* ==================== INTEGRACIÓN CON JOINTJS ==================== */
-
-/* Ocultar elementos JointJS nativos cuando usamos overlay */
-.joint-element .joint-label {
-    display: none;
-}
-
-.joint-element rect {
-    fill: transparent !important;
-    stroke: transparent !important;
-}
-
-/* ==================== ESTADOS ESPECIALES ==================== */
-
-/* Cuando se está arrastrando */
-.class-box.dragging {
-    cursor: grabbing;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.2);
-    z-index: 20;
-}
-
-/* Campo siendo editado */
-.editable.editing {
-    background: rgba(0, 123, 255, 0.15);
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.3);
-}
-
-/* Resaltar campo vacío */
-.editable:empty:not(:focus) {
-    border: 1px dashed #ccc;
-}
-
-/* ==================== MEJORAS VISUALES ADICIONALES ==================== */
-
-/* Separadores visuales más sutiles */
-.class-attributes::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 8px;
-    right: 8px;
-    height: 1px;
-    background: linear-gradient(to right, transparent, #ddd, transparent);
-}
-
-/* Efecto de brillo en selección */
-.class-box.selected::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.3);
-}
-
-/* Indicador visual para campos requeridos */
-.editable[required]:invalid {
-    border-left: 3px solid #dc2626;
-}
-
-/* Texto de ayuda para campos vacíos */
-.class-attributes:empty::before {
-    content: 'Haz clic para agregar atributos';
-    color: #9ca3af;
-    font-style: italic;
-    font-size: 11px;
-    padding: 4px;
-    display: block;
-}
-
-.class-methods:empty::before {
-    content: 'Haz clic para agregar métodos';
-    color: #9ca3af;
-    font-style: italic;
-    font-size: 11px;
-    padding: 4px;
-    display: block;
-}
-/* ESTILOS LIMPIOS PARA CLASES UML - SOLO JOINTJS NATIVO */
-/* Reemplaza los estilos anteriores con estos */
-
-/* ==================== ELEMENTOS JOINTJS MEJORADOS ==================== */
-
-/* Mejorar el texto de las clases */
-.joint-element text {
-    font-family: 'Fira Code', 'Consolas', monospace !important;
-    font-size: 12px !important;
-    line-height: 1.4 !important;
-    dominant-baseline: text-before-edge !important;
-}
-
-/* Efectos de selección mejorados */
-.joint-element.selected rect {
-    stroke: #007bff !important;
-    stroke-width: 3px !important;
-    filter: drop-shadow(0 0 8px rgba(0, 123, 255, 0.4)) !important;
-}
-
-/* Hover effects */
-.joint-element:hover rect {
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15)) !important;
-    transition: all 0.2s ease !important;
-}
-
-/* Cursor para elementos */
-.joint-element {
-    cursor: move;
-}
-
-/* ==================== ANIMACIONES ==================== */
-
-/* Animación de aparición */
-.joint-element {
-    animation: element-appear 0.3s ease;
-}
-
-@keyframes element-appear {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-/* ==================== CANVAS MEJORADO ==================== */
-
-/* Paper container con grid sutil */
-#paper-container {
-    background-color: #fdfdfe;
-    background-image:
-        radial-gradient(circle at 1px 1px, rgba(30, 64, 175, 0.1) 1px, transparent 0);
-    background-size: 20px 20px;
-}
-
-/* Estados del cursor según herramienta */
-#paper-container[data-tool="class"],
-#paper-container[data-tool="interface"] {
-    cursor: crosshair;
-}
-
-#paper-container[data-tool="select"] {
-    cursor: grab;
-}
-
-#paper-container[data-tool="select"]:active {
-    cursor: grabbing;
-}
-
-/* ==================== RELACIONES ==================== */
-
-/* Enlaces mejorados */
-.joint-link .connection {
-    stroke: #1e40af !important;
-    stroke-width: 2px !important;
-    fill: none !important;
-}
-
-.joint-link .marker-target,
-.joint-link .marker-source {
-    fill: #1e40af !important;
-    stroke: #1e40af !important;
-}
-
-/* ==================== RESPONSIVE ==================== */
-
-@media (max-width: 768px) {
-    .joint-element text {
-        font-size: 10px !important;
-    }
-}
-
-/* ==================== TEMA OSCURO (OPCIONAL) ==================== */
-
-@media (prefers-color-scheme: dark) {
-    #paper-container {
-        background-color: #1a1f2e;
-        background-image:
-            radial-gradient(circle at 1px 1px, rgba(96, 165, 250, 0.1) 1px, transparent 0);
-    }
-
-    .joint-element text {
-        fill: #e5e7eb !important;
-    }
-
-    .joint-element rect {
-        fill: #374151 !important;
-        stroke: #60a5fa !important;
-    }
-
-    .joint-link .connection {
-        stroke: #60a5fa !important;
-    }
-
-    .joint-link .marker-target,
-    .joint-link .marker-source {
-        fill: #60a5fa !important;
-        stroke: #60a5fa !important;
-    }
-}
-
-/* ==================== UTILIDADES ==================== */
-
-/* Eliminar elementos de prueba o overlays antiguos */
-.class-box,
-.uml-class-overlay {
-    display: none !important;
-}
-
-/* Asegurar que solo se vean elementos JointJS */
-.joint-paper-scroller {
-    overflow: hidden;
-}
-
-/* Mejorar la calidad del texto */
-.joint-viewport {
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
 }
