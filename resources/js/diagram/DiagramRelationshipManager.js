@@ -142,7 +142,7 @@ export class DiagramRelationshipManager {
             ` : ''}
 
             ${showName ? `
-                <div style="margin-bottom: 20px;">
+                <div style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">
                         Nombre de la relación:
                         <small style="color: #6b7280; font-weight: normal;">(opcional)</small>
@@ -151,6 +151,43 @@ export class DiagramRelationshipManager {
                            style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;">
                 </div>
             ` : ''}
+
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 14px; font-weight: 600;">
+                    🎯 Puntos de Conexión:
+                </h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">
+                            Salida desde ${source.get('umlData')?.className || 'Origen'}:
+                        </label>
+                        <select id="sourceAnchor" style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;">
+                            <option value="auto">🤖 Automático</option>
+                            <option value="top">⬆️ Arriba</option>
+                            <option value="right">➡️ Derecha</option>
+                            <option value="bottom">⬇️ Abajo</option>
+                            <option value="left">⬅️ Izquierda</option>
+                            <option value="center">🎯 Centro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">
+                            Llegada a ${target.get('umlData')?.className || 'Destino'}:
+                        </label>
+                        <select id="targetAnchor" style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;">
+                            <option value="auto">🤖 Automático</option>
+                            <option value="top">⬆️ Arriba</option>
+                            <option value="right">➡️ Derecha</option>
+                            <option value="bottom">⬇️ Abajo</option>
+                            <option value="left">⬅️ Izquierda</option>
+                            <option value="center">🎯 Centro</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 12px;">
+                    💡 Usa "Automático" para evitar superposiciones, o selecciona manualmente los puntos específicos.
+                </p>
+            </div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
                 <button id="cancelRelationBtn"
@@ -177,10 +214,16 @@ export class DiagramRelationshipManager {
             const targetMultiplicity = showMultiplicity ? document.getElementById('targetMultiplicity').value : '';
             const relationName = showName ? document.getElementById('relationName').value.trim() : '';
 
+            // Obtener los anchors seleccionados por el usuario
+            const sourceAnchorChoice = document.getElementById('sourceAnchor').value;
+            const targetAnchorChoice = document.getElementById('targetAnchor').value;
+
             this.createRelationshipFromConfig(relationshipType, source, target, {
                 sourceMultiplicity,
                 targetMultiplicity,
-                name: relationName
+                name: relationName,
+                sourceAnchor: sourceAnchorChoice,
+                targetAnchor: targetAnchorChoice
             });
 
             document.body.removeChild(modal);
@@ -272,9 +315,20 @@ export class DiagramRelationshipManager {
     createRelationshipFromConfig(relationshipType, source, target, config) {
         let link;
 
-        // Calcular anchors inteligentes para evitar superposiciones
-        const sourceAnchor = this.selectSmartAnchor(source, target, true);
-        const targetAnchor = this.selectSmartAnchor(target, source, false);
+        // Determinar anchors según la elección del usuario
+        let sourceAnchor, targetAnchor;
+
+        if (config.sourceAnchor === 'auto') {
+            sourceAnchor = this.selectSmartAnchor(source, target, true);
+        } else {
+            sourceAnchor = config.sourceAnchor;
+        }
+
+        if (config.targetAnchor === 'auto') {
+            targetAnchor = this.selectSmartAnchor(target, source, false);
+        } else {
+            targetAnchor = config.targetAnchor;
+        }
 
         switch(relationshipType) {
             case 'association':
@@ -309,7 +363,9 @@ export class DiagramRelationshipManager {
                         type: 'association',
                         sourceMultiplicity: config.sourceMultiplicity,
                         targetMultiplicity: config.targetMultiplicity,
-                        name: config.name
+                        name: config.name,
+                        sourceAnchor: config.sourceAnchor,
+                        targetAnchor: config.targetAnchor
                     }
                 });
                 break;
@@ -356,7 +412,9 @@ export class DiagramRelationshipManager {
                         type: 'inheritance',
                         sourceMultiplicity: '',
                         targetMultiplicity: '',
-                        name: config.name
+                        name: config.name,
+                        sourceAnchor: config.sourceAnchor,
+                        targetAnchor: config.targetAnchor
                     }
                 });
                 break;
@@ -400,7 +458,9 @@ export class DiagramRelationshipManager {
                         type: 'aggregation',
                         sourceMultiplicity: config.sourceMultiplicity,
                         targetMultiplicity: config.targetMultiplicity,
-                        name: config.name
+                        name: config.name,
+                        sourceAnchor: config.sourceAnchor,
+                        targetAnchor: config.targetAnchor
                     }
                 });
                 break;
@@ -444,7 +504,9 @@ export class DiagramRelationshipManager {
                         type: 'composition',
                         sourceMultiplicity: config.sourceMultiplicity,
                         targetMultiplicity: config.targetMultiplicity,
-                        name: config.name
+                        name: config.name,
+                        sourceAnchor: config.sourceAnchor,
+                        targetAnchor: config.targetAnchor
                     }
                 });
                 break;
@@ -543,6 +605,11 @@ export class DiagramRelationshipManager {
     }
 
     showEditRelationshipModal(link, relationshipType, currentSource, currentTarget, currentName) {
+        // Obtener los anchors actuales del relationData (más confiable que del link)
+        const relationData = link.get('relationData') || {};
+        const currentSourceAnchor = relationData.sourceAnchor || 'auto';
+        const currentTargetAnchor = relationData.targetAnchor || 'auto';
+
         const modal = document.createElement('div');
         modal.style.cssText = `
             position: fixed;
@@ -611,7 +678,7 @@ export class DiagramRelationshipManager {
             ` : ''}
 
             ${showName ? `
-                <div style="margin-bottom: 20px;">
+                <div style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">
                         Nombre de la relación:
                     </label>
@@ -619,6 +686,40 @@ export class DiagramRelationshipManager {
                            style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;">
                 </div>
             ` : ''}
+
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; color: #374151; font-size: 14px; font-weight: 600;">
+                    🎯 Puntos de Conexión:
+                </h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">
+                            Salida desde Origen:
+                        </label>
+                        <select id="editSourceAnchor" style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;">
+                            <option value="auto">🤖 Automático</option>
+                            <option value="top">⬆️ Arriba</option>
+                            <option value="right">➡️ Derecha</option>
+                            <option value="bottom">⬇️ Abajo</option>
+                            <option value="left">⬅️ Izquierda</option>
+                            <option value="center">🎯 Centro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">
+                            Llegada a Destino:
+                        </label>
+                        <select id="editTargetAnchor" style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;">
+                            <option value="auto">🤖 Automático</option>
+                            <option value="top">⬆️ Arriba</option>
+                            <option value="right">➡️ Derecha</option>
+                            <option value="bottom">⬇️ Abajo</option>
+                            <option value="left">⬅️ Izquierda</option>
+                            <option value="center">🎯 Centro</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
 
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
                 <button id="cancelEditBtn"
@@ -645,6 +746,10 @@ export class DiagramRelationshipManager {
             document.getElementById('editTargetMultiplicity').value = currentTarget;
         }
 
+        // Establecer anchors actuales
+        document.getElementById('editSourceAnchor').value = currentSourceAnchor;
+        document.getElementById('editTargetAnchor').value = currentTargetAnchor;
+
         // Event listeners
         document.getElementById('cancelEditBtn').onclick = () => {
             document.body.removeChild(modal);
@@ -655,6 +760,10 @@ export class DiagramRelationshipManager {
             const newTargetMultiplicity = showMultiplicity ? document.getElementById('editTargetMultiplicity').value : '';
             const newRelationName = showName ? document.getElementById('editRelationName').value.trim() : '';
 
+            // Obtener los nuevos anchors seleccionados
+            const newSourceAnchor = document.getElementById('editSourceAnchor').value;
+            const newTargetAnchor = document.getElementById('editTargetAnchor').value;
+
             // Actualizar labels
             const newLabels = this.createRelationLabelsImproved(
                 newSourceMultiplicity,
@@ -663,15 +772,25 @@ export class DiagramRelationshipManager {
             );
             link.set('labels', newLabels);
 
+            // Actualizar anchors si no son automáticos
+            if (newSourceAnchor !== 'auto') {
+                link.prop('source/anchor', { name: newSourceAnchor });
+            }
+            if (newTargetAnchor !== 'auto') {
+                link.prop('target/anchor', { name: newTargetAnchor });
+            }
+
             // Actualizar datos
             const relationData = link.get('relationData') || {};
             relationData.sourceMultiplicity = newSourceMultiplicity;
             relationData.targetMultiplicity = newTargetMultiplicity;
             relationData.name = newRelationName;
+            relationData.sourceAnchor = newSourceAnchor;
+            relationData.targetAnchor = newTargetAnchor;
             link.set('relationData', relationData);
 
             document.body.removeChild(modal);
-            console.log('✅ Relación editada');
+            console.log('✅ Relación editada con nuevos puntos de conexión');
         };
 
         document.getElementById('deleteRelationBtn').onclick = () => {
