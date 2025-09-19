@@ -21,6 +21,8 @@
         "backbone": "^1.6.1",
         "jointjs": "^3.7.7",
         "jquery": "^3.7.1",
-        "lodash": "^4.17.21"
+        "laravel-echo": "^2.2.0",
+        "lodash": "^4.17.21",
+        "pusher-js": "^8.4.0"
     }
 }

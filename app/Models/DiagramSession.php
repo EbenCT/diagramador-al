@@ -131,13 +131,13 @@ class DiagramSession extends Model
         return $this->active_users_count < $this->max_collaborators;
     }
 
-    public function generateInviteUrl(): string
-    {
-        return route('diagrams.join', [
-            'session' => $this->session_id,
-            'token' => $this->invite_token
-        ]);
-    }
+public function generateInviteUrl(): string
+{
+    return route('collaborate.join-with-token', [
+        'sessionId' => $this->session_id,
+        'token' => $this->invite_token
+    ]);
+}
 
     public function isInviteValid(): bool
     {

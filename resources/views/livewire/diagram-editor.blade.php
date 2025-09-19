@@ -166,6 +166,13 @@
         window.diagramData = @json($diagramData);
         window.diagramId = {{ $diagramId ?? 'null' }};
         window.diagramTitle = @json($diagramTitle ?? 'Nuevo Diagrama UML');
+        window.authUser = @json(auth()->user());
+
+        // NUEVO: Datos de sesión colaborativa
+        @if($collaborationSession)
+            window.diagramSessionId = @json($collaborationSession);
+            console.log('🤝 Sesión colaborativa detectada:', window.diagramSessionId);
+        @endif
 
         console.log('📊 Datos del template:', {
             hasData: window.diagramData !== '[]',

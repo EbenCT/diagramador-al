@@ -2,6 +2,7 @@
 // routes/web.php - ARCHIVO COMPLETO
 
 use App\Http\Controllers\DiagramController;
+use App\Http\Controllers\CollaborationController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
@@ -59,8 +60,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', function () {
         return redirect()->route('diagrams.index');
     })->name('dashboard');
-
-    // Rutas de diagramas
+   // Rutas de diagramas
     Route::prefix('diagrams')->name('diagrams.')->group(function () {
 
         // === RUTAS PRINCIPALES ===
@@ -73,7 +73,8 @@ Route::middleware('auth')->group(function () {
 
         // Guardar nuevo diagrama
         Route::post('/', [DiagramController::class, 'store'])->name('store');
-
+        //colaborativo
+        Route::post('/diagrams/{diagram}/collaborate', [CollaborationController::class, 'createSession'])->name('diagrams.collaborate');
         // Editor de diagrama - puede ser nuevo o existente
         Route::get('/editor/{diagram?}', function ($diagram = null) {
             if ($diagram) {

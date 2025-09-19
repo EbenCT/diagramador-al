@@ -363,19 +363,24 @@ class DiagramEditor extends Component
         }
     }
 
-    /**
-     * Render del componente
-     */
-    public function render()
-    {
-        return view('livewire.diagram-editor', [
-            'stats' => $this->getStats(),
-            'canExport' => $this->diagram && !empty($this->diagramData) && $this->diagramData !== '[]',
-            'hasChanges' => $this->isDirty,
-            'isNewDiagram' => !$this->diagram,
-            'diagramId' => $this->diagramId,
-            'diagramData' => $this->diagramData,
-            'diagramTitle' => $this->diagramTitle
-        ]);
-    }
+/**
+ * Render del componente
+ */
+public function render()
+{
+    // NUEVO: Obtener sesión colaborativa
+    $collaborationSession = session('collaboration_session');
+
+    return view('livewire.diagram-editor', [
+        'stats' => $this->getStats(),
+        'canExport' => $this->diagram && !empty($this->diagramData) && $this->diagramData !== '[]',
+        'hasChanges' => $this->isDirty,
+        'isNewDiagram' => !$this->diagram,
+        'diagramId' => $this->diagramId,
+        'diagramData' => $this->diagramData,
+        'diagramTitle' => $this->diagramTitle,
+        // NUEVO: Pasar sesión colaborativa a la vista
+        'collaborationSession' => $collaborationSession
+    ]);
+}
 }

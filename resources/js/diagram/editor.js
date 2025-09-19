@@ -6,7 +6,10 @@ import { DiagramSaveManager } from './DiagramSaveManager.js';
 import { DiagramZoomManager } from './DiagramZoomManager.js';
 import { DiagramClassManager } from './DiagramClassManager.js';
 import { DiagramRelationshipManager } from './DiagramRelationshipManager.js';
-
+// NUEVOS: Módulos de colaboración
+import { DiagramWebSocketManager } from './DiagramWebSocketManager.js';
+import { DiagramCollaborationManager } from './DiagramCollaborationManager.js';
+import { DiagramCursorManager } from './DiagramCursorManager.js';
 // Configurar JointJS correctamente
 joint.config.useCSSSelectors = false;
 
@@ -53,10 +56,43 @@ class UMLDiagramEditor {
         this.zoomManager.setupZoomButtons();
         this.zoomManager.setupPanNavigation();
         this.saveManager.loadDiagramData();
-
+    // NUEVO: Inicializar colaboración si está disponible
+    this.initializeCollaboration()
         console.log('✅ UMLDiagramEditor inicializado correctamente');
     }
+// NUEVO: Método para inicializar colaboración opcional
+async initializeCollaboration() {
+    // Solo inicializar colaboración si hay datos de sesión
+    const hasSessionData = window.diagramSessionId !== undefined;
+    const hasEcho = window.Echo !== undefined;
 
+    if (hasEcho && hasSessionData) {
+        console.log('🤝 Iniciando modo colaborativo...');
+
+        // Inicializar módulos de colaboración
+        this.webSocketManager = new DiagramWebSocketManager(this);
+        this.collaborationManager = new DiagramCollaborationManager(this);
+        this.cursorManager = new DiagramCursorManager(this);
+
+        // Intentar conectar
+        try {
+            const connected = await this.webSocketManager.initialize();
+            if (connected) {
+                console.log('✅ Colaboración activada');
+            } else {
+                console.warn('⚠️ Colaboración no disponible');
+            }
+        } catch (error) {
+            console.error('❌ Error en colaboración:', error);
+        }
+    } else {
+        console.log('📝 Modo individual (sin colaboración)');
+        // Inicializar variables nulas para evitar errores
+        this.webSocketManager = null;
+        this.collaborationManager = null;
+        this.cursorManager = null;
+    }
+}
     createPaper() {
         var container = document.getElementById('paper-container');
         if (!container) {
