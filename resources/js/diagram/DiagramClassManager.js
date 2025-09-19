@@ -1,13 +1,15 @@
 // resources/js/diagram/DiagramClassManager.js
-// Módulo encargado de clases UML - TAL COMO ESTABA EN EL EDITOR ORIGINAL
+// VERSIÓN SIMPLE Y FUNCIONAL - Solo usando JointJS nativo con texto estructurado
 
 import * as joint from 'jointjs';
 
 export class DiagramClassManager {
     constructor(editor) {
         this.editor = editor;
+        this.classCounter = 1; // Contador para nombres automáticos
+        this.interfaceCounter = 1; // Contador para interfaces
 
-        // Templates UML tal como estaban en el editor original
+        // Templates UML
         this.umlTemplates = {
             visibility: {
                 '+': 'public',
@@ -22,143 +24,76 @@ export class DiagramClassManager {
         };
     }
 
-    // ==================== CREACIÓN MEJORADA DE CLASES ====================
+    // ==================== CREACIÓN DIRECTA SIN PROMPTS ====================
 
     createClassImproved(x, y) {
-        // Paso 1: Nombre de la clase
-        var className = prompt('📦 Nombre de la clase:', 'Usuario');
-        if (!className) return;
+        // Crear clase directamente con nombre por defecto
+        const className = `Class ${this.classCounter++}`;
+        const attributes = ['- attribute1: String', '- attribute2: int'];
+        const methods = ['+ method1(): void', '+ method2(): String'];
 
-        // Paso 2: Atributos mejorados
-        var attributesHelp = `📝 Atributos (uno por línea):
-
-Formato: visibilidad nombre: tipo
-Ejemplos:
-  - id: int
-  + email: String
-  # password: String
-  ~ status: boolean
-
-Visibilidad:
-  + público    - privado    # protegido    ~ paquete
-
-Tipos comunes: ${this.umlTemplates.commonTypes.slice(0, 5).join(', ')}...`;
-
-        var defaultAttrs = `- id: Long
-- ${className.toLowerCase()}Name: String
-- createdAt: LocalDateTime`;
-
-        var attributesInput = prompt(attributesHelp, defaultAttrs);
-        var attributes = attributesInput ?
-            attributesInput.split('\n').map(line => line.trim()).filter(line => line) : [];
-
-        // Paso 3: Métodos (OPCIONAL)
-        var addMethods = confirm(`¿Agregar métodos a la clase "${className}"?\n\n(Los métodos son opcionales - puedes omitirlos)`);
-        var methods = [];
-
-        if (addMethods) {
-            var methodsHelp = `🔧 Métodos (uno por línea):
-
-Formato: visibilidad nombre(parámetros): tipoRetorno
-Ejemplos:
-  + getId(): Long
-  + getName(): String
-  + setName(name: String): void
-  + isActive(): boolean`;
-
-            var defaultMethods = `+ getId(): Long
-+ get${className}Name(): String
-+ set${className}Name(name: String): void`;
-
-            var methodsInput = prompt(methodsHelp, defaultMethods);
-            methods = methodsInput ?
-                methodsInput.split('\n').map(line => line.trim()).filter(line => line) : [];
-        }
-
-        // Crear clase con estilo UML 2.5 mejorado
         this.createClassElement(className, attributes, methods, x, y, 'class');
     }
 
     createInterface(x, y) {
-        var interfaceName = prompt('🔌 Nombre de la interfaz:', 'IUsuario');
-        if (!interfaceName) return;
+        // Crear interfaz directamente con nombre por defecto
+        const interfaceName = `Interface ${this.interfaceCounter++}`;
+        const methods = ['+ method1(): void', '+ method2(): String'];
 
-        var methodsHelp = `🔧 Métodos de la interfaz (uno por línea):
-
-Las interfaces solo tienen métodos públicos abstractos:
-  + metodo(): tipoRetorno
-  + validar(): boolean
-  + procesar(datos: String): void`;
-
-        var defaultMethods = `+ ${interfaceName.replace('I', '').toLowerCase()}(): void
-+ validar(): boolean`;
-
-        var methodsInput = prompt(methodsHelp, defaultMethods);
-        var methods = methodsInput ?
-            methodsInput.split('\n').map(line => line.trim()).filter(line => line) : [];
-
-        // Crear interfaz
         this.createClassElement(interfaceName, [], methods, x, y, 'interface');
     }
 
     createClassElement(className, attributes, methods, x, y, type) {
-        // Construir el texto UML 2.5
-        var classText = '';
+        // Construir texto UML formateado
+        let classText = '';
 
         // Agregar estereotipo para interfaces
         if (type === 'interface') {
-            classText = '<<interface>>\n';
+            classText += '<<interface>>\n';
         }
 
-        classText += className;
+        // Nombre de la clase
+        classText += className + '\n';
 
-        // Separador de nombre (línea horizontal implícita)
+        // Línea separadora
+        classText += '─'.repeat(Math.max(className.length + 4, 20)) + '\n';
+
+        // Atributos
         if (attributes.length > 0) {
-            classText += '\n' + '─'.repeat(Math.max(className.length, 20)) + '\n';
-            classText += attributes.join('\n');
+            classText += attributes.join('\n') + '\n';
+            classText += '─'.repeat(Math.max(className.length + 4, 20)) + '\n';
         }
 
-        // Separador de atributos/métodos
+        // Métodos
         if (methods.length > 0) {
-            if (attributes.length > 0) {
-                classText += '\n' + '─'.repeat(Math.max(className.length, 20)) + '\n';
-            } else {
-                classText += '\n' + '─'.repeat(Math.max(className.length, 20)) + '\n';
-            }
             classText += methods.join('\n');
         }
 
-        // Calcular dimensiones dinámicas
-        var maxLineLength = Math.max(
-            className.length,
-            ...attributes.map(attr => attr.length),
-            ...methods.map(method => method.length)
-        );
-
-        var width = Math.max(200, Math.min(400, maxLineLength * 8 + 40));
-        var height = Math.max(80, 30 + (attributes.length + methods.length + 2) * 16);
+        // Calcular dimensiones dinámicas basadas en el contenido
+        const lines = classText.split('\n').filter(line => line.trim());
+        const maxLineLength = Math.max(...lines.map(line => line.length));
+        const width = Math.max(200, maxLineLength * 8 + 30);
+        const height = Math.max(120, lines.length * 18 + 30);
 
         // Colores según tipo
-        var colors = type === 'interface' ? {
+        const colors = type === 'interface' ? {
             fill: '#faf5ff',
             stroke: '#7c3aed',
-            textColor: '#7c3aed',
             strokeDasharray: '8,4'
         } : {
-            fill: '#fefefe',
-            stroke: '#1e40af',
-            textColor: '#1e40af',
+            fill: '#ffffff',
+            stroke: '#333333',
             strokeDasharray: 'none'
         };
 
-        // Crear elemento con estilo UML 2.5 profesional
-        var classElement = new joint.shapes.standard.Rectangle({
+        // Crear elemento JointJS con estilo UML profesional
+        const classElement = new joint.shapes.standard.Rectangle({
             position: { x: x - width/2, y: y - height/2 },
             size: { width: width, height: height },
             attrs: {
                 body: {
-                    stroke: colors.stroke,
                     fill: colors.fill,
+                    stroke: colors.stroke,
                     strokeWidth: 2,
                     strokeDasharray: colors.strokeDasharray,
                     rx: 4,
@@ -168,8 +103,8 @@ Las interfaces solo tienen métodos públicos abstractos:
                         args: {
                             dx: 2,
                             dy: 2,
-                            blur: 3,
-                            color: 'rgba(0,0,0,0.1)'
+                            blur: 4,
+                            color: 'rgba(0,0,0,0.15)'
                         }
                     }
                 },
@@ -177,12 +112,12 @@ Las interfaces solo tienen métodos públicos abstractos:
                     text: classText,
                     fontSize: 12,
                     fontFamily: '"Fira Code", "Consolas", monospace',
-                    fill: colors.textColor,
+                    fill: type === 'interface' ? '#7c3aed' : '#1e40af',
                     textVerticalAnchor: 'top',
                     textAnchor: 'start',
-                    x: 12,
-                    y: 12,
-                    lineHeight: 1.3
+                    x: 10,
+                    y: 10,
+                    lineHeight: 1.4
                 }
             },
             umlData: {
@@ -193,100 +128,187 @@ Las interfaces solo tienen métodos públicos abstractos:
             }
         });
 
+        // Agregar al graph
         this.editor.graph.addCell(classElement);
+
+        // Hacer que sea editable con doble clic
+        this.makeElementEditable(classElement);
+
         this.editor.updateCanvasInfo();
         this.editor.selectTool('select');
 
-        console.log(`✅ ${type} creada:`, className, 'con', attributes.length, 'atributos y', methods.length, 'métodos');
+        console.log(`✅ ${type} creada:`, className);
     }
 
-    // ==================== EDICIÓN MEJORADA DE CLASES ====================
+    // ==================== HACER ELEMENTOS EDITABLES ====================
+
+    makeElementEditable(element) {
+        // Escuchar eventos de doble clic para edición
+        element.on('change:position', () => {
+            // Mantener sincronizado si se mueve
+        });
+    }
+
+    // ==================== EDICIÓN MEJORADA CON PROMPTS ====================
 
     editClassImproved(element) {
-        var umlData = element.get('umlData') || {};
-        var currentName = umlData.className || 'Clase';
-        var currentAttrs = umlData.attributes || [];
-        var currentMethods = umlData.methods || [];
-        var currentType = umlData.type || 'class';
+        const umlData = element.get('umlData') || {};
+        const currentName = umlData.className || 'Clase';
+        const currentAttrs = umlData.attributes || [];
+        const currentMethods = umlData.methods || [];
+        const currentType = umlData.type || 'class';
 
-        // Paso 1: Editar nombre
-        var newName = prompt(`📝 Nombre de la ${currentType}:`, currentName);
-        if (newName === null) return;
-
-        // Paso 2: Editar atributos
-        var attributesHelp = `📝 Atributos (uno por línea):
-
-Atributos actuales:
-${currentAttrs.map(attr => `  ${attr}`).join('\n') || '  (sin atributos)'}
-
-Visibilidad: + público  - privado  # protegido  ~ paquete
-Tipos: ${this.umlTemplates.commonTypes.slice(0, 4).join(', ')}...`;
-
-        var newAttrsInput = prompt(attributesHelp, currentAttrs.join('\n'));
-        if (newAttrsInput === null) return;
-
-        var newAttrs = newAttrsInput ?
-            newAttrsInput.split('\n').map(line => line.trim()).filter(line => line) : [];
-
-        // Paso 3: Editar métodos (solo si no es interfaz o si ya tenía métodos)
-        var newMethods = currentMethods;
-
-        if (currentType === 'interface' || currentMethods.length > 0 ||
-            confirm('¿Agregar/editar métodos?')) {
-
-            var methodsHelp = `🔧 Métodos (uno por línea):
-
-Métodos actuales:
-${currentMethods.map(method => `  ${method}`).join('\n') || '  (sin métodos)'}
-
-Formato: + nombre(parámetros): tipoRetorno`;
-
-            var newMethodsInput = prompt(methodsHelp, currentMethods.join('\n'));
-            if (newMethodsInput !== null) {
-                newMethods = newMethodsInput ?
-                    newMethodsInput.split('\n').map(line => line.trim()).filter(line => line) : [];
-            }
-        }
-
-        // Actualizar elemento
-        this.updateClassElement(element, newName, newAttrs, newMethods, currentType);
-
-        console.log('✅ Clase editada:', newName);
+        // Crear interfaz de edición más amigable
+        this.showEditDialog(element, currentName, currentAttrs, currentMethods, currentType);
     }
 
+    showEditDialog(element, currentName, currentAttrs, currentMethods, currentType) {
+        // Crear un div modal para edición
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            font-family: 'Inter', sans-serif;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        `;
+
+        dialog.innerHTML = `
+            <h3 style="margin: 0 0 20px 0; color: #1e40af; font-size: 18px;">
+                Editar ${currentType === 'interface' ? 'Interfaz' : 'Clase'}
+            </h3>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">Nombre:</label>
+                <input type="text" id="className" value="${currentName}"
+                       style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">
+                    Atributos (uno por línea):
+                    <small style="color: #6b7280; font-weight: normal;">Formato: + público, - privado, # protegido, ~ paquete</small>
+                </label>
+                <textarea id="classAttributes" rows="4"
+                          style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-family: 'Fira Code', monospace; font-size: 12px; resize: vertical;">${currentAttrs.join('\n')}</textarea>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 4px; font-weight: 500; color: #374151;">
+                    Métodos (uno por línea):
+                    <small style="color: #6b7280; font-weight: normal;">Formato: + método(): tipo</small>
+                </label>
+                <textarea id="classMethods" rows="4"
+                          style="width: 100%; padding: 8px; border: 2px solid #e5e7eb; border-radius: 6px; font-family: 'Fira Code', monospace; font-size: 12px; resize: vertical;">${currentMethods.join('\n')}</textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="cancelBtn"
+                        style="padding: 8px 16px; border: 2px solid #e5e7eb; background: white; border-radius: 6px; cursor: pointer; font-weight: 500; color: #374151;">
+                    Cancelar
+                </button>
+                <button id="saveBtn"
+                        style="padding: 8px 16px; border: 2px solid #1e40af; background: #1e40af; color: white; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    Guardar
+                </button>
+                <button id="deleteBtn"
+                        style="padding: 8px 16px; border: 2px solid #dc2626; background: #dc2626; color: white; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    Eliminar
+                </button>
+            </div>
+        `;
+
+        modal.appendChild(dialog);
+        document.body.appendChild(modal);
+
+        // Enfocar en el nombre
+        setTimeout(() => {
+            document.getElementById('className').focus();
+            document.getElementById('className').select();
+        }, 100);
+
+        // Event listeners
+        document.getElementById('cancelBtn').onclick = () => {
+            document.body.removeChild(modal);
+        };
+
+        document.getElementById('saveBtn').onclick = () => {
+            const newName = document.getElementById('className').value || 'Clase';
+            const newAttrs = document.getElementById('classAttributes').value
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line);
+            const newMethods = document.getElementById('classMethods').value
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line);
+
+            this.updateClassElement(element, newName, newAttrs, newMethods, currentType);
+            document.body.removeChild(modal);
+        };
+
+        document.getElementById('deleteBtn').onclick = () => {
+            if (confirm('¿Estás seguro de que quieres eliminar esta clase?')) {
+                element.remove();
+                document.body.removeChild(modal);
+            }
+        };
+
+        // Cerrar con ESC
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                document.body.removeChild(modal);
+                document.removeEventListener('keydown', handleKeyDown);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+    }
+
+    // ==================== ACTUALIZAR ELEMENTO ====================
+
     updateClassElement(element, className, attributes, methods, type) {
-        // Reconstruir texto
-        var classText = '';
+        // Construir nuevo texto
+        let classText = '';
 
         if (type === 'interface') {
-            classText = '<<interface>>\n';
+            classText += '<<interface>>\n';
         }
 
-        classText += className;
+        classText += className + '\n';
+        classText += '─'.repeat(Math.max(className.length + 4, 20)) + '\n';
 
         if (attributes.length > 0) {
-            classText += '\n' + '─'.repeat(Math.max(className.length, 20)) + '\n';
-            classText += attributes.join('\n');
+            classText += attributes.join('\n') + '\n';
+            classText += '─'.repeat(Math.max(className.length + 4, 20)) + '\n';
         }
 
         if (methods.length > 0) {
-            if (attributes.length > 0) {
-                classText += '\n' + '─'.repeat(Math.max(className.length, 20)) + '\n';
-            } else {
-                classText += '\n' + '─'.repeat(Math.max(className.length, 20)) + '\n';
-            }
             classText += methods.join('\n');
         }
 
         // Calcular nuevas dimensiones
-        var maxLineLength = Math.max(
-            className.length,
-            ...attributes.map(attr => attr.length),
-            ...methods.map(method => method.length)
-        );
-
-        var newWidth = Math.max(200, Math.min(400, maxLineLength * 8 + 40));
-        var newHeight = Math.max(80, 30 + (attributes.length + methods.length + 2) * 16);
+        const lines = classText.split('\n').filter(line => line.trim());
+        const maxLineLength = Math.max(...lines.map(line => line.length));
+        const newWidth = Math.max(200, maxLineLength * 8 + 30);
+        const newHeight = Math.max(120, lines.length * 18 + 30);
 
         // Actualizar elemento
         element.attr('label/text', classText);
@@ -299,5 +321,7 @@ Formato: + nombre(parámetros): tipoRetorno`;
             methods: methods,
             type: type
         });
+
+        console.log('✅ Clase actualizada:', className);
     }
 }

@@ -848,3 +848,507 @@
         print-color-adjust: exact !important;
     }
 }
+/* NUEVOS ESTILOS PARA CLASES UML EDITABLES INLINE */
+
+/* ==================== CONTENEDOR PRINCIPAL DE CLASE ==================== */
+.class-box {
+    position: absolute;
+    background: #fff;
+    border: 2px solid #333;
+    min-width: 150px;
+    min-height: 120px;
+    cursor: move;
+    user-select: none;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 10;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+/* Estado cuando la clase está seleccionada */
+.class-box.selected {
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0,123,255,0.5);
+    z-index: 15;
+}
+
+/* Estado hover */
+.class-box:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+/* Interfaces - estilo diferenciado */
+.class-box.interface {
+    border: 2px dashed #7c3aed;
+    background: #faf5ff;
+}
+
+.class-box.interface .class-header {
+    background: linear-gradient(135deg, #faf5ff 0%, #e9d5ff 100%);
+    border-bottom-color: #7c3aed;
+}
+
+/* ==================== BOTÓN DE ELIMINAR ==================== */
+.delete-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #dc2626;
+    background: #dc2626;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 20;
+}
+
+.class-box:hover .delete-btn {
+    opacity: 1;
+}
+
+.delete-btn:hover {
+    background: #b91c1c;
+    transform: scale(1.1);
+}
+
+/* ==================== CABECERA DE LA CLASE (NOMBRE) ==================== */
+.class-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #333;
+    padding: 8px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 14px;
+    position: relative;
+}
+
+/* Estereotipo para interfaces */
+.stereotype {
+    font-size: 10px;
+    font-style: italic;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+/* ==================== SECCIONES DE ATRIBUTOS Y MÉTODOS ==================== */
+.class-attributes,
+.class-methods {
+    padding: 6px 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    border-bottom: 1px solid #ddd;
+    min-height: 40px;
+    display: flex;
+    flex-direction: column;
+}
+
+.class-methods {
+    border-bottom: none;
+}
+
+/* ==================== CAMPOS DE TEXTO EDITABLES ==================== */
+.editable {
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 100%;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    margin: 2px 0;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+}
+
+/* Estados de interacción de los campos editables */
+.editable:hover {
+    background: rgba(0, 123, 255, 0.05);
+}
+
+.editable:focus {
+    background: rgba(0, 123, 255, 0.1);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+}
+
+/* Campo del nombre de la clase */
+.class-name {
+    font-weight: bold;
+    text-align: center;
+    font-size: 14px;
+}
+
+/* ==================== ESTILOS SEGÚN VISIBILIDAD ==================== */
+
+/* Métodos y atributos públicos (+) */
+.editable[value*="+ "],
+.editable[placeholder*="+ "] {
+    color: #059669;
+}
+
+/* Métodos y atributos privados (-) */
+.editable[value*="- "],
+.editable[placeholder*="- "] {
+    color: #dc2626;
+}
+
+/* Métodos y atributos protegidos (#) */
+.editable[value*="# "] {
+    color: #d97706;
+}
+
+/* Métodos y atributos de paquete (~) */
+.editable[value*="~ "] {
+    color: #7c3aed;
+}
+
+/* ==================== PLACEHOLDERS ==================== */
+.editable::placeholder {
+    color: #9ca3af;
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.editable:focus::placeholder {
+    opacity: 0.5;
+}
+
+/* ==================== ANIMACIONES ==================== */
+
+/* Animación de aparición */
+.class-box {
+    animation: class-fade-in 0.3s ease;
+}
+
+@keyframes class-fade-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Animación de eliminación */
+.class-box.removing {
+    animation: class-fade-out 0.3s ease forwards;
+}
+
+@keyframes class-fade-out {
+    to {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+}
+
+/* ==================== TOOLTIP DE AYUDA ==================== */
+.class-box::before {
+    content: 'Haz clic en cualquier texto para editar';
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+}
+
+.class-box:hover::before {
+    opacity: 1;
+}
+
+/* ==================== ESTADOS RESPONSIVE ==================== */
+@media (max-width: 768px) {
+    .class-box {
+        font-size: 10px;
+        min-width: 120px;
+        min-height: 100px;
+    }
+
+    .class-header {
+        padding: 6px;
+        font-size: 12px;
+    }
+
+    .class-attributes,
+    .class-methods {
+        padding: 4px 6px;
+        font-size: 10px;
+        min-height: 30px;
+    }
+
+    .editable {
+        margin: 1px 0;
+        padding: 1px 2px;
+    }
+
+    .delete-btn {
+        width: 16px;
+        height: 16px;
+        font-size: 10px;
+        top: -6px;
+        right: -6px;
+    }
+}
+
+/* ==================== MEJORAS DE ACCESIBILIDAD ==================== */
+.editable:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .class-box,
+    .editable,
+    .delete-btn {
+        transition: none;
+        animation: none;
+    }
+}
+
+/* ==================== INTEGRACIÓN CON JOINTJS ==================== */
+
+/* Ocultar elementos JointJS nativos cuando usamos overlay */
+.joint-element .joint-label {
+    display: none;
+}
+
+.joint-element rect {
+    fill: transparent !important;
+    stroke: transparent !important;
+}
+
+/* ==================== ESTADOS ESPECIALES ==================== */
+
+/* Cuando se está arrastrando */
+.class-box.dragging {
+    cursor: grabbing;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+    z-index: 20;
+}
+
+/* Campo siendo editado */
+.editable.editing {
+    background: rgba(0, 123, 255, 0.15);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.3);
+}
+
+/* Resaltar campo vacío */
+.editable:empty:not(:focus) {
+    border: 1px dashed #ccc;
+}
+
+/* ==================== MEJORAS VISUALES ADICIONALES ==================== */
+
+/* Separadores visuales más sutiles */
+.class-attributes::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 8px;
+    right: 8px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #ddd, transparent);
+}
+
+/* Efecto de brillo en selección */
+.class-box.selected::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.3);
+}
+
+/* Indicador visual para campos requeridos */
+.editable[required]:invalid {
+    border-left: 3px solid #dc2626;
+}
+
+/* Texto de ayuda para campos vacíos */
+.class-attributes:empty::before {
+    content: 'Haz clic para agregar atributos';
+    color: #9ca3af;
+    font-style: italic;
+    font-size: 11px;
+    padding: 4px;
+    display: block;
+}
+
+.class-methods:empty::before {
+    content: 'Haz clic para agregar métodos';
+    color: #9ca3af;
+    font-style: italic;
+    font-size: 11px;
+    padding: 4px;
+    display: block;
+}
+/* ESTILOS LIMPIOS PARA CLASES UML - SOLO JOINTJS NATIVO */
+/* Reemplaza los estilos anteriores con estos */
+
+/* ==================== ELEMENTOS JOINTJS MEJORADOS ==================== */
+
+/* Mejorar el texto de las clases */
+.joint-element text {
+    font-family: 'Fira Code', 'Consolas', monospace !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    dominant-baseline: text-before-edge !important;
+}
+
+/* Efectos de selección mejorados */
+.joint-element.selected rect {
+    stroke: #007bff !important;
+    stroke-width: 3px !important;
+    filter: drop-shadow(0 0 8px rgba(0, 123, 255, 0.4)) !important;
+}
+
+/* Hover effects */
+.joint-element:hover rect {
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15)) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Cursor para elementos */
+.joint-element {
+    cursor: move;
+}
+
+/* ==================== ANIMACIONES ==================== */
+
+/* Animación de aparición */
+.joint-element {
+    animation: element-appear 0.3s ease;
+}
+
+@keyframes element-appear {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ==================== CANVAS MEJORADO ==================== */
+
+/* Paper container con grid sutil */
+#paper-container {
+    background-color: #fdfdfe;
+    background-image:
+        radial-gradient(circle at 1px 1px, rgba(30, 64, 175, 0.1) 1px, transparent 0);
+    background-size: 20px 20px;
+}
+
+/* Estados del cursor según herramienta */
+#paper-container[data-tool="class"],
+#paper-container[data-tool="interface"] {
+    cursor: crosshair;
+}
+
+#paper-container[data-tool="select"] {
+    cursor: grab;
+}
+
+#paper-container[data-tool="select"]:active {
+    cursor: grabbing;
+}
+
+/* ==================== RELACIONES ==================== */
+
+/* Enlaces mejorados */
+.joint-link .connection {
+    stroke: #1e40af !important;
+    stroke-width: 2px !important;
+    fill: none !important;
+}
+
+.joint-link .marker-target,
+.joint-link .marker-source {
+    fill: #1e40af !important;
+    stroke: #1e40af !important;
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 768px) {
+    .joint-element text {
+        font-size: 10px !important;
+    }
+}
+
+/* ==================== TEMA OSCURO (OPCIONAL) ==================== */
+
+@media (prefers-color-scheme: dark) {
+    #paper-container {
+        background-color: #1a1f2e;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(96, 165, 250, 0.1) 1px, transparent 0);
+    }
+
+    .joint-element text {
+        fill: #e5e7eb !important;
+    }
+
+    .joint-element rect {
+        fill: #374151 !important;
+        stroke: #60a5fa !important;
+    }
+
+    .joint-link .connection {
+        stroke: #60a5fa !important;
+    }
+
+    .joint-link .marker-target,
+    .joint-link .marker-source {
+        fill: #60a5fa !important;
+        stroke: #60a5fa !important;
+    }
+}
+
+/* ==================== UTILIDADES ==================== */
+
+/* Eliminar elementos de prueba o overlays antiguos */
+.class-box,
+.uml-class-overlay {
+    display: none !important;
+}
+
+/* Asegurar que solo se vean elementos JointJS */
+.joint-paper-scroller {
+    overflow: hidden;
+}
+
+/* Mejorar la calidad del texto */
+.joint-viewport {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}

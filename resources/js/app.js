@@ -1,4 +1,4 @@
-// resources/js/app.js - VERSIÓN SIN SHAPES PERSONALIZADAS
+// resources/js/app.js - VERSIÓN CON FUNCIONES GLOBALES AGREGADAS
 import './bootstrap';
 
 // Solo importar el editor, SIN shapes personalizadas
@@ -24,6 +24,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     return editor.getState();
                 }
             };
+
+            // NUEVAS LÍNEAS AGREGADAS - PASO 3:
+            // Hacer el editor disponible globalmente para las funciones de eliminación
+            window.umlEditor = editor;
+
+            // Función global para eliminar clases (necesaria para el botón X)
+            window.deleteClass = function(elementId) {
+                if (window.umlEditor && window.umlEditor.graph) {
+                    const element = window.umlEditor.graph.getCell(elementId);
+                    if (element) {
+                        const classDiv = document.getElementById(`class-overlay-${elementId}`);
+                        if (classDiv) {
+                            classDiv.classList.add('removing');
+                            setTimeout(() => {
+                                element.remove();
+                            }, 300);
+                        } else {
+                            element.remove();
+                        }
+                    }
+                }
+            };
+            // FIN DE LAS NUEVAS LÍNEAS
 
             // Configurar toolbar DESPUÉS de que el editor esté listo
             setTimeout(function() {
