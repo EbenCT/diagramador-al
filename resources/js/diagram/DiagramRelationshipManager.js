@@ -1,12 +1,16 @@
-// resources/js/diagram/DiagramRelationshipManager.js
-// Módulo encargado de relaciones UML - VERSIÓN SIMPLE CON ANTI-SUPERPOSICIÓN
+// resources/js/diagram/DiagramRelationshipManager.js - REFACTORIZADO COMPLETO
+// Mantiene TODA la funcionalidad original pero usa DiagramElementFactory para métodos duplicados
 
 import * as joint from 'jointjs';
+import { DiagramElementFactory } from './DiagramElementFactory.js';
 
 export class DiagramRelationshipManager {
     constructor(editor) {
         this.editor = editor;
         this.firstElementSelected = null;
+
+        // Usar la factory SOLO para métodos específicos duplicados
+        this.elementFactory = new DiagramElementFactory();
     }
 
     // ==================== CREACIÓN MEJORADA DE RELACIONES ====================
@@ -267,9 +271,6 @@ export class DiagramRelationshipManager {
 
     // ==================== SISTEMA SIMPLE ANTI-SUPERPOSICIÓN ====================
 
-    /**
-     * Calcula un offset simple para evitar superposiciones
-     */
     calculateSimpleOffset(sourceElement, targetElement) {
         // Contar conexiones existentes en cada elemento
         const sourceConnections = this.getConnectionCount(sourceElement);
@@ -282,9 +283,6 @@ export class DiagramRelationshipManager {
         return { sourceOffset, targetOffset };
     }
 
-    /**
-     * Cuenta las conexiones de un elemento
-     */
     getConnectionCount(element) {
         const links = this.editor.graph.getLinks();
         return links.filter(link => {
@@ -294,9 +292,6 @@ export class DiagramRelationshipManager {
         }).length;
     }
 
-    /**
-     * Selecciona anchor básico según la posición relativa y número de conexiones
-     */
     selectSmartAnchor(sourceElement, targetElement, isSource = true) {
         const element = isSource ? sourceElement : targetElement;
         const otherElement = isSource ? targetElement : sourceElement;
@@ -341,19 +336,7 @@ export class DiagramRelationshipManager {
                         id: target.id,
                         anchor: { name: targetAnchor }
                     },
-                    attrs: {
-                        line: {
-                            stroke: '#1e40af',
-                            strokeWidth: 2.5, // Más gruesa
-                            targetMarker: {
-                                type: 'path',
-                                d: 'M 12 -6 0 0 12 6', // Flecha más grande
-                                stroke: '#1e40af',
-                                fill: 'none',
-                                strokeWidth: 2.5
-                            }
-                        }
-                    },
+                    attrs: this.elementFactory.getRelationshipAttrs('association'), // ← Usar factory
                     labels: this.createRelationLabelsImproved(
                         config.sourceMultiplicity,
                         config.targetMultiplicity,
@@ -380,24 +363,12 @@ export class DiagramRelationshipManager {
                         id: target.id,
                         anchor: { name: targetAnchor }
                     },
-                    attrs: {
-                        line: {
-                            stroke: '#1e40af',
-                            strokeWidth: 2.5, // Más gruesa
-                            targetMarker: {
-                                type: 'path',
-                                d: 'M 20 -12 L 0 0 L 20 12 Z', // Triángulo MÁS GRANDE
-                                fill: 'white',
-                                stroke: '#1e40af',
-                                strokeWidth: 2.5
-                            }
-                        }
-                    },
+                    attrs: this.elementFactory.getRelationshipAttrs('inheritance'), // ← Usar factory
                     labels: config.name ? [{
                         attrs: {
                             text: {
                                 text: config.name,
-                                fontSize: 14, // Texto más grande
+                                fontSize: 14,
                                 fontFamily: 'Arial, sans-serif',
                                 fill: '#1e40af',
                                 fontWeight: 'bold'
@@ -429,26 +400,7 @@ export class DiagramRelationshipManager {
                         id: target.id,
                         anchor: { name: targetAnchor }
                     },
-                    attrs: {
-                        line: {
-                            stroke: '#1e40af',
-                            strokeWidth: 2.5, // Más gruesa
-                            sourceMarker: {
-                                type: 'path',
-                                d: 'M 24 -10 12 0 24 10 36 0 z', // Rombo MÁS GRANDE
-                                fill: 'white',
-                                stroke: '#1e40af',
-                                strokeWidth: 2.5
-                            },
-                            targetMarker: {
-                                type: 'path',
-                                d: 'M 12 -6 0 0 12 6', // Flecha más grande
-                                stroke: '#1e40af',
-                                fill: 'none',
-                                strokeWidth: 2.5
-                            }
-                        }
-                    },
+                    attrs: this.elementFactory.getRelationshipAttrs('aggregation'), // ← Usar factory
                     labels: this.createRelationLabelsImproved(
                         config.sourceMultiplicity,
                         config.targetMultiplicity,
@@ -475,26 +427,7 @@ export class DiagramRelationshipManager {
                         id: target.id,
                         anchor: { name: targetAnchor }
                     },
-                    attrs: {
-                        line: {
-                            stroke: '#1e40af',
-                            strokeWidth: 2.5, // Más gruesa
-                            sourceMarker: {
-                                type: 'path',
-                                d: 'M 24 -10 12 0 24 10 36 0 z', // Rombo MÁS GRANDE
-                                fill: '#1e40af',
-                                stroke: '#1e40af',
-                                strokeWidth: 2.5
-                            },
-                            targetMarker: {
-                                type: 'path',
-                                d: 'M 12 -6 0 0 12 6', // Flecha más grande
-                                stroke: '#1e40af',
-                                fill: 'none',
-                                strokeWidth: 2.5
-                            }
-                        }
-                    },
+                    attrs: this.elementFactory.getRelationshipAttrs('composition'), // ← Usar factory
                     labels: this.createRelationLabelsImproved(
                         config.sourceMultiplicity,
                         config.targetMultiplicity,
@@ -538,7 +471,7 @@ export class DiagramRelationshipManager {
                 attrs: {
                     text: {
                         text: sourceMultiplicity,
-                        fontSize: 13, // Más grande
+                        fontSize: 13,
                         fontFamily: 'Arial, sans-serif',
                         fill: '#374151',
                         fontWeight: 'bold'
@@ -546,7 +479,7 @@ export class DiagramRelationshipManager {
                 },
                 position: {
                     distance: 0.15,
-                    offset: -18 // Más separado
+                    offset: -18
                 }
             });
         }
@@ -557,7 +490,7 @@ export class DiagramRelationshipManager {
                 attrs: {
                     text: {
                         text: relationName,
-                        fontSize: 14, // Más grande
+                        fontSize: 14,
                         fontFamily: 'Arial, sans-serif',
                         fill: '#1e40af',
                         fontWeight: 'bold'
@@ -565,7 +498,7 @@ export class DiagramRelationshipManager {
                 },
                 position: {
                     distance: 0.5,
-                    offset: -18 // Más separado
+                    offset: -18
                 }
             });
         }
@@ -576,7 +509,7 @@ export class DiagramRelationshipManager {
                 attrs: {
                     text: {
                         text: targetMultiplicity,
-                        fontSize: 13, // Más grande
+                        fontSize: 13,
                         fontFamily: 'Arial, sans-serif',
                         fill: '#374151',
                         fontWeight: 'bold'
@@ -584,7 +517,7 @@ export class DiagramRelationshipManager {
                 },
                 position: {
                     distance: 0.85,
-                    offset: -18 // Más separado
+                    offset: -18
                 }
             });
         }
@@ -605,7 +538,7 @@ export class DiagramRelationshipManager {
     }
 
     showEditRelationshipModal(link, relationshipType, currentSource, currentTarget, currentName) {
-        // Obtener los anchors actuales del relationData (más confiable que del link)
+        // Obtener los anchors actuales del relationData
         const relationData = link.get('relationData') || {};
         const currentSourceAnchor = relationData.sourceAnchor || 'auto';
         const currentTargetAnchor = relationData.targetAnchor || 'auto';
@@ -811,16 +744,8 @@ export class DiagramRelationshipManager {
         document.addEventListener('keydown', handleKeyDown);
     }
 
-    // ==================== MÉTODOS HEREDADOS PARA COMPATIBILIDAD ====================
-
-    // Método legacy para compatibilidad
-    editRelationship(link) {
-        this.editRelationshipImproved(link);
-    }
-
     // ==================== UTILIDADES ====================
 
-    // Resetear selección de primera clase
     resetFirstElementSelected() {
         if (this.firstElementSelected) {
             this.editor.highlightElement(this.firstElementSelected, false);
@@ -831,5 +756,10 @@ export class DiagramRelationshipManager {
 
     getFirstElementSelected() {
         return this.firstElementSelected;
+    }
+
+    // Método legacy para compatibilidad
+    editRelationship(link) {
+        this.editRelationshipImproved(link);
     }
 }
