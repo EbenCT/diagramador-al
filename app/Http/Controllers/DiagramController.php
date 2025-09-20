@@ -371,4 +371,29 @@ class DiagramController extends Controller
 
         return response()->json($stats);
     }
+
+    /**
+     * MÉTODO AGREGADO: Mostrar el editor - maneja tanto creación como edición
+     * Este método unifica la funcionalidad del editor para nuevos diagramas y existentes
+     */
+    public function editor(Diagram $diagram = null)
+    {
+        // Si no hay diagrama, es un nuevo diagrama
+        if (!$diagram) {
+            return view('diagrams.editor', [
+                'isNew' => true,
+                'diagram' => null
+            ]);
+        }
+
+        // Si hay diagrama, verificar permisos para editarlo
+        if (!$diagram->canBeEditedBy(Auth::user())) {
+            abort(403, 'No tienes permisos para editar este diagrama');
+        }
+
+        return view('diagrams.editor', [
+            'isNew' => false,
+            'diagram' => $diagram
+        ]);
+    }
 }
