@@ -1,5 +1,6 @@
 // resources/js/diagram/DiagramSaveManager.js - COMPATIBLE CON UML 2.5
 // Mantiene retrocompatibilidad completa y soporte para características UML 2.5
+// NUEVO: Edición inline del título con doble clic
 
 import * as joint from 'jointjs';
 import { DiagramElementFactory } from './DiagramElementFactory.js';
@@ -7,10 +8,257 @@ import { DiagramElementFactory } from './DiagramElementFactory.js';
 export class DiagramSaveManager {
     constructor(editor) {
         this.editor = editor;
-
-        // Usar la factory factorizada con soporte UML 2.5
         this.elementFactory = new DiagramElementFactory();
+
+        // NUEVO: Inicializar edición inline del título
+        this.initializeTitleEditing();
     }
+
+    // ==================== NUEVO: EDICIÓN INLINE DEL TÍTULO ====================
+
+    /**
+     * Inicializa la funcionalidad de edición inline del título
+     */
+    initializeTitleEditing() {
+        // Buscar el elemento del título en la página
+        this.findAndSetupTitleElement();
+
+        // Si no se encuentra inmediatamente, reintentar después de un momento
+        // (útil si el DOM se está cargando)
+        setTimeout(() => {
+            if (!this.titleElement) {
+                this.findAndSetupTitleElement();
+            }
+        }, 1000);
+
+        console.log('✅ Edición inline del título inicializada');
+    }
+
+    /**
+     * Busca y configura el elemento del título
+     */
+    findAndSetupTitleElement() {
+        // Buscar el elemento del título por diferentes selectores posibles
+        const selectors = [
+            'h1', // Título principal
+            '.diagram-title', // Clase específica
+            '[data-diagram-title]', // Atributo específico
+            'h2', // Título secundario
+            '.page-title', // Clase de título de página
+            '.editor-title' // Clase de título del editor
+        ];
+
+        for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element && element.textContent.includes('Diagrama')) {
+                this.titleElement = element;
+                break;
+            }
+        }
+
+        if (this.titleElement) {
+            this.setupTitleEvents();
+            console.log('📝 Elemento de título encontrado:', this.titleElement.tagName);
+        } else {
+            console.log('⚠️ No se encontró elemento de título para editar');
+        }
+    }
+
+    /**
+     * Configura los eventos del título
+     */
+    setupTitleEvents() {
+        if (!this.titleElement) return;
+
+        // Agregar cursor pointer para indicar que es editable
+        this.titleElement.style.cursor = 'pointer';
+        this.titleElement.title = 'Doble clic para editar el título';
+
+        // Evento de doble clic
+        this.titleElement.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            this.startTitleEditing();
+        });
+
+        console.log('🖱️ Eventos de título configurados');
+    }
+
+    /**
+     * Inicia la edición del título
+     */
+    startTitleEditing() {
+        if (!this.titleElement || this.isEditing) return;
+
+        const currentTitle = this.titleElement.textContent.trim();
+        this.isEditing = true;
+
+        // Crear input de edición
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentTitle;
+        input.className = 'title-editor-input';
+
+        // Aplicar estilos del input
+        this.applyInputStyles(input);
+
+        // Reemplazar el título con el input
+        this.titleElement.style.display = 'none';
+        this.titleElement.parentNode.insertBefore(input, this.titleElement.nextSibling);
+
+        // Configurar eventos del input
+        this.setupInputEvents(input, currentTitle);
+
+        // Enfocar y seleccionar
+        input.focus();
+        input.select();
+
+        console.log(`✏️ Editando título: "${currentTitle}"`);
+    }
+
+    /**
+     * Aplica estilos al input de edición
+     */
+    applyInputStyles(input) {
+        const titleStyles = window.getComputedStyle(this.titleElement);
+
+        input.style.fontSize = titleStyles.fontSize;
+        input.style.fontFamily = titleStyles.fontFamily;
+        input.style.fontWeight = titleStyles.fontWeight;
+        input.style.color = titleStyles.color;
+        input.style.background = 'transparent';
+        input.style.border = '2px solid #3b82f6';
+        input.style.borderRadius = '4px';
+        input.style.padding = '4px 8px';
+        input.style.outline = 'none';
+        input.style.width = 'auto';
+        input.style.minWidth = '200px';
+        input.style.maxWidth = '500px';
+    }
+
+    /**
+     * Configura eventos del input de edición
+     */
+    setupInputEvents(input, originalTitle) {
+        // Confirmar con Enter
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.finishTitleEditing(input, originalTitle);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.cancelTitleEditing(input);
+            }
+        });
+
+        // Confirmar al perder foco
+        input.addEventListener('blur', () => {
+            // Pequeño delay para permitir clics en otros elementos
+            setTimeout(() => {
+                if (this.isEditing) {
+                    this.finishTitleEditing(input, originalTitle);
+                }
+            }, 100);
+        });
+    }
+
+    /**
+     * Finaliza la edición del título
+     */
+    async finishTitleEditing(input, originalTitle) {
+        if (!this.isEditing) return;
+
+        const newTitle = input.value.trim();
+
+        // Validar título
+        if (!newTitle) {
+            this.showSaveNotification('❌ El título no puede estar vacío', 'error');
+            this.cancelTitleEditing(input);
+            return;
+        }
+
+        if (newTitle === originalTitle) {
+            this.cancelTitleEditing(input);
+            return;
+        }
+
+        try {
+            // Actualizar título en el elemento
+            this.titleElement.textContent = newTitle;
+
+            // Actualizar variables globales
+            window.currentDiagramTitle = newTitle;
+
+            // Actualizar título vía Livewire si está disponible
+            await this.updateTitleViaLivewire(newTitle);
+
+            // Limpiar
+            this.cleanupTitleEditing(input);
+
+            this.showSaveNotification(`✏️ Título actualizado a "${newTitle}"`, 'success');
+            console.log(`✅ Título actualizado: "${originalTitle}" → "${newTitle}"`);
+
+        } catch (error) {
+            console.error('❌ Error al actualizar título:', error);
+            this.showSaveNotification('❌ Error al actualizar el título', 'error');
+
+            // Restaurar título original
+            this.titleElement.textContent = originalTitle;
+            this.cleanupTitleEditing(input);
+        }
+    }
+
+    /**
+     * Cancela la edición del título
+     */
+    cancelTitleEditing(input) {
+        this.cleanupTitleEditing(input);
+        console.log('❌ Edición de título cancelada');
+    }
+
+    /**
+     * Limpia la edición del título
+     */
+    cleanupTitleEditing(input) {
+        if (input && input.parentNode) {
+            input.parentNode.removeChild(input);
+        }
+
+        if (this.titleElement) {
+            this.titleElement.style.display = '';
+        }
+
+        this.isEditing = false;
+    }
+
+    /**
+     * Actualiza el título vía Livewire
+     */
+    async updateTitleViaLivewire(newTitle) {
+        if (!window.Livewire) return;
+
+        try {
+            // Método moderno de Livewire 3
+            if (window.Livewire.find && typeof window.Livewire.find === 'function') {
+                const wireId = document.querySelector('[wire\\:id]')?.getAttribute('wire:id');
+                if (wireId) {
+                    const component = window.Livewire.find(wireId);
+                    if (component) {
+                        component.set('diagramTitle', newTitle);
+                        await component.call('updateTitle');
+                        return;
+                    }
+                }
+            }
+
+            // Fallback para otras versiones
+            window.Livewire.dispatch('update-diagram-title', [newTitle]);
+
+        } catch (error) {
+            console.warn('⚠️ No se pudo actualizar vía Livewire:', error);
+        }
+    }
+
+    // ==================== MÉTODOS PRINCIPALES (RESTAURADOS A ORIGINAL) ====================
 
     saveDiagram() {
         try {
@@ -39,6 +287,12 @@ export class DiagramSaveManager {
             }
 
             window.currentDiagramTitle = title;
+
+            // Actualizar título en la página si existe
+            if (this.titleElement && title) {
+                this.titleElement.textContent = title;
+            }
+
             this.showSaveNotification(
                 `💾 Diagrama guardado correctamente${uml25Elements > 0 ? ' (UML 2.5)' : ''}`,
                 'success'
@@ -51,6 +305,8 @@ export class DiagramSaveManager {
             this.showSaveNotification('❌ Error al guardar el diagrama', 'error');
         }
     }
+
+    // ==================== MÉTODOS EXISTENTES (SIN CAMBIOS) ====================
 
     loadDiagramData() {
         console.log('🔄 Cargando datos del diagrama...');
@@ -94,6 +350,11 @@ export class DiagramSaveManager {
         if (window.diagramTitle) {
             window.currentDiagramTitle = window.diagramTitle;
             console.log('📝 Título del diagrama establecido:', window.currentDiagramTitle);
+
+            // NUEVO: Actualizar título en la página
+            if (this.titleElement) {
+                this.titleElement.textContent = window.diagramTitle;
+            }
         }
     }
 
@@ -233,11 +494,8 @@ export class DiagramSaveManager {
         this.showSaveNotification('📸 Export a PNG será implementado próximamente', 'info');
     }
 
-    // ==================== NUEVOS MÉTODOS PARA UML 2.5 ====================
+    // ==================== MÉTODOS UML 2.5 (SIN CAMBIOS) ====================
 
-    /**
-     * Obtiene estadísticas del diagrama incluyendo características UML 2.5
-     */
     getDiagramStats() {
         const elements = this.editor.graph.getElements();
         const links = this.editor.graph.getLinks();
@@ -275,9 +533,6 @@ export class DiagramSaveManager {
         };
     }
 
-    /**
-     * Convierte elementos UML 2.5 a formato legacy (para compatibilidad hacia atrás)
-     */
     convertToLegacy() {
         if (!confirm('¿Convertir elementos UML 2.5 a formato legacy?\n\nEsto eliminará las características avanzadas.')) {
             return;
@@ -312,9 +567,6 @@ export class DiagramSaveManager {
         console.log(`🔄 Convertidos ${convertedCount} elementos a formato legacy`);
     }
 
-    /**
-     * Exporta solo las características UML 2.5 para análisis
-     */
     exportUML25Features() {
         const elements = this.editor.graph.getElements();
         const uml25Data = [];
@@ -349,7 +601,9 @@ export class DiagramSaveManager {
     }
 }
 
-// Función global para compatibilidad
+// ==================== FUNCIONES GLOBALES ====================
+
+// Función global para compatibilidad (ORIGINAL)
 window.saveFromButton = function() {
     if (window.DiagramEditor?.instance?.saveManager) {
         window.DiagramEditor.instance.saveManager.saveDiagram();
@@ -358,7 +612,16 @@ window.saveFromButton = function() {
     }
 };
 
-// Funciones globales adicionales para UML 2.5
+// NUEVO: Función global para activar edición de título manualmente
+window.editDiagramTitle = function() {
+    if (window.DiagramEditor?.instance?.saveManager) {
+        window.DiagramEditor.instance.saveManager.startTitleEditing();
+    } else {
+        console.error('❌ Save Manager no disponible');
+    }
+};
+
+// Funciones globales adicionales para UML 2.5 (SIN CAMBIOS)
 window.exportUML25Features = function() {
     if (window.DiagramEditor?.instance?.saveManager) {
         window.DiagramEditor.instance.saveManager.exportUML25Features();
