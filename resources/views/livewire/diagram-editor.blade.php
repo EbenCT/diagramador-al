@@ -165,7 +165,7 @@
         // Datos del diagrama para JavaScript
         window.diagramData = @json($diagramData);
         window.diagramId = {{ $diagramId ?? 'null' }};
-        window.diagramTitle = @json($diagramTitle ?? 'Nuevo Diagrama UML');
+        window.diagramTitle = @json($diagramTitle ?? 'Nuevo Diagrama UML *');
         window.authUser = @json(auth()->user());
 
         // NUEVO: Datos de sesión colaborativa

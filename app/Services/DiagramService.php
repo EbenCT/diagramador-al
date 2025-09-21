@@ -21,7 +21,7 @@ class DiagramService
         $user = Auth::user();
 
         $diagram = Diagram::create([
-            'title' => $data['title'] ?? 'Nuevo Diagrama UML',
+            'title' => $data['title'] ?? 'Nuevo Diagrama UML *',
             'description' => $data['description'] ?? null,
             'data' => $data['data'] ?? ['cells' => []],
             'user_id' => $user->id,

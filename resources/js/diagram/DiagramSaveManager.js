@@ -50,7 +50,7 @@ export class DiagramSaveManager {
 
         for (const selector of selectors) {
             const element = document.querySelector(selector);
-            if (element && element.textContent.includes('Diagrama')) {
+            if (element && element.textContent.includes('*')) {
                 this.titleElement = element;
                 break;
             }
@@ -164,48 +164,53 @@ export class DiagramSaveManager {
     /**
      * Finaliza la edición del título
      */
-    async finishTitleEditing(input, originalTitle) {
-        if (!this.isEditing) return;
+async finishTitleEditing(input, originalTitle) {
+    if (!this.isEditing) return;
 
-        const newTitle = input.value.trim();
+    let newTitle = input.value.trim();
 
-        // Validar título
-        if (!newTitle) {
-            this.showSaveNotification('❌ El título no puede estar vacío', 'error');
-            this.cancelTitleEditing(input);
-            return;
-        }
-
-        if (newTitle === originalTitle) {
-            this.cancelTitleEditing(input);
-            return;
-        }
-
-        try {
-            // Actualizar título en el elemento
-            this.titleElement.textContent = newTitle;
-
-            // Actualizar variables globales
-            window.currentDiagramTitle = newTitle;
-
-            // Actualizar título vía Livewire si está disponible
-            await this.updateTitleViaLivewire(newTitle);
-
-            // Limpiar
-            this.cleanupTitleEditing(input);
-
-            this.showSaveNotification(`✏️ Título actualizado a "${newTitle}"`, 'success');
-            console.log(`✅ Título actualizado: "${originalTitle}" → "${newTitle}"`);
-
-        } catch (error) {
-            console.error('❌ Error al actualizar título:', error);
-            this.showSaveNotification('❌ Error al actualizar el título', 'error');
-
-            // Restaurar título original
-            this.titleElement.textContent = originalTitle;
-            this.cleanupTitleEditing(input);
-        }
+    // Validar título
+    if (!newTitle) {
+        this.showSaveNotification('❌ El título no puede estar vacío', 'error');
+        this.cancelTitleEditing(input);
+        return;
     }
+
+    // ✅ NUEVO: Asegurar que siempre empiece con *
+    if (!newTitle.startsWith('*')) {
+        newTitle = '*' + newTitle;
+    }
+
+    if (newTitle === originalTitle) {
+        this.cancelTitleEditing(input);
+        return;
+    }
+
+    try {
+        // Actualizar título en el elemento
+        this.titleElement.textContent = newTitle;
+
+        // Actualizar variables globales
+        window.currentDiagramTitle = newTitle;
+
+        // Actualizar título vía Livewire si está disponible
+        await this.updateTitleViaLivewire(newTitle);
+
+        // Limpiar
+        this.cleanupTitleEditing(input);
+
+        this.showSaveNotification(`✏️ Título actualizado a "${newTitle}"`, 'success');
+        console.log(`✅ Título actualizado: "${originalTitle}" → "${newTitle}"`);
+
+    } catch (error) {
+        console.error('❌ Error al actualizar título:', error);
+        this.showSaveNotification('❌ Error al actualizar el título', 'error');
+
+        // Restaurar título original
+        this.titleElement.textContent = originalTitle;
+        this.cleanupTitleEditing(input);
+    }
+}
 
     /**
      * Cancela la edición del título
@@ -262,16 +267,33 @@ export class DiagramSaveManager {
 
     saveDiagram() {
         try {
-            var jsonData = JSON.stringify(this.editor.graph.toJSON());
-            var title = window.currentDiagramTitle ||
-                       prompt('📝 Título del diagrama:', 'Mi Diagrama UML');
+        var jsonData = JSON.stringify(this.editor.graph.toJSON());
+        var title;
 
-            if (!title && !window.currentDiagramId) {
-                console.log('❌ Guardado cancelado');
-                return;
+        // ✅ FIXED: Solo pedir título si es diagrama nuevo SIN nombre
+        if (window.currentDiagramId) {
+            // Diagrama existente - usar título actual
+            title = window.currentDiagramTitle || '* Diagrama Existente';
+        } else {
+            // Diagrama nuevo - pedir título solo si no tiene
+            if (window.currentDiagramTitle) {
+                title = window.currentDiagramTitle;
+            } else {
+                title = prompt('📝 Título del diagrama:', '* Mi Diagrama UML');
+
+                // Asegurar que empiece con *
+                if (title && !title.startsWith('*')) {
+                    title = '* ' + title;
+                }
             }
+        }
 
-            console.log('💾 Guardando diagrama...');
+        if (!title && !window.currentDiagramId) {
+            console.log('❌ Guardado cancelado');
+            return;
+        }
+
+        console.log('💾 Guardando diagrama...');
 
             // Análisis de contenido para logging
             const data = JSON.parse(jsonData);

@@ -16,7 +16,7 @@ class DiagramEditor extends Component
     public $diagramId = null;
     public $diagram = null;
     public $diagramData = '[]';
-    public $diagramTitle = 'Nuevo Diagrama UML';
+    public $diagramTitle = 'Nuevo Diagrama UML *';
     public $diagramDescription = '';
 
     // Estado del editor
@@ -78,7 +78,7 @@ class DiagramEditor extends Component
     private function initializeNewDiagram()
     {
         $this->diagramData = json_encode(['cells' => []]);
-        $this->diagramTitle = 'Nuevo Diagrama UML';
+        $this->diagramTitle = 'Nuevo Diagrama UML *';
         $this->diagramDescription = '';
         $this->elementCount = 0;
         $this->isDirty = false;
