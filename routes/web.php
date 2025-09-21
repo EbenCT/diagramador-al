@@ -28,30 +28,7 @@ Route::get('/', function () {
 })->name('home');
 
 // Rutas de autenticación (descomenta si usas Laravel Breeze/Jetstream/UI)
-// require __DIR__.'/auth.php';
-
-// Si no tienes sistema de auth, aquí tienes rutas básicas de prueba
-Route::get('/login', function () {
-    // Simulación de login para testing - QUITAR EN PRODUCCIÓN
-    if (!Auth::check()) {
-        // Buscar el primer usuario o crear uno de prueba
-        $user = \App\Models\User::first();
-        if (!$user) {
-            $user = \App\Models\User::create([
-                'name' => 'Usuario de Prueba',
-                'email' => 'test@example.com',
-                'password' => bcrypt('password')
-            ]);
-        }
-        Auth::login($user);
-    }
-    return redirect()->route('diagrams.index');
-})->name('login');
-
-Route::post('/logout', function () {
-    Auth::logout();
-    return redirect('/');
-})->name('logout');
+ require __DIR__.'/auth.php';
 
 // Rutas protegidas por autenticación
 Route::middleware('auth')->group(function () {
