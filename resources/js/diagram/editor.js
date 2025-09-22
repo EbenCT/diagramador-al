@@ -13,6 +13,7 @@ import { SimpleImageExporter } from './utils/simpleImageExport.js';
 import { SimpleXMIExporter } from './utils/simpleXMIExport.js';
 import { SimpleSQLGenerator } from './utils/simpleSQLGenerator.js';
 import { SimpleJavaGenerator } from './utils/simpleJavaGenerator.js';
+import { SimplePostmanGenerator } from './utils/simplePostmanGenerator.js';
 // Configurar JointJS correctamente
 joint.config.useCSSSelectors = false;
 
@@ -235,6 +236,11 @@ async initializeCollaboration() {
         if (generateJavaBtn) {
             generateJavaBtn.addEventListener('click', () => this.generateJavaProject());
         }
+
+        const generatePostmanBtn = document.getElementById('generate-postman-btn');
+        if (generatePostmanBtn) {
+            generatePostmanBtn.addEventListener('click', () => this.generatePostmanCollection());
+        }
     }
 
     // ==================== SELECCIÓN DE HERRAMIENTAS ====================
@@ -393,6 +399,10 @@ async initializeCollaboration() {
 
     generateJavaProject() {
         SimpleJavaGenerator.quickGenerateJava(this);
+    }
+
+    generatePostmanCollection() {
+        SimplePostmanGenerator.quickGeneratePostman(this);
     }
 
     getState() {
