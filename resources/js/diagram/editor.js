@@ -6,10 +6,12 @@ import { DiagramSaveManager } from './DiagramSaveManager.js';
 import { DiagramZoomManager } from './DiagramZoomManager.js';
 import { DiagramClassManager } from './DiagramClassManager.js';
 import { DiagramRelationshipManager } from './DiagramRelationshipManager.js';
-// NUEVOS: Módulos de colaboración
 import { DiagramWebSocketManager } from './DiagramWebSocketManager.js';
 import { DiagramCollaborationManager } from './DiagramCollaborationManager.js';
 import { DiagramCursorManager } from './DiagramCursorManager.js';
+import { SimpleImageExporter } from './utils/simpleImageExport.js';
+import { SimpleXMIExporter } from './utils/simpleXMIExport.js';
+import { SimpleSQLGenerator } from './utils/simpleSQLGenerator.js';
 // Configurar JointJS correctamente
 joint.config.useCSSSelectors = false;
 
@@ -205,6 +207,28 @@ async initializeCollaboration() {
         });
 
         console.log('✅ Event listeners configurados (incluyendo zoom shortcuts y pan)');
+        const exportPNGBtn = document.getElementById('export-png-btn');
+        const exportJPGBtn = document.getElementById('export-jpg-btn');
+
+        if (exportPNGBtn) {
+            exportPNGBtn.addEventListener('click', () => this.exportToPNG());
+        }
+
+        if (exportJPGBtn) {
+            exportJPGBtn.addEventListener('click', () => this.exportToJPG());
+        }
+
+        // Botón de exportación XMI
+        const exportXMIBtn = document.getElementById('export-xmi-btn');
+        if (exportXMIBtn) {
+            exportXMIBtn.addEventListener('click', () => this.exportToXMI());
+        }
+
+        // Botón de generación SQL
+        const generateSQLBtn = document.getElementById('generate-sql-btn');
+        if (generateSQLBtn) {
+            generateSQLBtn.addEventListener('click', () => this.generateSQL());
+        }
     }
 
     // ==================== SELECCIÓN DE HERRAMIENTAS ====================
@@ -387,6 +411,21 @@ async initializeCollaboration() {
         console.log('📊 Elementos en el graph:', this.graph.toJSON());
         return this.getState();
     }
+        exportToPNG() {
+            SimpleImageExporter.quickExportPNG(this);
+        }
+
+        exportToJPG() {
+            SimpleImageExporter.quickExportJPG(this);
+        }
+
+        exportToXMI() {
+            SimpleXMIExporter.quickExportXMI(this);
+        }
+
+        generateSQL() {
+            SimpleSQLGenerator.quickGenerateSQL(this);
+        }
 }
 
 // Hacer disponible globalmente
