@@ -12,6 +12,7 @@ import { DiagramCursorManager } from './DiagramCursorManager.js';
 import { SimpleImageExporter } from './utils/simpleImageExport.js';
 import { SimpleXMIExporter } from './utils/simpleXMIExport.js';
 import { SimpleSQLGenerator } from './utils/simpleSQLGenerator.js';
+import { SimpleJavaGenerator } from './utils/simpleJavaGenerator.js';
 // Configurar JointJS correctamente
 joint.config.useCSSSelectors = false;
 
@@ -229,6 +230,11 @@ async initializeCollaboration() {
         if (generateSQLBtn) {
             generateSQLBtn.addEventListener('click', () => this.generateSQL());
         }
+
+        const generateJavaBtn = document.getElementById('generate-java-btn');
+        if (generateJavaBtn) {
+            generateJavaBtn.addEventListener('click', () => this.generateJavaProject());
+        }
     }
 
     // ==================== SELECCIÓN DE HERRAMIENTAS ====================
@@ -383,6 +389,10 @@ async initializeCollaboration() {
 
     exportToPNG() {
         this.saveManager.exportToPNG();
+    }
+
+    generateJavaProject() {
+        SimpleJavaGenerator.quickGenerateJava(this);
     }
 
     getState() {

@@ -100,6 +100,17 @@
                                 Generar SQL
                                 <span class="ml-auto text-xs text-gray-400">MySQL</span>
                             </button>
+
+                            <button
+                                id="generate-java-btn"
+                                @click="expanded = false"
+                                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-900 flex items-center">
+                                <svg class="w-4 h-4 mr-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                </svg>
+                                Generar Java
+                                <span class="ml-auto text-xs text-gray-400">Spring Boot</span>
+                            </button>
                         </div>
                     </div>
                 </div>
