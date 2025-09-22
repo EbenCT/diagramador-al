@@ -313,10 +313,10 @@ ${this.generateEntityRelationships(className, entityRelationships)}
         }).filter(rel => rel).join('\n');
     }
 
-    generateRepository(cls) {
-        const className = cls.name;
+generateRepository(cls) {
+    const className = cls.name;
 
-        return `package ${this.packageName}.domain.repository;
+    return `package ${this.packageName}.domain.repository;
 
 import ${this.packageName}.domain.model.${className};
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -333,20 +333,24 @@ import java.util.Optional;
 @Repository
 public interface ${className}Repository extends JpaRepository<${className}, Long> {
 
-    // Métodos de consulta básicos generados automáticamente
+    // Métodos de consulta básicos (SIN soft delete)
 
     List<${className}> findByOrderByCreatedAtDesc();
 
-    Optional<${className}> findByIdAndDeletedAtIsNull(Long id);
+    List<${className}> findTop10ByOrderByCreatedAtDesc();
 
-    List<${className}> findAllByDeletedAtIsNull();
+    @Query("SELECT e FROM ${className} e ORDER BY e.createdAt DESC")
+    List<${className}> findAllOrderedByDate();
 
-    @Query("SELECT e FROM ${className} e WHERE e.deletedAt IS NULL ORDER BY e.createdAt DESC")
-    List<${className}> findAllActive();
+    // Buscar por ID con validación
+    @Query("SELECT e FROM ${className} e WHERE e.id = :id")
+    Optional<${className}> findByIdSafe(@Param("id") Long id);
 
     // TODO: Agregar métodos de consulta específicos según necesidades del negocio
+    // Ejemplo:
+    // List<${className}> findByNombreContaining(String nombre);
 }`;
-    }
+}
 
     generateService(cls) {
         const className = cls.name;
@@ -414,7 +418,7 @@ public class ${className}Service {
     public List<${className}ResponseDTO> findAll() {
         log.debug("Obteniendo todas las entidades ${className}");
 
-        return ${this.decapitalizeFirst(className)}Repository.findAllActive()
+        return ${this.decapitalizeFirst(className)}Repository.findByOrderByCreatedAtDesc()
             .stream()
             .map(this::mapEntityToResponse)
             .collect(Collectors.toList());
@@ -955,9 +959,9 @@ server.port=8080
 server.servlet.context-path=/
 
 # Database Configuration
-spring.datasource.url=jdbc:mysql://localhost:3306/${this.artifactId.replace(/-/g, '_')}_db?useSSL=false&serverTimezone=UTC
+spring.datasource.url=jdbc:mysql://localhost:3306/${this.artifactId.replace(/-/g, '_')}_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 spring.datasource.username=root
-spring.datasource.password=
+spring.datasource.password=root
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 # JPA Configuration
@@ -986,9 +990,9 @@ spring.profiles.active=dev`;
 # ${this.projectName} - Development Environment
 
 # Database Development
-spring.datasource.url=jdbc:mysql://localhost:3306/${this.artifactId.replace(/-/g, '_')}_dev?useSSL=false&serverTimezone=UTC
-spring.datasource.username=dev_user
-spring.datasource.password=dev_pass
+spring.datasource.url=jdbc:mysql://localhost:3306/${this.artifactId.replace(/-/g, '_')}_dev?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.username=root
+spring.datasource.password=root
 
 # JPA Development
 spring.jpa.hibernate.ddl-auto=create-drop
