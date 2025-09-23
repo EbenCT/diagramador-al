@@ -606,7 +606,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import jakarta.validation.constraints.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
+import java.time.LocalDateTime;
 /**
  * DTO de Request para ${className}
  * Generado automáticamente desde diagrama UML
