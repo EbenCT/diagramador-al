@@ -460,7 +460,7 @@ public class ${className}Service {
     private void mapRequestToEntity(${className}RequestDTO requestDTO, ${className} entity) {
         // TODO: Implementar mapeo específico de campos
         // Ejemplo básico:
-        // entity.setNombre(requestDTO.getNombre());
+        ${this.generateDtoToEntityMapping(cls.attributes)}
     }
 
     private ${className}ResponseDTO mapEntityToResponse(${className} entity) {
@@ -471,11 +471,33 @@ public class ${className}Service {
 
         // TODO: Implementar mapeo específico de campos
         // Ejemplo básico:
-        // responseDTO.setNombre(entity.getNombre());
+        ${this.generateEntityToResponseMapping(cls.attributes)}
 
         return responseDTO;
     }
 }`;
+    }
+
+    generateDtoToEntityMapping(attributes) {
+        return attributes.map(attr => {
+            const attrData = this.parseAttribute(attr);
+            const fieldName = attrData.name;
+            const capitalizedField = this.capitalizeFirst(fieldName);
+
+            return `        if (requestDTO.get${capitalizedField}() != null) {
+            entity.set${capitalizedField}(requestDTO.get${capitalizedField}());
+        }`;
+        }).join('\n');
+    }
+
+    generateEntityToResponseMapping(attributes) {
+        return attributes.map(attr => {
+            const attrData = this.parseAttribute(attr);
+            const fieldName = attrData.name;
+            const capitalizedField = this.capitalizeFirst(fieldName);
+
+            return `        responseDTO.set${capitalizedField}(entity.get${capitalizedField}());`;
+        }).join('\n');
     }
 
     generateController(cls) {
@@ -990,12 +1012,12 @@ spring.profiles.active=dev`;
 # ${this.projectName} - Development Environment
 
 # Database Development
-spring.datasource.url=jdbc:mysql://localhost:3306/${this.artifactId.replace(/-/g, '_')}_dev?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.url=jdbc:mysql://localhost:3306/${this.artifactId.replace(/-/g, '_')}_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 spring.datasource.username=root
 spring.datasource.password=root
 
 # JPA Development
-spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 spring.jpa.format-sql=true
 
@@ -1079,9 +1101,57 @@ src/main/java/${this.packageName.replace(/\./g, '/')}/
 
 ## Configuración
 
-1. Crear base de datos MySQL: \`${this.artifactId.replace(/-/g, '_')}_db\`
+### Opción 1: Docker (Recomendado)
+
+1. **Ejecutar MySQL con Docker:**
+   \`\`\`bash
+   docker run --name ${this.artifactId}-mysql \\
+     -e MYSQL_ROOT_PASSWORD=root \\
+     -e MYSQL_DATABASE=${this.artifactId.replace(/-/g, '_')}_db \\
+     -p 3306:3306 -d mysql:8.0
+   \`\`\`
+
+2. **Ejecutar aplicación:**
+   \`\`\`bash
+   mvn spring-boot:run
+   \`\`\`
+
+3. **Comandos útiles:**
+   \`\`\`bash
+   # Ver el contenedor
+   docker ps
+
+   # Detener MySQL
+   docker stop ${this.artifactId}-mysql
+
+   # Iniciar MySQL existente
+   docker start ${this.artifactId}-mysql
+
+   # Eliminar contenedor
+   docker rm -f ${this.artifactId}-mysql
+   \`\`\`
+
+### Opción 2: MySQL Local
+
+1. Crear base de datos: \`CREATE DATABASE ${this.artifactId.replace(/-/g, '_')}_db;\`
 2. Configurar credenciales en \`application.properties\`
 3. Ejecutar: \`mvn spring-boot:run\`
+
+## Inicio Rápido
+
+\`\`\`bash
+# 1. Crear base de datos MySQL
+docker run --name ${this.artifactId}-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=${this.artifactId.replace(/-/g, '_')}_db -p 3306:3306 -d mysql:8.0
+
+# 2. Esperar 30 segundos para que MySQL inicie
+sleep 30
+
+# 3. Ejecutar aplicación Spring Boot
+mvn spring-boot:run
+
+# 4. Probar API
+curl http://localhost:8080/api/usuario
+\`\`\`
 
 ## Endpoints Generados
 
