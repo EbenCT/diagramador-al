@@ -8,6 +8,7 @@ import { DiagramClassManager } from './DiagramClassManager.js';
 import { DiagramRelationshipManager } from './DiagramRelationshipManager.js';
 import { DiagramWebSocketManager } from './DiagramWebSocketManager.js';
 import { DiagramCollaborationManager } from './DiagramCollaborationManager.js';
+import { DiagramPollingManager } from './DiagramPollingManager.js';
 import { DiagramCursorManager } from './DiagramCursorManager.js';
 import { SimpleImageExporter } from './utils/simpleImageExport.js';
 import { SimpleXMIExporter } from './utils/simpleXMIExport.js';
@@ -62,43 +63,33 @@ class UMLDiagramEditor {
         this.zoomManager.setupZoomButtons();
         this.zoomManager.setupPanNavigation();
         this.saveManager.loadDiagramData();
-    // NUEVO: Inicializar colaboración si está disponible
-    this.initializeCollaboration()
+        // NUEVO: Inicializar colaboración si está disponible
+        this.initializeCollaboration()
         console.log('✅ UMLDiagramEditor inicializado correctamente');
     }
-// NUEVO: Método para inicializar colaboración opcional
-async initializeCollaboration() {
-    // Solo inicializar colaboración si hay datos de sesión
-    const hasSessionData = window.diagramSessionId !== undefined;
-    const hasEcho = window.Echo !== undefined;
+    async initializeCollaboration() {
+        // Detectar si hay sesión colaborativa (desde URL o window)
+        const params = new URLSearchParams(window.location.search);
+        const hasCollabParam = params.get('collab') || window.diagramSessionId;
 
-    if (hasEcho && hasSessionData) {
-        console.log('🤝 Iniciando modo colaborativo...');
+        if (hasCollabParam) {
+            console.log('🤝 Iniciando modo colaborativo...');
 
-        // Inicializar módulos de colaboración
-        this.webSocketManager = new DiagramWebSocketManager(this);
-        this.collaborationManager = new DiagramCollaborationManager(this);
-        this.cursorManager = new DiagramCursorManager(this);
+            // ✅ CAMBIO: Usar PollingManager en lugar de WebSocketManager
+            this.pollingManager = new DiagramPollingManager(this);
+            this.collaborationManager = new DiagramCollaborationManager(this);
+            this.cursorManager = new DiagramCursorManager(this);
 
-        // Intentar conectar
-        try {
-            const connected = await this.webSocketManager.initialize();
-            if (connected) {
-                console.log('✅ Colaboración activada');
-            } else {
-                console.warn('⚠️ Colaboración no disponible');
-            }
-        } catch (error) {
-            console.error('❌ Error en colaboración:', error);
+            console.log('✅ Colaboración por polling activada');
+        } else {
+            console.log('📝 Modo individual (sin colaboración)');
+            // Inicializar variables nulas para evitar errores
+            this.pollingManager = null;
+            this.collaborationManager = null;
+            this.cursorManager = null;
         }
-    } else {
-        console.log('📝 Modo individual (sin colaboración)');
-        // Inicializar variables nulas para evitar errores
-        this.webSocketManager = null;
-        this.collaborationManager = null;
-        this.cursorManager = null;
     }
-}
+
     createPaper() {
         var container = document.getElementById('paper-container');
         if (!container) {
@@ -364,7 +355,28 @@ async initializeCollaboration() {
         this.selectTool('select');
         console.log('❌ Operación cancelada');
     }
+// ==================== MÉTODOS DE COLABORACIÓN ====================
 
+    // ✅ CAMBIO: Método de cleanup para colaboración
+    stopCollaboration() {
+        if (this.pollingManager) {
+            this.pollingManager.stopCollaboration();
+        }
+        if (this.collaborationManager) {
+            this.collaborationManager.cleanup?.();
+        }
+        if (this.cursorManager) {
+            this.cursorManager.cleanup?.();
+        }
+        console.log('🛑 Colaboración detenida');
+    }
+
+    // Método para compatibilidad con código existente
+    broadcastDiagramUpdate(data) {
+        if (this.pollingManager) {
+            this.pollingManager.broadcastDiagramUpdate(data);
+        }
+    }
     // Delegar métodos de zoom al ZoomManager
     updateCanvasInfo() {
         this.zoomManager.updateCanvasInfo();
@@ -448,6 +460,17 @@ async initializeCollaboration() {
         generateSQL() {
             SimpleSQLGenerator.quickGenerateSQL(this);
         }
+        getState() {
+        return {
+            selectedTool: this.selectedTool,
+            elementCount: this.graph.getElements().length,
+            linkCount: this.graph.getLinks().length,
+            zoom: this.zoomManager.getCurrentZoom(),
+            relationshipMode: this.relationshipMode,
+            hasSelection: !!this.selectedElement,
+            collaborationStatus: this.pollingManager?.getConnectionStatus?.() || null // ✅ CAMBIO
+        };
+    }
 }
 
 // Hacer disponible globalmente

@@ -52,6 +52,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [DiagramController::class, 'store'])->name('store');
         //colaborativo
         Route::post('/diagrams/{diagram}/collaborate', [CollaborationController::class, 'createSession'])->name('diagrams.collaborate');
+
         // Editor de diagrama - puede ser nuevo o existente
         Route::get('/editor/{diagram?}', function ($diagram = null) {
             if ($diagram) {
@@ -182,6 +183,11 @@ Route::middleware('auth')->group(function () {
             })->name('search');
         });
     });
+        // === API PARA COLABORACIÓN (FUERA DEL GRUPO DIAGRAMS) ===
+    Route::prefix('api')->group(function () {
+        Route::post('/diagrams/{diagram}/create-collab', [CollaborationController::class, 'createSession'])->name('api.create-collab');
+        Route::post('/collab/{sessionToken}/sync', [CollaborationController::class, 'sync'])->name('api.collab.sync');
+    });
 });
 
 // === RUTAS PÚBLICAS (SIN AUTENTICACIÓN) ===
@@ -240,31 +246,33 @@ Route::prefix('collaborate')->name('collaborate.')->group(function () {
         return view('collaboration.join', compact('session'));
     })->name('join');
 
-    // Unirse a sesión con token
-    Route::get('/{sessionId}/{token}', function ($sessionId, $token) {
-        $session = \App\Models\DiagramSession::where('session_id', $sessionId)
-            ->where('invite_token', $token)
-            ->where('status', 'active')
-            ->with('diagram')
-            ->first();
+// Unirse a sesión con token
+Route::get('/{sessionId}/{token}', function ($sessionId, $token) {
+    $session = \App\Models\DiagramSession::where('session_id', $sessionId)
+        ->where('invite_token', $token)
+        ->where('status', 'active')
+        ->with('diagram')
+        ->first();
 
-        if (!$session || !$session->isInviteValid()) {
-            abort(404, 'Enlace de invitación no válido o expirado');
+    if (!$session || !$session->isInviteValid()) {
+        abort(404, 'Enlace de invitación no válido o expirado');
+    }
+
+    // Si el usuario está autenticado, unirlo directamente
+    if (Auth::check()) {
+        $collaborationService = app(\App\Services\DiagramService::class);
+        $result = $collaborationService->joinSession($sessionId, $token, Auth::user());
+
+        if ($result) {
+            // ✅ ARREGLO: Agregar parámetro collab en la URL
+            $editorUrl = route('diagrams.editor', $session->diagram->id) . '?collab=' . $token;
+            return redirect($editorUrl)
+                ->with('success', 'Te uniste a la sesión colaborativa');
         }
+    }
 
-        // Si el usuario está autenticado, unirlo directamente
-        if (Auth::check()) {
-            $collaborationService = app(\App\Services\DiagramService::class);
-            $result = $collaborationService->joinSession($sessionId, $token, Auth::user());
-
-            if ($result) {
-                return redirect()->route('diagrams.editor', $session->diagram->id)
-                    ->with('success', 'Te uniste a la sesión colaborativa');
-            }
-        }
-
-        return view('collaboration.join', compact('session', 'token'));
-    })->name('join-with-token');
+    return view('collaboration.join', compact('session', 'token'));
+})->name('join-with-token');
 });
 
 // === RUTAS ADMINISTRATIVAS (FUTURO) ===

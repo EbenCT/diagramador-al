@@ -266,6 +266,7 @@
         window.diagramId = {{ $diagramId ?? 'null' }};
         window.diagramTitle = @json($diagramTitle ?? 'Nuevo Diagrama UML *');
         window.authUser = @json(auth()->user());
+        window.authUserId = {{ auth()->id() }};
         window.AI_CONFIG = {
             GROQ_API_KEY: '{{ config("services.groq.api_key") }}',
             GROQ_MODEL: '{{ config("services.groq.model") }}'
