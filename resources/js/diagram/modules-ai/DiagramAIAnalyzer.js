@@ -20,12 +20,15 @@ export class DiagramAIAnalyzer {
     initializeAI() {
         console.log('🤖 Inicializando módulo de IA...');
 
-        // Obtener API key de configuración
-        this.apiKey = window.GROQ_API_KEY;
+        // Obtener API key de múltiples fuentes
+        this.apiKey = window.AI_CONFIG?.GROQ_API_KEY ||
+                     window.GROQ_API_KEY ||
+                     null;
 
         if (!this.apiKey) {
             console.warn('⚠️ API key de Groq no configurada');
-            return;
+            console.warn('💡 Configura GROQ_API_KEY en tu .env o en window.AI_CONFIG');
+            // Mostrar el botón pero con advertencia
         }
 
         this.createFloatingButton();
@@ -435,6 +438,7 @@ export class DiagramAIAnalyzer {
                         sourceClass: sourceUml.className || 'Unnamed',
                         targetClass: targetUml.className || 'Unnamed',
                         type: relationData.type || umlData.relationshipType || umlData.type || 'association',
+                        name: relationData.name || umlData.name || '', // ← AGREGAR NOMBRE DE RELACIÓN
                         sourceMultiplicity: umlData.sourceMultiplicity || relationData.sourceMultiplicity || '',
                         targetMultiplicity: umlData.targetMultiplicity || relationData.targetMultiplicity || ''
                     });
@@ -478,8 +482,9 @@ export class DiagramAIAnalyzer {
             relationships.forEach(rel => {
                 const sourceCard = rel.sourceMultiplicity ? `[${rel.sourceMultiplicity}]` : '';
                 const targetCard = rel.targetMultiplicity ? `[${rel.targetMultiplicity}]` : '';
+                const relationName = rel.name ? ` "${rel.name}"` : '';
 
-                diagramText += `\n- ${rel.sourceClass} ${sourceCard} ←→ ${rel.targetClass} ${targetCard} (${rel.type})\n`;
+                diagramText += `\n- ${rel.sourceClass} ${sourceCard} ←→ ${rel.targetClass} ${targetCard} (${rel.type}${relationName})\n`;
             });
         }
 

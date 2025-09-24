@@ -266,7 +266,10 @@
         window.diagramId = {{ $diagramId ?? 'null' }};
         window.diagramTitle = @json($diagramTitle ?? 'Nuevo Diagrama UML *');
         window.authUser = @json(auth()->user());
-
+        window.AI_CONFIG = {
+            GROQ_API_KEY: '{{ config("services.groq.api_key") }}',
+            GROQ_MODEL: '{{ config("services.groq.model") }}'
+        };
         // NUEVO: Datos de sesión colaborativa
         @if($collaborationSession)
             window.diagramSessionId = @json($collaborationSession);
