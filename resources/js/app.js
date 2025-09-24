@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // NUEVAS LÍNEAS AGREGADAS - PASO 3:
             // Hacer el editor disponible globalmente para las funciones de eliminación
             window.umlEditor = editor;
-
+            window.diagramEditor = editor;
             // Función global para eliminar clases (necesaria para el botón X)
             window.deleteClass = function(elementId) {
                 if (window.umlEditor && window.umlEditor.graph) {

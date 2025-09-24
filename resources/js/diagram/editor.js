@@ -14,6 +14,7 @@ import { SimpleXMIExporter } from './utils/simpleXMIExport.js';
 import { SimpleSQLGenerator } from './utils/simpleSQLGenerator.js';
 import { SimpleJavaGenerator } from './utils/simpleJavaGenerator.js';
 import { SimplePostmanGenerator } from './utils/simplePostmanGenerator.js';
+import { DiagramAIAnalyzer } from './modules-ai/DiagramAIAnalyzer.js';
 // Configurar JointJS correctamente
 joint.config.useCSSSelectors = false;
 
@@ -50,6 +51,7 @@ class UMLDiagramEditor {
         this.zoomManager = new DiagramZoomManager(this);
         this.classManager = new DiagramClassManager(this);
         this.relationshipManager = new DiagramRelationshipManager(this);
+        this.aiAnalyzer = new DiagramAIAnalyzer(this);
 
         this.init();
     }
