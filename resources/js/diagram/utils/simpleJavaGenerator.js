@@ -83,34 +83,35 @@ export class SimpleJavaGenerator {
         return classes;
     }
 
-    extractRelationships() {
-        const relationships = [];
-        const links = this.editor.graph.getLinks();
+extractRelationships() {
+    const relationships = [];
+    const links = this.editor.graph.getLinks();
 
-        links.forEach(link => {
-            const source = link.getSourceElement();
-            const target = link.getTargetElement();
-            const umlData = link.get('umlData') || {};
+    links.forEach(link => {
+        const source = link.getSourceElement();
+        const target = link.getTargetElement();
+        const umlData = link.get('umlData') || {};
+        const relationData = link.get('relationData') || {}; // AGREGAR ESTA LÍNEA
 
-            if (source && target) {
-                const sourceUml = source.get('umlData');
-                const targetUml = target.get('umlData');
+        if (source && target) {
+            const sourceUml = source.get('umlData');
+            const targetUml = target.get('umlData');
 
-                if (sourceUml?.type === 'class' && targetUml?.type === 'class') {
-                    relationships.push({
-                        sourceClass: sourceUml.className,
-                        targetClass: targetUml.className,
-                        type: umlData.relationshipType || 'association',
-                        sourceMultiplicity: umlData.sourceMultiplicity || '',
-                        targetMultiplicity: umlData.targetMultiplicity || ''
-                    });
-                }
+            if (sourceUml?.type === 'class' && targetUml?.type === 'class') {
+                relationships.push({
+                    sourceClass: sourceUml.className,
+                    targetClass: targetUml.className,
+                    type: relationData.type || umlData.relationshipType || umlData.type || 'association', // CAMBIAR ESTA LÍNEA
+                    sourceMultiplicity: umlData.sourceMultiplicity || relationData.sourceMultiplicity || '',
+                    targetMultiplicity: umlData.targetMultiplicity || relationData.targetMultiplicity || ''
+                });
             }
-        });
+        }
+    });
 
-        console.log('🔗 Relaciones extraídas:', relationships.length);
-        return relationships;
-    }
+    console.log('🔗 Relaciones extraídas:', relationships.length);
+    return relationships;
+}
 
     async buildSpringBootProject(classes, relationships) {
         const zip = new JSZip();
@@ -278,10 +279,22 @@ ${this.generateEntityRelationships(className, entityRelationships)}
 generateEntityRelationships(className, relationships) {
     return relationships.map(rel => {
         if (rel.sourceClass === className) {
+            console.log('Procesando relación:', {
+                sourceClass: rel.sourceClass,
+                targetClass: rel.targetClass,
+                type: rel.type
+            });
             const targetClass = rel.targetClass;
             const fieldName = this.decapitalizeFirst(targetClass);
 
             switch (rel.type) {
+                case 'inheritance':
+                    // HERENCIA: Siempre FK de hija hacia padre (sin evaluar multiplicidad)
+                    return `
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
+    private ${targetClass} ${fieldName};`;
+
                 case 'association':
                     // CAMBIO CLAVE: Evaluar sourceMultiplicity en lugar de targetMultiplicity
                     if (rel.sourceMultiplicity.includes('*') || rel.sourceMultiplicity.includes('n')) {
