@@ -275,43 +275,48 @@ ${this.generateEntityRelationships(className, entityRelationships)}
         }).join('\n');
     }
 
-    generateEntityRelationships(className, relationships) {
-        return relationships.map(rel => {
-            if (rel.sourceClass === className) {
-                // Esta clase es el origen de la relación
-                const targetClass = rel.targetClass;
-                const fieldName = this.decapitalizeFirst(targetClass);
+generateEntityRelationships(className, relationships) {
+    return relationships.map(rel => {
+        if (rel.sourceClass === className) {
+            const targetClass = rel.targetClass;
+            const fieldName = this.decapitalizeFirst(targetClass);
 
-                switch (rel.type) {
-                    case 'association':
-                        if (rel.targetMultiplicity.includes('*') || rel.targetMultiplicity.includes('n')) {
-                            return `
-    @OneToMany(mappedBy = "${this.decapitalizeFirst(className)}", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<${targetClass}> ${fieldName}s;`;
-                        } else {
-                            return `
+            switch (rel.type) {
+                case 'association':
+                    // CAMBIO CLAVE: Evaluar sourceMultiplicity en lugar de targetMultiplicity
+                    if (rel.sourceMultiplicity.includes('*') || rel.sourceMultiplicity.includes('n')) {
+                        // Source es "*" -> @ManyToOne + FK en esta tabla
+                        return `
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
     private ${targetClass} ${fieldName};`;
-                        }
-
-                    case 'composition':
+                    } else {
+                        // Source es "1" -> @OneToMany + FK en la tabla target
                         return `
-    @OneToMany(mappedBy = "${this.decapitalizeFirst(className)}", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(className)}_id")
+    private Set<${targetClass}> ${fieldName}s;`;
+                    }
+
+                case 'composition':
+                    return `
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(className)}_id")
     private Set<${targetClass}> ${fieldName}s;`;
 
-                    case 'aggregation':
-                        return `
-    @OneToMany(mappedBy = "${this.decapitalizeFirst(className)}", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
+                case 'aggregation':
+                    return `
+    @OneToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(className)}_id")
     private Set<${targetClass}> ${fieldName}s;`;
 
-                    default:
-                        return `// Relación ${rel.type} con ${targetClass}`;
-                }
+                default:
+                    return `// Relación ${rel.type} con ${targetClass}`;
             }
-            return '';
-        }).filter(rel => rel).join('\n');
-    }
+        }
+        return '';
+    }).filter(rel => rel).join('\n');
+}
 
 generateRepository(cls) {
     const className = cls.name;
