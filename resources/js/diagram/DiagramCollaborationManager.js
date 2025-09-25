@@ -66,6 +66,9 @@ export class DiagramCollaborationManager {
 
     updateCollaboratorsList(users) {
         // Limpiar colaboradores antiguos
+        if (!Array.isArray(users)) {
+            users = [];
+        }
         this.collaborators.clear();
         this.remoteSelections.clear();
 

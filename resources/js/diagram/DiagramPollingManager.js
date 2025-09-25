@@ -110,9 +110,10 @@ export class DiagramPollingManager {
 
     async syncChanges() {
         if (!this.sessionToken || !this.isActive) return;
+        let changesToSend = [];
 
         try {
-            const changesToSend = [...this.pendingChanges];
+            changesToSend = [...this.pendingChanges];
             this.pendingChanges = []; // Limpiar cambios pendientes
 
             const response = await axios.post(`/api/collab/${this.sessionToken}/sync`, {
