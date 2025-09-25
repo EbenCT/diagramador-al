@@ -143,62 +143,93 @@ export class DiagramPollingManager {
         }
     }
 
-    applyRemoteChanges(changes) {
-        changes.forEach(change => {
-            if (change.user_id === this.userId) return; // Ignorar nuestros cambios
+applyRemoteChanges(changes) {
+    changes.forEach(change => {
+        if (change.user_id === this.userId) return; // Ignorar nuestros cambios
 
-            try {
-                this.applyRemoteChange(change);
-            } catch (error) {
-                console.error('❌ Error aplicando cambio remoto:', change, error);
+        try {
+            const { type, element_id, data } = change;
+
+            console.log('🔄 Aplicando cambio remoto:', { type, element_id, user_id: change.user_id });
+
+            switch (type) {
+                case 'change:position':
+                    this.applyPositionChange(element_id, data);
+                    break;
+
+                case 'change:size':
+                    this.applySizeChange(element_id, data);
+                    break;
+
+                case 'change:attrs':
+                    this.applyAttrsChange(element_id, data);
+                    break;
+
+                case 'add':
+                    this.applyAddElement(data);
+                    break;
+
+                case 'remove':
+                    this.applyRemoveElement(element_id);
+                    break;
+
+                // Ignorar eventos batch y change genéricos para evitar redundancia
+                case 'batch:start':
+                case 'batch:stop':
+                case 'change':
+                    break;
+
+                default:
+                    console.warn('🤷 Tipo de cambio remoto desconocido:', type);
             }
-        });
+        } catch (error) {
+            console.error('❌ Error aplicando cambio remoto:', error, change);
+        }
+    });
+}
+
+applyPositionChange(elementId, data) {
+    const element = this.editor.graph.getCell(elementId);
+    if (element && data.position) {
+        element.set('position', data.position, { silent: true });
+        console.log('📍 Posición actualizada remotamente:', elementId);
     }
+}
 
-    applyRemoteChange(change) {
-        const { type, element_id, data } = change;
+applySizeChange(elementId, data) {
+    const element = this.editor.graph.getCell(elementId);
+    if (element && data.size) {
+        element.set('size', data.size, { silent: true });
+        console.log('📏 Tamaño actualizado remotamente:', elementId);
+    }
+}
 
-        switch(type) {
-            case 'add':
-                if (data.cellData && !this.editor.graph.getCell(data.cellData.id)) {
-                    this.editor.graph.fromJSON({ cells: [data.cellData] }, { silent: true });
-                    console.log('➕ Elemento agregado remotamente:', data.cellData.id);
-                }
-                break;
+applyAttrsChange(elementId, data) {
+    const element = this.editor.graph.getCell(elementId);
+    if (element && data.attrs) {
+        element.set('attrs', data.attrs, { silent: true });
+        console.log('🎨 Atributos actualizados remotamente:', elementId);
+    }
+}
 
-            case 'remove':
-                const cellToRemove = this.editor.graph.getCell(data.elementId);
-                if (cellToRemove) {
-                    cellToRemove.remove({ silent: true });
-                    console.log('➖ Elemento eliminado remotamente:', data.elementId);
-                }
-                break;
-
-            case 'change:position':
-                const cellToMove = this.editor.graph.getCell(element_id);
-                if (cellToMove && data.position) {
-                    cellToMove.position(data.position.x, data.position.y, { silent: true });
-                    console.log('📍 Elemento movido remotamente:', element_id);
-                }
-                break;
-
-            case 'change:size':
-                const cellToResize = this.editor.graph.getCell(element_id);
-                if (cellToResize && data.size) {
-                    cellToResize.resize(data.size.width, data.size.height, { silent: true });
-                    console.log('📏 Elemento redimensionado remotamente:', element_id);
-                }
-                break;
-
-            case 'change:attrs':
-                const cellToUpdate = this.editor.graph.getCell(element_id);
-                if (cellToUpdate && data.attrs) {
-                    cellToUpdate.attr(data.attrs, { silent: true });
-                    console.log('🎨 Atributos actualizados remotamente:', element_id);
-                }
-                break;
+applyAddElement(data) {
+    if (data.cellData) {
+        // Verificar que el elemento no exista ya
+        const existingElement = this.editor.graph.getCell(data.cellData.id);
+        if (!existingElement) {
+            this.editor.graph.fromJSON({ cells: [data.cellData] }, { silent: true });
+            console.log('➕ Elemento agregado remotamente:', data.cellData.id);
         }
     }
+}
+
+applyRemoveElement(elementId) {
+    const element = this.editor.graph.getCell(elementId);
+    if (element) {
+        element.remove({ silent: true });
+        console.log('🗑️ Elemento eliminado remotamente:', elementId);
+    }
+}
 
     updateActiveUsers(activeUsers) {
         const countElement = document.getElementById('active-users-count');

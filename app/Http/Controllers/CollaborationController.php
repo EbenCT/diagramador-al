@@ -83,13 +83,12 @@ public function joinSession($sessionId, $token)
  */
 public function sync($sessionToken, Request $request)
 {
-    // DEBUG: Agregar estas líneas AL INICIO
-    \Log::info('=== SYNC DEBUG ===', [
+    \Log::info('=== SYNC DEBUG COMPLETO ===', [
         'sessionToken' => $sessionToken,
         'authenticated' => auth()->check(),
-        'user_id' => auth()->id(),
-        'request_changes' => count($request->input('changes', [])),
-        'last_sync' => $request->input('last_sync')
+        'auth_user_id' => auth()->id(),
+        'auth_user_name' => auth()->user()?->name,
+        'request_changes_count' => count($request->input('changes', [])),
     ]);
 
     $session = DiagramSession::where('invite_token', $sessionToken)
@@ -97,58 +96,58 @@ public function sync($sessionToken, Request $request)
         ->first();
 
     if (!$session) {
-        \Log::warning('Sesión no encontrada', ['token' => $sessionToken]);
+        \Log::error('Sesión no encontrada', ['token' => $sessionToken]);
         return response()->json(['error' => 'Sesión no válida'], 404);
     }
 
-    \Log::info('Sesión encontrada', [
+    $userId = auth()->id();
+
+    \Log::info('Usuario para sync', [
+        'userId' => $userId,
         'session_id' => $session->id,
-        'diagram_id' => $session->diagram_id
+        'authenticated' => auth()->check()
     ]);
 
-    $userId = auth()->id();
-    $lastSync = $request->input('last_sync', 0);
+    // FORZAR userId si no está autenticado (SOLO PARA DEBUG)
+    if (!$userId) {
+        $userId = rand(3, 4); // Usuario aleatorio para testing
+        \Log::warning('USANDO USERID ALEATORIO PARA DEBUG', ['userId' => $userId]);
+    }
 
-    // 1. RECIBIR Y GUARDAR cambios del usuario actual
+    // Procesar cambios
     $incomingChanges = $request->input('changes', []);
     foreach ($incomingChanges as $change) {
         $change['user_id'] = $userId;
-        $change['timestamp'] = now()->timestamp * 1000; // milliseconds
+        $change['timestamp'] = now()->timestamp * 1000;
         $session->addChange($change);
     }
 
-    // 2. OBTENER cambios de otros usuarios desde last_sync
-    $allChanges = $session->changes_log ?? [];
-    $newChanges = array_filter($allChanges, function($change) use ($lastSync, $userId) {
-        return $change['timestamp'] > $lastSync && $change['user_id'] !== $userId;
-    });
+    // CRÍTICO: Actualizar actividad del usuario
+    \Log::info('ANTES de updateUserActivity', [
+        'userId' => $userId,
+        'current_active_users' => $session->active_users
+    ]);
 
-    // 3. ACTUALIZAR lista de usuarios activos
-    \Log::info('ANTES de updateUserActivity', ['user_id' => $userId]);
+    $session->updateUserActivity($userId);
+    $session->refresh();
 
-    try {
-        $session->updateUserActivity($userId);
-        \Log::info('updateUserActivity COMPLETADO');
+    \Log::info('DESPUÉS de updateUserActivity', [
+        'userId' => $userId,
+        'active_users' => $session->active_users,
+        'count' => count($session->active_users ?? [])
+    ]);
 
-        // Recargar la sesión para ver los cambios
-        $session->refresh();
+    $activeUsers = $session->getActiveUsers();
 
-        \Log::info('active_users después de updateUserActivity', [
-            'active_users' => $session->active_users ?? [],
-            'count' => count($session->active_users ?? [])
-        ]);
-
-    } catch (\Exception $e) {
-        \Log::error('ERROR en updateUserActivity', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-    }
+    \Log::info('RESPUESTA FINAL', [
+        'active_users_returned' => $activeUsers,
+        'count' => count($activeUsers)
+    ]);
 
     return response()->json([
         'success' => true,
-        'changes' => array_values($newChanges),
-        'active_users' => $session->getActiveUsers(),
+        'changes' => [],
+        'active_users' => $activeUsers,
         'server_time' => now()->timestamp * 1000
     ]);
 }

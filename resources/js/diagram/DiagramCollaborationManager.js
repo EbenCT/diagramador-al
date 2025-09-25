@@ -64,23 +64,45 @@ export class DiagramCollaborationManager {
         console.log(`➖ Colaborador removido: ${user.name}`);
     }
 
-    updateCollaboratorsList(users) {
-        // Limpiar colaboradores antiguos
-        if (!Array.isArray(users)) {
-            users = [];
-        }
-        this.collaborators.clear();
-        this.remoteSelections.clear();
+updateCollaboratorsList(users) {
+    if (!Array.isArray(users)) {
+        users = [];
+    }
 
-        // Agregar usuarios actuales
-        users.forEach(user => {
-            if (user.id !== this.editor.webSocketManager?.userId) {
-                this.addCollaborator(user);
-            }
+    // Limpiar colaboradores antiguos
+    this.collaborators.clear();
+    this.remoteSelections.clear();
+
+    // ARREGLO: Obtener userId del manager correcto (polling vs websocket)
+    const currentUserId = this.editor.pollingManager?.userId || this.editor.webSocketManager?.userId;
+
+    console.log('DEBUG usuarios:', {
+        totalUsers: users.length,
+        currentUserId: currentUserId,
+        users: users
+    });
+
+    // Agregar usuarios actuales (excluyendo el usuario actual)
+    users.forEach(user => {
+        // 🔧 ARREGLO: Soportar tanto user.id como user.user_id
+        const userId = user.id || user.user_id;
+
+        console.log('Evaluando usuario:', {
+            user: user,
+            userId: userId,
+            currentUserId: currentUserId,
+            shouldAdd: user && userId && userId !== currentUserId
         });
 
-        console.log(`👥 Lista de colaboradores actualizada: ${users.length} usuarios`);
-    }
+        if (user && userId && userId !== currentUserId) {
+            // 🔧 NORMALIZAR: Asegurar que el usuario tenga .id para addCollaborator
+            user.id = userId;
+            this.addCollaborator(user);
+        }
+    });
+
+    console.log(`Lista de colaboradores actualizada: ${users.length} usuarios totales, ${this.collaborators.size} colaboradores remotos`);
+}
 
     updateCollaboratorsUI() {
         const collaboratorsElement = document.getElementById('collaborators-list');

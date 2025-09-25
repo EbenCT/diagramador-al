@@ -29,7 +29,9 @@ class DiagramSession extends Model
         'current_state',
         'cursor_positions',
         'active_users_count',
-        'owner_id'
+        'owner_id',
+        'active_users',      // ← AGREGAR
+        'changes_log'
     ];
 
     protected $casts = [
@@ -40,7 +42,9 @@ class DiagramSession extends Model
         'current_state' => 'array',
         'cursor_positions' => 'array',
         'allow_anonymous' => 'boolean',
-        'is_public' => 'boolean'
+        'is_public' => 'boolean',
+        'active_users' => 'array',    // ← AGREGAR
+        'changes_log' => 'array'
     ];
 
     protected static function boot()
