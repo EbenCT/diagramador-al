@@ -144,13 +144,21 @@ export class DiagramPollingManager {
     }
 
 applyRemoteChanges(changes) {
+    if (!changes || changes.length === 0) return;
+
     changes.forEach(change => {
-        if (change.user_id === this.userId) return; // Ignorar nuestros cambios
+        // Ignorar nuestros propios cambios para evitar loops
+        if (change.user_id === this.userId) return;
 
         try {
             const { type, element_id, data } = change;
 
-            console.log('🔄 Aplicando cambio remoto:', { type, element_id, user_id: change.user_id });
+            console.log('🔄 Aplicando cambio remoto:', {
+                type,
+                element_id,
+                user_id: change.user_id,
+                data
+            });
 
             switch (type) {
                 case 'change:position':
@@ -173,6 +181,10 @@ applyRemoteChanges(changes) {
                     this.applyRemoveElement(element_id);
                     break;
 
+                case 'change:umlData':
+                    this.applyUMLDataChange(element_id, data);
+                    break;
+
                 // Ignorar eventos batch y change genéricos para evitar redundancia
                 case 'batch:start':
                 case 'batch:stop':
@@ -182,17 +194,34 @@ applyRemoteChanges(changes) {
                 default:
                     console.warn('🤷 Tipo de cambio remoto desconocido:', type);
             }
+
         } catch (error) {
             console.error('❌ Error aplicando cambio remoto:', error, change);
         }
     });
 }
 
+applyUMLDataChange(elementId, data) {
+    const element = this.editor.graph.getCell(elementId);
+    if (element && data.umlData && this.editor.classManager) {
+        // Actualizar datos UML sin triggear eventos
+        element.set('umlData', data.umlData, { silent: true });
+
+        // Regenerar markup si es necesario
+        if (this.editor.classManager.elementFactory) {
+            this.editor.classManager.elementFactory.updateClassMarkup(element);
+        }
+
+        console.log('🏷️ Datos UML actualizados remotamente:', elementId);
+    }
+}
+
 applyPositionChange(elementId, data) {
     const element = this.editor.graph.getCell(elementId);
     if (element && data.position) {
+        // Usar silent: true para evitar triggear eventos locales
         element.set('position', data.position, { silent: true });
-        console.log('📍 Posición actualizada remotamente:', elementId);
+        console.log('📍 Posición actualizada remotamente:', elementId, data.position);
     }
 }
 
@@ -200,25 +229,34 @@ applySizeChange(elementId, data) {
     const element = this.editor.graph.getCell(elementId);
     if (element && data.size) {
         element.set('size', data.size, { silent: true });
-        console.log('📏 Tamaño actualizado remotamente:', elementId);
+        console.log('📏 Tamaño actualizado remotamente:', elementId, data.size);
     }
 }
 
 applyAttrsChange(elementId, data) {
     const element = this.editor.graph.getCell(elementId);
     if (element && data.attrs) {
-        element.set('attrs', data.attrs, { silent: true });
+        // Para attrs, hacer merge inteligente
+        const currentAttrs = element.get('attrs') || {};
+        const newAttrs = { ...currentAttrs, ...data.attrs };
+
+        element.set('attrs', newAttrs, { silent: true });
         console.log('🎨 Atributos actualizados remotamente:', elementId);
     }
 }
 
 applyAddElement(data) {
-    if (data.cellData) {
-        // Verificar que el elemento no exista ya
-        const existingElement = this.editor.graph.getCell(data.cellData.id);
-        if (!existingElement) {
-            this.editor.graph.fromJSON({ cells: [data.cellData] }, { silent: true });
-            console.log('➕ Elemento agregado remotamente:', data.cellData.id);
+    if (data.cell) {
+        try {
+            // Verificar que el elemento no existe ya
+            const existingElement = this.editor.graph.getCell(data.cell.id);
+            if (!existingElement) {
+                // Agregar el elemento sin triggear eventos
+                this.editor.graph.addCell(data.cell, { silent: true });
+                console.log('➕ Elemento agregado remotamente:', data.cell.id);
+            }
+        } catch (error) {
+            console.error('❌ Error agregando elemento remoto:', error);
         }
     }
 }
@@ -228,6 +266,21 @@ applyRemoveElement(elementId) {
     if (element) {
         element.remove({ silent: true });
         console.log('🗑️ Elemento eliminado remotamente:', elementId);
+    }
+}
+
+applyUMLDataChange(elementId, data) {
+    const element = this.editor.graph.getCell(elementId);
+    if (element && data.umlData && this.editor.classManager) {
+        // Actualizar datos UML sin triggear eventos
+        element.set('umlData', data.umlData, { silent: true });
+
+        // Regenerar markup si es necesario
+        if (this.editor.classManager.elementFactory) {
+            this.editor.classManager.elementFactory.updateClassMarkup(element);
+        }
+
+        console.log('🏷️ Datos UML actualizados remotamente:', elementId);
     }
 }
 

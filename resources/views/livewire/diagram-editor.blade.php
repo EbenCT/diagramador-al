@@ -129,7 +129,13 @@
                     </div>
                 </div>
             </div>
-
+            <button id="invite-collab-btn"
+                    class="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg transform hover:scale-105">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path>
+                </svg>
+                <span>Compartir & Invitar</span>
+            </button>
             <!-- Controles de zoom - JavaScript directo -->
             <div class="flex items-center space-x-2">
                 <button id="zoom-in" class="p-2 hover:bg-gray-100 rounded-md transition-colors" title="Acercar (Scroll Up)">
@@ -218,6 +224,261 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal de Invitación (agregar al final del body) -->
+<div id="invite-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <!-- Backdrop con blur -->
+    <div class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity"></div>
+
+    <!-- Modal -->
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-white" id="modal-title">
+                            Invitar Colaboradores
+                        </h3>
+                    </div>
+                    <button id="close-modal" class="text-white/80 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="bg-white px-6 py-6">
+                <!-- Estado de carga -->
+                <div id="invite-loading" class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-200 border-t-purple-600"></div>
+                    <p class="mt-4 text-gray-600">Generando enlace de invitación...</p>
+                </div>
+
+                <!-- Contenido del enlace -->
+                <div id="invite-content" class="hidden space-y-4">
+                    <!-- Descripción -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex">
+                            <svg class="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="ml-3">
+                                <h4 class="text-sm font-medium text-blue-900">Colaboración en Tiempo Real</h4>
+                                <p class="mt-1 text-sm text-blue-700">Comparte este enlace para que otros puedan editar el diagrama contigo en tiempo real.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Enlace -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Enlace de Invitación
+                        </label>
+                        <div class="flex items-center space-x-2">
+                            <input
+                                id="invite-url"
+                                type="text"
+                                readonly
+                                class="flex-1 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-sm font-mono text-gray-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                value="Generando..."
+                            />
+                            <button
+                                id="copy-invite-btn"
+                                class="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 whitespace-nowrap"
+                            >
+                                <svg id="copy-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                <span id="copy-text">Copiar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Estadísticas -->
+                    <div class="grid grid-cols-2 gap-4 pt-4">
+                        <div class="bg-gray-50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-gray-900" id="collab-users-count">0</div>
+                            <div class="text-sm text-gray-600">Usuarios Activos</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-green-600" id="session-status">Activa</div>
+                            <div class="text-sm text-gray-600">Sesión</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estado de error -->
+                <div id="invite-error" class="hidden text-center py-8">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </div>
+                    <p class="text-red-600 font-medium">Error al generar enlace</p>
+                    <p class="text-gray-600 text-sm mt-2" id="error-message">Por favor, intenta de nuevo</p>
+                    <button id="retry-btn" class="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                        Reintentar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-4 flex justify-end">
+                <button id="close-modal-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Script de Invitación Colaborativa
+(function() {
+    const modal = document.getElementById('invite-modal');
+    const inviteBtn = document.getElementById('invite-collab-btn');
+    const closeModalBtns = [
+        document.getElementById('close-modal'),
+        document.getElementById('close-modal-btn')
+    ];
+    const copyBtn = document.getElementById('copy-invite-btn');
+    const retryBtn = document.getElementById('retry-btn');
+
+    let currentInviteUrl = '';
+
+    // Abrir modal
+    inviteBtn?.addEventListener('click', async () => {
+        modal?.classList.remove('hidden');
+        await createCollaborationSession();
+    });
+
+    // Cerrar modal
+    closeModalBtns.forEach(btn => {
+        btn?.addEventListener('click', () => {
+            modal?.classList.add('hidden');
+        });
+    });
+
+    // Cerrar con ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal?.classList.contains('hidden')) {
+            modal?.classList.add('hidden');
+        }
+    });
+
+    // Cerrar al hacer click fuera
+    modal?.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal?.classList.add('hidden');
+        }
+    });
+
+    // Copiar enlace
+    copyBtn?.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(currentInviteUrl);
+
+            // Feedback visual
+            const copyIcon = document.getElementById('copy-icon');
+            const copyText = document.getElementById('copy-text');
+
+            copyIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+            copyText.textContent = '¡Copiado!';
+            copyBtn.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+            copyBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+
+            setTimeout(() => {
+                copyIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>';
+                copyText.textContent = 'Copiar';
+                copyBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                copyBtn.classList.add('bg-purple-600', 'hover:bg-purple-700');
+            }, 2000);
+        } catch (err) {
+            console.error('Error al copiar:', err);
+            alert('No se pudo copiar el enlace');
+        }
+    });
+
+    // Reintentar
+    retryBtn?.addEventListener('click', async () => {
+        await createCollaborationSession();
+    });
+
+    // Crear sesión colaborativa
+    async function createCollaborationSession() {
+        const loadingEl = document.getElementById('invite-loading');
+        const contentEl = document.getElementById('invite-content');
+        const errorEl = document.getElementById('invite-error');
+
+        // Reset UI
+        loadingEl?.classList.remove('hidden');
+        contentEl?.classList.add('hidden');
+        errorEl?.classList.add('hidden');
+
+        try {
+            const diagramId = window.diagramId || window.DiagramEditor?.instance?.diagramId;
+
+            if (!diagramId) {
+                throw new Error('ID del diagrama no encontrado');
+            }
+
+            const response = await fetch(`/api/diagrams/${diagramId}/create-collab`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                },
+                body: JSON.stringify({
+                    max_collaborators: 10
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al crear sesión');
+            }
+
+            const data = await response.json();
+            currentInviteUrl = data.invite_url;
+
+            // Mostrar contenido
+            loadingEl?.classList.add('hidden');
+            contentEl?.classList.remove('hidden');
+
+            // Actualizar UI
+            document.getElementById('invite-url').value = currentInviteUrl;
+
+            // Actualizar estadísticas si hay datos
+            if (data.session?.active_users) {
+                const activeUsers = Array.isArray(data.session.active_users)
+                    ? data.session.active_users.length
+                    : Object.keys(data.session.active_users).length;
+                document.getElementById('collab-users-count').textContent = activeUsers;
+            }
+
+            console.log('✅ Sesión colaborativa creada:', data);
+
+        } catch (error) {
+            console.error('❌ Error creando sesión:', error);
+
+            loadingEl?.classList.add('hidden');
+            errorEl?.classList.remove('hidden');
+
+            const errorMsg = document.getElementById('error-message');
+            if (errorMsg) {
+                errorMsg.textContent = error.message || 'Error desconocido';
+            }
+        }
+    }
+})();
+</script>
 
     {{-- Notificaciones flash - Solo para operaciones Livewire --}}
     @if (session()->has('message'))
