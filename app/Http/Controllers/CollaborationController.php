@@ -83,13 +83,6 @@ public function joinSession($sessionId, $token)
  */
 public function sync($sessionToken, Request $request)
 {
-    \Log::info('=== SYNC DEBUG COMPLETO ===', [
-        'sessionToken' => $sessionToken,
-        'authenticated' => auth()->check(),
-        'auth_user_id' => auth()->id(),
-        'auth_user_name' => auth()->user()?->name,
-        'request_changes_count' => count($request->input('changes', [])),
-    ]);
 
     $session = DiagramSession::where('invite_token', $sessionToken)
         ->where('status', 'active')
@@ -101,12 +94,6 @@ public function sync($sessionToken, Request $request)
     }
 
     $userId = auth()->id();
-
-    \Log::info('Usuario para sync', [
-        'userId' => $userId,
-        'session_id' => $session->id,
-        'authenticated' => auth()->check()
-    ]);
 
     // FORZAR userId si no está autenticado (SOLO PARA DEBUG)
     if (!$userId) {
@@ -121,21 +108,21 @@ public function sync($sessionToken, Request $request)
         $change['timestamp'] = now()->timestamp * 1000;
         $session->addChange($change);
     }
-
+/*
     // CRÍTICO: Actualizar actividad del usuario
     \Log::info('ANTES de updateUserActivity', [
         'userId' => $userId,
         'current_active_users' => $session->active_users
-    ]);
+    ]);*/
 
     $session->updateUserActivity($userId);
     $session->refresh();
-
+/*
     \Log::info('DESPUÉS de updateUserActivity', [
         'userId' => $userId,
         'active_users' => $session->active_users,
         'count' => count($session->active_users ?? [])
-    ]);
+    ]);*/
 
     $activeUsers = $session->getActiveUsers();
 
@@ -144,12 +131,21 @@ public function sync($sessionToken, Request $request)
         'count' => count($activeUsers)
     ]);
 
-    return response()->json([
-        'success' => true,
-        'changes' => [],
-        'active_users' => $activeUsers,
-        'server_time' => now()->timestamp * 1000
-    ]);
+// Obtener cambios de otros usuarios
+$lastSync = $request->input('last_sync', 0);
+$otherUsersChanges = $session->getChangesSince($lastSync, $userId);
+
+\Log::info('Cambios a enviar', [
+    'count' => count($otherUsersChanges),
+    'changes' => $otherUsersChanges
+]);
+
+return response()->json([
+    'success' => true,
+    'changes' => $otherUsersChanges,  // ← Ahora devuelve cambios reales
+    'active_users' => $activeUsers,
+    'server_time' => now()->timestamp * 1000
+]);
 }
 
 }

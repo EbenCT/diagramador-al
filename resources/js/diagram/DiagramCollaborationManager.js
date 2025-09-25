@@ -43,8 +43,9 @@ export class DiagramCollaborationManager {
 
         this.collaborators.set(user.id, collaborator);
         this.updateCollaboratorsUI();
-
-        console.log(`➕ Colaborador agregado: ${user.name}`, collaborator);
+        if (!this.collaborators.has(user.id)) {
+            console.log(`➕ Colaborador agregado: ${user.name}`, collaborator);
+        }
     }
 
     removeCollaborator(user) {
@@ -76,23 +77,11 @@ updateCollaboratorsList(users) {
     // ARREGLO: Obtener userId del manager correcto (polling vs websocket)
     const currentUserId = this.editor.pollingManager?.userId || this.editor.webSocketManager?.userId;
 
-    console.log('DEBUG usuarios:', {
-        totalUsers: users.length,
-        currentUserId: currentUserId,
-        users: users
-    });
-
     // Agregar usuarios actuales (excluyendo el usuario actual)
     users.forEach(user => {
         // 🔧 ARREGLO: Soportar tanto user.id como user.user_id
         const userId = user.id || user.user_id;
 
-        console.log('Evaluando usuario:', {
-            user: user,
-            userId: userId,
-            currentUserId: currentUserId,
-            shouldAdd: user && userId && userId !== currentUserId
-        });
 
         if (user && userId && userId !== currentUserId) {
             // 🔧 NORMALIZAR: Asegurar que el usuario tenga .id para addCollaborator

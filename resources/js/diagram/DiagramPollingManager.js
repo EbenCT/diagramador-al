@@ -96,7 +96,7 @@ export class DiagramPollingManager {
 
     logChange(change) {
         this.pendingChanges.push(change);
-        console.log('📝 Cambio registrado:', change);
+       // console.log('📝 Cambio registrado:', change);
     }
 
     startPolling() {
@@ -152,13 +152,13 @@ applyRemoteChanges(changes) {
 
         try {
             const { type, element_id, data } = change;
-
+/*
             console.log('🔄 Aplicando cambio remoto:', {
                 type,
                 element_id,
                 user_id: change.user_id,
                 data
-            });
+            });*/
 
             switch (type) {
                 case 'change:position':
@@ -218,9 +218,17 @@ applyUMLDataChange(elementId, data) {
 
 applyPositionChange(elementId, data) {
     const element = this.editor.graph.getCell(elementId);
+
     if (element && data.position) {
-        // Usar silent: true para evitar triggear eventos locales
+        // Actualizar posición con silent para evitar eventos
         element.set('position', data.position, { silent: true });
+
+        // FORZAR render visual
+        const view = this.editor.paper.findViewByModel(element);
+        if (view) {
+            view.update();
+        }
+
         console.log('📍 Posición actualizada remotamente:', elementId, data.position);
     }
 }

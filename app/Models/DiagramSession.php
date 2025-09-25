@@ -191,15 +191,16 @@ public function addChange($change)
  */
 public function updateUserActivity($userId)
 {
+    /*
     \Log::info('=== updateUserActivity INICIO ===', [
         'userId' => $userId,
         'current_active_users' => $this->active_users
     ]);
-
+*/
     $activeUsers = $this->active_users ?? [];
     $userExists = false;
 
-    \Log::info('Active users antes del loop', ['activeUsers' => $activeUsers]);
+    //\Log::info('Active users antes del loop', ['activeUsers' => $activeUsers]);
 
     // Buscar usuario existente
     foreach ($activeUsers as &$user) {
@@ -219,10 +220,10 @@ public function updateUserActivity($userId)
             'last_ping' => now()->toISOString()
         ];
         $activeUsers[] = $newUser;
-        \Log::info('Usuario agregado', ['newUser' => $newUser]);
+       // \Log::info('Usuario agregado', ['newUser' => $newUser]);
     }
 
-    \Log::info('Active users antes de filtrar', ['activeUsers' => $activeUsers]);
+   // \Log::info('Active users antes de filtrar', ['activeUsers' => $activeUsers]);
 
     // Limpiar usuarios inactivos (más de 30 segundos sin ping)
     $activeUsers = array_filter($activeUsers, function($user) {
@@ -237,14 +238,14 @@ public function updateUserActivity($userId)
         return $isActive;
     });
 
-    \Log::info('Active users después de filtrar', ['activeUsers' => array_values($activeUsers)]);
+    //\Log::info('Active users después de filtrar', ['activeUsers' => array_values($activeUsers)]);
 
     $result = $this->update(['active_users' => array_values($activeUsers)]);
-
+/*
     \Log::info('=== updateUserActivity RESULTADO ===', [
         'update_result' => $result,
         'final_active_users' => array_values($activeUsers)
-    ]);
+    ]);*/
 }
 
 /**
@@ -253,6 +254,26 @@ public function updateUserActivity($userId)
 public function getActiveUsers()
 {
     return $this->active_users ?? [];
+}
+/**
+ * Obtener cambios desde un timestamp específico de otros usuarios
+ */
+public function getChangesSince($lastSync, $currentUserId)
+{
+    $allChanges = $this->changes_log ?? [];
+
+    // Filtrar cambios:
+    // 1. Que sean posteriores a lastSync
+    // 2. Que NO sean del usuario actual
+    $filteredChanges = array_filter($allChanges, function($change) use ($lastSync, $currentUserId) {
+        $isAfterLastSync = ($change['timestamp'] ?? 0) > $lastSync;
+        $isFromOtherUser = ($change['user_id'] ?? null) != $currentUserId;
+
+        return $isAfterLastSync && $isFromOtherUser;
+    });
+
+    // Re-indexar array (importante para JSON)
+    return array_values($filteredChanges);
 }
 
 }
