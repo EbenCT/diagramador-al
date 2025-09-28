@@ -1,5 +1,12 @@
 // resources/js/diagram/modules-ai/DiagramAIAnalyzer.js
-// Módulo de análisis de diagramas UML con IA (Groq)
+// Módulo de análisis de diagramas UML con IA - VERSIÓN REFACTORIZADA
+// Implementa mini-panel flotante, animaciones y modificaciones inteligentes
+
+import { AIAnimationManager } from './AIAnimationManager.js';
+import { AIBubbleRenderer } from './AIBubbleRenderer.js';
+import { AIResponseParser } from './AIResponseParser.js';
+import { AIChangePreview } from './AIChangePreview.js';
+import { AICommandExecutor } from './AICommandExecutor.js';
 
 export class DiagramAIAnalyzer {
     constructor(editor) {
@@ -8,33 +15,45 @@ export class DiagramAIAnalyzer {
         this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
         this.model = 'llama-3.1-8b-instant';
 
-        // UI Referencias
-        this.floatingButton = null;
-        this.sidebarContainer = null;
+        // Estados
         this.isVisible = false;
         this.isAnalyzing = false;
+        this.currentAnalysis = null;
+        this.pendingChanges = [];
+
+        // UI Referencias
+        this.floatingButton = null;
+        this.miniPanel = null;
+
+        // Módulos especializados
+        this.animationManager = new AIAnimationManager(editor);
+        this.bubbleRenderer = new AIBubbleRenderer(editor);
+        this.responseParser = new AIResponseParser(editor);
+        this.changePreview = new AIChangePreview(editor);
+        this.commandExecutor = new AICommandExecutor(editor);
 
         this.initializeAI();
     }
 
-    initializeAI() {
-        console.log('🤖 Inicializando módulo de IA...');
+    // ==================== INICIALIZACIÓN ====================
 
-        // Obtener API key de múltiples fuentes
+    initializeAI() {
+        console.log('🤖 Inicializando módulo de IA refactorizado...');
+
+        // Obtener API key
         this.apiKey = window.AI_CONFIG?.GROQ_API_KEY ||
                      window.GROQ_API_KEY ||
                      null;
 
         if (!this.apiKey) {
             console.warn('⚠️ API key de Groq no configurada');
-            console.warn('💡 Configura GROQ_API_KEY en tu .env o en window.AI_CONFIG');
-            // Mostrar el botón pero con advertencia
         }
 
         this.createFloatingButton();
-        this.createSidebar();
+        this.createMiniPanel();
+        this.addStyles();
 
-        console.log('✅ Módulo de IA inicializado correctamente');
+        console.log('✅ Módulo de IA refactorizado inicializado');
     }
 
     // ==================== INTERFAZ DE USUARIO ====================
@@ -45,548 +64,321 @@ export class DiagramAIAnalyzer {
             <span class="ai-icon">🤖</span>
             <span class="ai-text">Analizar con IA</span>
         `;
-        this.floatingButton.className = 'ai-floating-button';
-        this.floatingButton.onclick = () => this.toggleSidebar();
-
-        // Estilos
-        this.floatingButton.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: linear-gradient(45deg, #6366f1, #8b5cf6);
-            color: white;
-            border: none;
-            border-radius: 50px;
-            padding: 12px 20px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-            user-select: none;
-        `;
-
-        // Hover effects
-        this.floatingButton.addEventListener('mouseenter', () => {
-            this.floatingButton.style.transform = 'translateY(-2px)';
-            this.floatingButton.style.boxShadow = '0 6px 20px rgba(99, 102, 241, 0.4)';
-        });
-
-        this.floatingButton.addEventListener('mouseleave', () => {
-            this.floatingButton.style.transform = 'translateY(0)';
-            this.floatingButton.style.boxShadow = '0 4px 15px rgba(99, 102, 241, 0.3)';
-        });
+        this.floatingButton.className = 'ai-floating-button-v2';
+        this.floatingButton.onclick = () => this.toggleMiniPanel();
 
         document.body.appendChild(this.floatingButton);
+        console.log('✅ Botón flotante creado');
     }
 
-    createSidebar() {
-        this.sidebarContainer = document.createElement('div');
-        this.sidebarContainer.className = 'ai-sidebar';
-        this.sidebarContainer.innerHTML = `
-            <div class="ai-sidebar-header">
-                <h3>
+    createMiniPanel() {
+        this.miniPanel = document.createElement('div');
+        this.miniPanel.className = 'ai-mini-panel';
+        this.miniPanel.innerHTML = `
+            <div class="ai-mini-header">
+                <div class="ai-header-left">
                     <span class="ai-header-icon">🤖</span>
-                    Análisis IA
-                </h3>
-                <button class="ai-close-btn" id="ai-close-btn">
-                    ✕
-                </button>
+                    <span class="ai-header-title">Análisis IA</span>
+                </div>
+                <button class="ai-close-btn" id="ai-mini-close">✕</button>
             </div>
-            <div class="ai-sidebar-content">
-                <div class="ai-welcome">
-                    <p>👋 Analiza tu diagrama UML con inteligencia artificial</p>
-
-                    <!-- Campo de contexto opcional -->
+            <div class="ai-mini-content">
+                <!-- Estado inicial: Formulario -->
+                <div class="ai-form-state" id="ai-form-state">
                     <div class="ai-context-section">
-                        <label for="ai-context-input" class="ai-context-label">
-                            📝 Contexto (opcional)
-                        </label>
+                        <label class="ai-context-label">📝 Contexto (opcional)</label>
                         <textarea
-                            id="ai-context-input"
-                            class="ai-context-input"
-                            placeholder="Ej: Sistema de gestión universitaria, necesito validar las relaciones entre estudiantes y cursos..."
-                            maxlength="300"
+                            id="ai-context-input-v2"
+                            class="ai-context-input-v2"
+                            placeholder="Ej: Sistema de e-commerce, validar relaciones producto-pedido..."
+                            maxlength="200"
                         ></textarea>
-                        <div class="ai-context-counter">
-                            <span id="context-char-count">0</span>/300 caracteres
+                        <div class="ai-char-counter">
+                            <span id="ai-char-count">0</span>/200
                         </div>
                     </div>
-
-                    <button class="ai-analyze-btn" id="ai-analyze-btn">
+                    <button class="ai-analyze-btn-v2" id="ai-analyze-btn-v2">
                         🚀 Analizar Diagrama
                     </button>
                 </div>
-                <div class="ai-result" style="display: none;">
-                    <!-- Aquí aparecerá el resultado del análisis -->
+
+                <!-- Estado de carga: Animación -->
+                <div class="ai-loading-state" id="ai-loading-state" style="display: none;">
+                    <div class="ai-loading-icon">🔄</div>
+                    <p class="ai-loading-text">Analizando diagrama...</p>
+                    <div class="ai-progress-bar">
+                        <div class="ai-progress-fill"></div>
+                    </div>
                 </div>
-                <div class="ai-loading" style="display: none;">
-                    <div class="ai-spinner"></div>
-                    <p>🔄 Analizando con IA...</p>
+
+                <!-- Estado resultado: Control de cambios -->
+                <div class="ai-result-state" id="ai-result-state" style="display: none;">
+                    <div class="ai-result-summary">
+                        <span class="ai-result-icon">✅</span>
+                        <span class="ai-result-text">Análisis completado</span>
+                    </div>
+                    <div class="ai-changes-control">
+                        <button class="ai-btn ai-btn-success" id="ai-apply-all">
+                            ✓ Aplicar Todo
+                        </button>
+                        <button class="ai-btn ai-btn-danger" id="ai-discard-all">
+                            ✗ Descartar Todo
+                        </button>
+                    </div>
+                    <button class="ai-btn ai-btn-secondary" id="ai-analyze-again">
+                        🔄 Analizar Nuevamente
+                    </button>
                 </div>
             </div>
         `;
 
-        // Estilos CSS
-        this.sidebarContainer.style.cssText = `
-            position: fixed;
-            top: 0;
-            right: -400px;
-            width: 400px;
-            height: 100vh;
-            background: white;
-            border-left: 1px solid #e5e7eb;
-            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
-            z-index: 999;
-            transition: right 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            font-family: system-ui, -apple-system, sans-serif;
-        `;
-
-        this.addSidebarStyles();
-        document.body.appendChild(this.sidebarContainer);
-        this.setupEventListeners();
+        document.body.appendChild(this.miniPanel);
+        this.setupMiniPanelEvents();
+        console.log('✅ Mini panel creado');
     }
 
-    setupEventListeners() {
-        // Botón cerrar sidebar
-        const closeBtn = this.sidebarContainer.querySelector('#ai-close-btn');
-        closeBtn.addEventListener('click', () => this.toggleSidebar());
+    setupMiniPanelEvents() {
+        // Cerrar panel
+        document.getElementById('ai-mini-close').onclick = () => this.hideMiniPanel();
+
+        // Contador de caracteres
+        const contextInput = document.getElementById('ai-context-input-v2');
+        const charCount = document.getElementById('ai-char-count');
+        contextInput.oninput = () => {
+            const count = contextInput.value.length;
+            charCount.textContent = count;
+            charCount.style.color = count > 150 ? '#ef4444' : '#6b7280';
+        };
 
         // Botón analizar
-        const analyzeBtn = this.sidebarContainer.querySelector('#ai-analyze-btn');
-        analyzeBtn.addEventListener('click', () => this.analyzeCurrentDiagram());
+        document.getElementById('ai-analyze-btn-v2').onclick = () => this.startAnalysis();
 
-        // Contador de caracteres del contexto
-        const contextInput = this.sidebarContainer.querySelector('#ai-context-input');
-        const charCounter = this.sidebarContainer.querySelector('#context-char-count');
+        // Controles de cambios
+        document.getElementById('ai-apply-all').onclick = () => this.applyAllChanges();
+        document.getElementById('ai-discard-all').onclick = () => this.discardAllChanges();
+        document.getElementById('ai-analyze-again').onclick = () => this.resetToForm();
 
-        contextInput.addEventListener('input', () => {
-            const count = contextInput.value.length;
-            charCounter.textContent = count;
-
-            // Cambiar color si se acerca al límite
-            if (count > 250) {
-                charCounter.style.color = '#ef4444';
-            } else if (count > 200) {
-                charCounter.style.color = '#f59e0b';
-            } else {
-                charCounter.style.color = '#9ca3af';
-            }
-        });
+        console.log('✅ Eventos del mini panel configurados');
     }
 
-    addSidebarStyles() {
-        if (document.getElementById('ai-sidebar-styles')) return;
+    // ==================== ESTADOS DEL PANEL ====================
 
-        const styles = document.createElement('style');
-        styles.id = 'ai-sidebar-styles';
-        styles.textContent = `
-            .ai-sidebar-header {
-                padding: 20px;
-                border-bottom: 1px solid #e5e7eb;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                background: #f8fafc;
-            }
-
-            .ai-sidebar-header h3 {
-                margin: 0;
-                color: #1f2937;
-                font-size: 18px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .ai-close-btn {
-                background: none;
-                border: none;
-                font-size: 20px;
-                cursor: pointer;
-                color: #6b7280;
-                padding: 4px;
-                border-radius: 4px;
-                transition: background 0.2s;
-            }
-
-            .ai-close-btn:hover {
-                background: #e5e7eb;
-            }
-
-            .ai-sidebar-content {
-                flex: 1;
-                padding: 20px;
-                overflow-y: auto;
-            }
-
-            .ai-welcome {
-                text-align: center;
-                margin-bottom: 20px;
-            }
-
-            .ai-welcome p {
-                color: #6b7280;
-                margin-bottom: 16px;
-            }
-
-            .ai-context-section {
-                margin-bottom: 20px;
-            }
-
-            .ai-context-label {
-                display: block;
-                font-size: 12px;
-                font-weight: 600;
-                color: #374151;
-                margin-bottom: 6px;
-            }
-
-            .ai-context-input {
-                width: 100%;
-                min-height: 80px;
-                padding: 10px;
-                border: 1px solid #d1d5db;
-                border-radius: 6px;
-                font-size: 13px;
-                font-family: system-ui, -apple-system, sans-serif;
-                resize: vertical;
-                transition: border-color 0.2s;
-            }
-
-            .ai-context-input:focus {
-                outline: none;
-                border-color: #6366f1;
-                box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-            }
-
-            .ai-context-counter {
-                text-align: right;
-                font-size: 11px;
-                color: #9ca3af;
-                margin-top: 4px;
-            }
-
-            .ai-analyze-btn {
-                background: linear-gradient(45deg, #10b981, #059669);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-                width: 100%;
-            }
-
-            .ai-analyze-btn:hover:not(:disabled) {
-                transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-            }
-
-            .ai-analyze-btn:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
-            }
-
-            .ai-reanalyze-btn {
-                background: linear-gradient(45deg, #6366f1, #8b5cf6);
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-size: 13px;
-                font-weight: 500;
-                cursor: pointer;
-                transition: all 0.2s;
-            }
-
-            .ai-reanalyze-btn:hover:not(:disabled) {
-                transform: translateY(-1px);
-                box-shadow: 0 3px 8px rgba(99, 102, 241, 0.3);
-            }
-
-            .ai-reanalyze-btn:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
-            }
-
-            .ai-result {
-                background: #f8fafc;
-                border-radius: 8px;
-                padding: 16px;
-                margin-top: 16px;
-                border-left: 4px solid #6366f1;
-            }
-
-            .ai-result h4 {
-                margin: 0 0 12px 0;
-                color: #1f2937;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .ai-analysis-content {
-                font-family: system-ui, -apple-system, sans-serif;
-                font-size: 14px;
-                line-height: 1.7;
-                color: #374151;
-                padding: 8px 0;
-            }
-
-            .ai-analysis-content strong {
-                color: #1f2937;
-                font-weight: 600;
-            }
-
-            .ai-loading {
-                text-align: center;
-                padding: 40px 20px;
-            }
-
-            .ai-spinner {
-                width: 40px;
-                height: 40px;
-                border: 3px solid #e5e7eb;
-                border-top: 3px solid #6366f1;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-                margin: 0 auto 16px;
-            }
-
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-
-            .ai-error {
-                background: #fef2f2;
-                border: 1px solid #fecaca;
-                border-radius: 8px;
-                padding: 16px;
-                color: #991b1b;
-                margin-top: 16px;
-            }
-        `;
-        document.head.appendChild(styles);
-    }
-
-    toggleSidebar() {
-        this.isVisible = !this.isVisible;
-
+    toggleMiniPanel() {
         if (this.isVisible) {
-            this.sidebarContainer.style.right = '0';
-            this.floatingButton.querySelector('.ai-text').textContent = 'Cerrar IA';
+            this.hideMiniPanel();
         } else {
-            this.sidebarContainer.style.right = '-400px';
-            this.floatingButton.querySelector('.ai-text').textContent = 'Analizar con IA';
+            this.showMiniPanel();
         }
     }
 
-    // ==================== EXTRACCIÓN DE DATOS ====================
-
-    extractClasses() {
-        const classes = [];
-        const elements = this.editor.graph.getElements();
-
-        elements.forEach(element => {
-            const umlData = element.get('umlData');
-            if (umlData && (umlData.type === 'class' || umlData.type === 'interface')) {
-                const className = umlData.className || 'UnnamedClass';
-                const stereotype = umlData.uml25?.stereotype || null;
-
-                classes.push({
-                    id: element.id,
-                    name: className,
-                    type: umlData.type,
-                    stereotype: stereotype,
-                    attributes: umlData.attributes || [],
-                    methods: umlData.methods || [],
-                    position: element.position()
-                });
-            }
-        });
-
-        console.log('🏗️ Clases extraídas para IA:', classes.length);
-        return classes;
+    showMiniPanel() {
+        this.miniPanel.classList.add('ai-mini-panel-visible');
+        this.floatingButton.querySelector('.ai-text').textContent = 'Cerrar IA';
+        this.isVisible = true;
     }
 
-    extractRelationships() {
-        const relationships = [];
-        const links = this.editor.graph.getLinks();
+    hideMiniPanel() {
+        this.miniPanel.classList.remove('ai-mini-panel-visible');
+        this.floatingButton.querySelector('.ai-text').textContent = 'Analizar con IA';
+        this.isVisible = false;
 
-        links.forEach(link => {
-            const source = link.getSourceElement();
-            const target = link.getTargetElement();
-            const umlData = link.get('umlData') || {};
-            const relationData = link.get('relationData') || {};
-
-            if (source && target) {
-                const sourceUml = source.get('umlData');
-                const targetUml = target.get('umlData');
-
-                if (sourceUml?.type === 'class' && targetUml?.type === 'class') {
-                    relationships.push({
-                        sourceClass: sourceUml.className || 'Unnamed',
-                        targetClass: targetUml.className || 'Unnamed',
-                        type: relationData.type || umlData.relationshipType || umlData.type || 'association',
-                        name: relationData.name || umlData.name || '', // ← AGREGAR NOMBRE DE RELACIÓN
-                        sourceMultiplicity: umlData.sourceMultiplicity || relationData.sourceMultiplicity || '',
-                        targetMultiplicity: umlData.targetMultiplicity || relationData.targetMultiplicity || ''
-                    });
-                }
-            }
-        });
-
-        console.log('🔗 Relaciones extraídas para IA:', relationships.length);
-        return relationships;
+        // Limpiar elementos visuales si el panel se cierra
+        this.clearAllVisualElements();
     }
 
-    // ==================== FORMATEO PARA IA ====================
+    showFormState() {
+        document.getElementById('ai-form-state').style.display = 'block';
+        document.getElementById('ai-loading-state').style.display = 'none';
+        document.getElementById('ai-result-state').style.display = 'none';
+    }
 
-    formatDiagramForAI(classes, relationships) {
-        let diagramText = '';
+    showLoadingState() {
+        document.getElementById('ai-form-state').style.display = 'none';
+        document.getElementById('ai-loading-state').style.display = 'block';
+        document.getElementById('ai-result-state').style.display = 'none';
 
-        // Formatear clases
-        if (classes.length > 0) {
-            diagramText += 'CLASES UML:\n';
-            classes.forEach(cls => {
-                diagramText += `\n- ${cls.name}`;
-                if (cls.stereotype) {
-                    diagramText += ` <<${cls.stereotype}>>`;
-                }
-                diagramText += ` (${cls.type})\n`;
+        // Iniciar animación de progreso
+        this.startProgressAnimation();
+    }
 
-                if (cls.attributes.length > 0) {
-                    diagramText += `  Atributos: ${cls.attributes.join(', ')}\n`;
-                }
+    showResultState() {
+        document.getElementById('ai-form-state').style.display = 'none';
+        document.getElementById('ai-loading-state').style.display = 'none';
+        document.getElementById('ai-result-state').style.display = 'block';
+    }
 
-                if (cls.methods.length > 0) {
-                    diagramText += `  Métodos: ${cls.methods.join(', ')}\n`;
-                }
-            });
-            diagramText += '\n';
+    resetToForm() {
+        this.showFormState();
+        this.clearAllVisualElements();
+        this.pendingChanges = [];
+
+        // Focus en textarea para nuevo análisis
+        const contextInput = document.getElementById('ai-context-input-v2');
+        if (contextInput) {
+            contextInput.focus();
         }
-
-        // Formatear relaciones
-        if (relationships.length > 0) {
-            diagramText += 'RELACIONES:\n';
-            relationships.forEach(rel => {
-                const sourceCard = rel.sourceMultiplicity ? `[${rel.sourceMultiplicity}]` : '';
-                const targetCard = rel.targetMultiplicity ? `[${rel.targetMultiplicity}]` : '';
-                const relationName = rel.name ? ` "${rel.name}"` : '';
-
-                diagramText += `\n- ${rel.sourceClass} ${sourceCard} ←→ ${rel.targetClass} ${targetCard} (${rel.type}${relationName})\n`;
-            });
-        }
-
-        return diagramText || 'Diagrama vacío - no hay clases ni relaciones definidas.';
     }
 
-    // ==================== ANÁLISIS CON IA ====================
+    startProgressAnimation() {
+        const progressFill = document.querySelector('.ai-progress-fill');
+        if (!progressFill) return;
 
-    async analyzeCurrentDiagram() {
+        progressFill.style.width = '0%';
+        progressFill.style.transition = 'width 2s ease-out';
+
+        setTimeout(() => {
+            progressFill.style.width = '100%';
+        }, 100);
+    }
+
+    // ==================== ANÁLISIS PRINCIPAL ====================
+
+    async startAnalysis() {
         if (this.isAnalyzing) return;
 
         try {
-            this.setLoadingState(true);
+            this.isAnalyzing = true;
+            this.showLoadingState();
+
+            // Iniciar animación de escaneo del canvas
+            await this.animationManager.startScanAnimation();
 
             // Extraer datos del diagrama
-            const classes = this.extractClasses();
-            const relationships = this.extractRelationships();
+            const diagramData = this.extractDiagramData();
 
-            if (classes.length === 0) {
-                this.showError('⚠️ No hay clases en el diagrama para analizar. Agrega al menos una clase UML.');
+            if (diagramData.classes.length === 0) {
+                this.showError('⚠️ No hay clases en el diagrama para analizar');
                 return;
             }
 
             // Obtener contexto del usuario
-            const contextInput = this.sidebarContainer.querySelector('#ai-context-input');
-            const userContext = contextInput ? contextInput.value.trim() : '';
+            const userContext = document.getElementById('ai-context-input-v2').value.trim();
 
-            // Formatear para IA
-            const diagramText = this.formatDiagramForAI(classes, relationships);
-            console.log('📋 Diagrama formateado para IA:', diagramText);
+            // Enviar a IA
+            const response = await this.sendToAI(diagramData, userContext);
 
-            // Enviar a Groq API con contexto
-            const analysis = await this.sendToGroqAPI(diagramText, userContext);
-
-            // Mostrar resultado
-            this.showAnalysisResult(analysis);
+            // Procesar respuesta
+            await this.processAIResponse(response);
 
         } catch (error) {
-            console.error('❌ Error en análisis de IA:', error);
-            this.showError(`❌ Error al analizar: ${error.message}`);
+            console.error('❌ Error en análisis:', error);
+            this.showError(`Error: ${error.message}`);
         } finally {
-            this.setLoadingState(false);
+            this.isAnalyzing = false;
+            this.animationManager.stopScanAnimation();
         }
     }
 
-    // Método para re-analizar (vuelve al formulario inicial)
-    reAnalyze() {
-        // Mostrar de nuevo el formulario inicial
-        const welcomeDiv = this.sidebarContainer.querySelector('.ai-welcome');
-        const resultDiv = this.sidebarContainer.querySelector('.ai-result');
+    async processAIResponse(response) {
+        // Parsear respuesta para extraer comandos
+        const parsedResponse = this.responseParser.parseResponse(response);
 
-        welcomeDiv.style.display = 'block';
-        resultDiv.style.display = 'none';
-
-        // Focus en el textarea de contexto para editar
-        const contextInput = this.sidebarContainer.querySelector('#ai-context-input');
-        if (contextInput) {
-            contextInput.focus();
+        // Mostrar burbujas con información general
+        if (parsedResponse.bubbles && parsedResponse.bubbles.length > 0) {
+            this.bubbleRenderer.showBubbles(parsedResponse.bubbles);
         }
 
-        console.log('🔄 Preparado para re-análisis');
+        // Procesar cambios sugeridos
+        if (parsedResponse.changes && parsedResponse.changes.length > 0) {
+            this.pendingChanges = parsedResponse.changes;
+
+            // Mostrar preview de cambios
+            await this.changePreview.showChangesPreview(this.pendingChanges);
+
+            // Cambiar a estado de resultado
+            this.showResultState();
+        } else {
+            // Solo información, no hay cambios
+            this.resetToForm();
+        }
+
+        this.currentAnalysis = parsedResponse;
     }
 
-    async sendToGroqAPI(diagramText, userContext = '') {
-        // Construir prompt base
-        let prompt = `Eres un experto en modelado de datos conceptual. Analiza este DIAGRAMA CONCEPTUAL UML enfocándote en estructura de dominio:
+    // ==================== GESTIÓN DE CAMBIOS ====================
 
-${diagramText}`;
+    async applyAllChanges() {
+        if (!this.pendingChanges || this.pendingChanges.length === 0) return;
 
-        // Agregar contexto del usuario si existe
-        if (userContext) {
-            prompt += `
+        try {
+            console.log('🔄 Aplicando todos los cambios...');
 
-CONTEXTO ADICIONAL DEL USUARIO:
-${userContext}
+            // Ocultar preview
+            this.changePreview.hidePreview();
 
-Ten en cuenta este contexto para hacer un análisis más específico y relevante.`;
+            // Ejecutar cambios
+            await this.commandExecutor.executeChanges(this.pendingChanges);
+
+            // Limpiar estado
+            this.pendingChanges = [];
+            this.resetToForm();
+
+            // Mostrar confirmación
+            this.showSuccess('✅ Cambios aplicados correctamente');
+
+        } catch (error) {
+            console.error('❌ Error aplicando cambios:', error);
+            this.showError(`Error aplicando cambios: ${error.message}`);
+        }
+    }
+
+    async discardAllChanges() {
+        console.log('🗑️ Descartando todos los cambios...');
+
+        // Ocultar preview
+        this.changePreview.hidePreview();
+
+        // Limpiar burbujas
+        this.bubbleRenderer.clearBubbles();
+
+        // Limpiar estado
+        this.pendingChanges = [];
+        this.resetToForm();
+    }
+
+    // ==================== EXTRACCIÓN DE DATOS ====================
+
+    extractDiagramData() {
+        const elements = this.editor.graph.getElements();
+        const links = this.editor.graph.getLinks();
+
+        const classes = elements.map(element => {
+            const umlData = element.get('umlData') || {};
+            return {
+                id: element.id,
+                name: umlData.className || 'UnnamedClass',
+                type: umlData.type || 'class',
+                attributes: umlData.attributes || [],
+                methods: umlData.methods || [],
+                position: element.position(),
+                uml25: umlData.uml25 || null
+            };
+        });
+
+        const relationships = links.map(link => {
+            const linkData = link.get('linkData') || {};
+            return {
+                id: link.id,
+                type: linkData.type || 'association',
+                source: link.getSourceElement()?.get('umlData')?.className || 'Unknown',
+                target: link.getTargetElement()?.get('umlData')?.className || 'Unknown',
+                sourceMultiplicity: linkData.sourceMultiplicity,
+                targetMultiplicity: linkData.targetMultiplicity,
+                name: linkData.name
+            };
+        });
+
+        return { classes, relationships };
+    }
+
+    // ==================== COMUNICACIÓN CON IA ====================
+
+    async sendToAI(diagramData, userContext) {
+        if (!this.apiKey) {
+            throw new Error('API key de Groq no configurada');
         }
 
-        prompt += `
-
-IMPORTANTE: Este es un diagrama CONCEPTUAL - NO menciones IDs técnicos, timestamps, o detalles de implementación. Esos se generan automáticamente en código.
-
-Analiza SOLO:
-
-🗃️ **ENTIDADES**
-- ¿Los atributos de dominio están completos?
-- ¿Los tipos de datos son apropiados para el negocio?
-- ¿Los estereotipos <<entity>> representan bien el dominio?
-
-🔗 **RELACIONES DE NEGOCIO**
-- ¿Las multiplicidades reflejan las reglas del negocio?
-- ¿Faltan relaciones importantes del dominio?
-- ¿Las relaciones de composición/agregación son correctas?
-
-⚠️ **PROBLEMAS CONCEPTUALES**
-- Máximo 3 problemas de modelado de dominio
-
-💡 **MEJORAS SUGERIDAS**
-- Máximo 3 sugerencias para el modelo conceptual
-
-Respuesta máximo 200 palabras. Enfócate en REGLAS DE NEGOCIO y DOMINIO, no en implementación técnica.`;
+        const prompt = this.buildOptimizedPrompt(diagramData, userContext);
 
         const response = await fetch(this.apiUrl, {
             method: 'POST',
@@ -595,147 +387,337 @@ Respuesta máximo 200 palabras. Enfócate en REGLAS DE NEGOCIO y DOMINIO, no en 
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                messages: [
-                    {
-                        role: "system",
-                        content: "Eres un experto arquitecto de bases de datos especializado en UML 2.5 para modelado de datos."
-                    },
-                    {
-                        role: "user",
-                        content: prompt
-                    }
-                ],
                 model: this.model,
-                temperature: 0.3,
-                max_tokens: 2048
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.7,
+                max_tokens: 1000
             })
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`API Error: ${response.status} - ${errorData.error?.message || 'Error desconocido'}`);
+            throw new Error(`Error API: ${response.status}`);
         }
 
         const data = await response.json();
-        const analysis = data.choices[0]?.message?.content;
+        return data.choices[0]?.message?.content || 'Sin respuesta';
+    }
 
-        if (!analysis) {
-            throw new Error('No se recibió análisis de la IA');
+    buildOptimizedPrompt(diagramData, userContext) {
+        const diagramText = this.formatDiagramForAI(diagramData);
+
+        return `Eres un experto en diseño UML. Analiza este diagrama y proporciona:
+
+1. ANÁLISIS BREVE (máximo 2 líneas)
+2. COMANDOS ESPECÍFICOS para mejorar el diagrama
+
+DIAGRAMA:
+${diagramText}
+
+CONTEXTO: ${userContext || 'Diagrama general'}
+
+RESPONDE EN ESTE FORMATO EXACTO:
+ANÁLISIS: [tu análisis corto]
+
+COMANDOS:
+- CREAR_CLASE: [nombre] | ATRIBUTOS: [lista] | MÉTODOS: [lista]
+- AGREGAR_ATRIBUTO: [clase] | [atributo]
+- AGREGAR_MÉTODO: [clase] | [método]
+- CREAR_RELACIÓN: [tipo] | [clase1] -> [clase2] | [multiplicidad]
+
+Usa SOLO estos comandos. Máximo 5 comandos.`;
+    }
+
+    formatDiagramForAI(diagramData) {
+        let text = `CLASES (${diagramData.classes.length}):\n`;
+
+        diagramData.classes.forEach(cls => {
+            text += `- ${cls.name} (${cls.type})\n`;
+            if (cls.attributes.length > 0) {
+                text += `  Atributos: ${cls.attributes.join(', ')}\n`;
+            }
+            if (cls.methods.length > 0) {
+                text += `  Métodos: ${cls.methods.join(', ')}\n`;
+            }
+        });
+
+        if (diagramData.relationships.length > 0) {
+            text += `\nRELACIONES (${diagramData.relationships.length}):\n`;
+            diagramData.relationships.forEach(rel => {
+                text += `- ${rel.source} --${rel.type}--> ${rel.target}\n`;
+            });
         }
 
-        return {
-            analysis: analysis,
-            tokensUsed: data.usage?.total_tokens || 'N/A',
-            model: data.model || this.model
-        };
+        return text;
     }
 
-    // ==================== UI STATES ====================
+    // ==================== UTILIDADES ====================
 
-    setLoadingState(loading) {
-        this.isAnalyzing = loading;
-
-        const welcomeDiv = this.sidebarContainer.querySelector('.ai-welcome');
-        const loadingDiv = this.sidebarContainer.querySelector('.ai-loading');
-        const resultDiv = this.sidebarContainer.querySelector('.ai-result');
-        const analyzeBtn = this.sidebarContainer.querySelector('.ai-analyze-btn');
-        const reanalyzeBtn = this.sidebarContainer.querySelector('#ai-reanalyze-btn');
-
-        if (loading) {
-            welcomeDiv.style.display = 'none';
-            loadingDiv.style.display = 'block';
-            resultDiv.style.display = 'none';
-            analyzeBtn.disabled = true;
-            if (reanalyzeBtn) reanalyzeBtn.disabled = true;
-            this.floatingButton.style.opacity = '0.6';
-        } else {
-            loadingDiv.style.display = 'none';
-            analyzeBtn.disabled = false;
-            if (reanalyzeBtn) reanalyzeBtn.disabled = false;
-            this.floatingButton.style.opacity = '1';
-        }
-    }
-
-    showAnalysisResult(result) {
-        const resultDiv = this.sidebarContainer.querySelector('.ai-result');
-
-        // Convertir markdown básico a HTML
-        const formattedAnalysis = this.convertMarkdownToHtml(result.analysis);
-
-        resultDiv.innerHTML = `
-            <h4>✅ Análisis Completado</h4>
-            <div class="ai-analysis-content">${formattedAnalysis}</div>
-            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
-                💡 Tokens usados: ${result.tokensUsed} | ⚡ Modelo: ${result.model}
-            </div>
-            <div style="margin-top: 16px; text-align: center;">
-                <button class="ai-reanalyze-btn" id="ai-reanalyze-btn">
-                    🔄 Analizar Nuevamente
-                </button>
-            </div>
-        `;
-
-        resultDiv.style.display = 'block';
-
-        // Configurar event listener para el botón de re-análisis
-        const reanalyzeBtn = resultDiv.querySelector('#ai-reanalyze-btn');
-        reanalyzeBtn.addEventListener('click', () => this.reAnalyze());
-
-        // Scroll al resultado
-        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    convertMarkdownToHtml(text) {
-        return text
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/^- (.+)$/gm, '• $1')
-            .replace(/\n\n/g, '<br><br>')
-            .replace(/\n/g, '<br>');
+    clearAllVisualElements() {
+        this.bubbleRenderer.clearBubbles();
+        this.changePreview.hidePreview();
+        this.animationManager.stopScanAnimation();
     }
 
     showError(message) {
-        const contentDiv = this.sidebarContainer.querySelector('.ai-sidebar-content');
-
-        // Crear o actualizar div de error
-        let errorDiv = contentDiv.querySelector('.ai-error');
-        if (!errorDiv) {
-            errorDiv = document.createElement('div');
-            errorDiv.className = 'ai-error';
-            contentDiv.appendChild(errorDiv);
-        }
-
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-
-        // Auto-ocultar después de 5 segundos
-        setTimeout(() => {
-            if (errorDiv) errorDiv.style.display = 'none';
-        }, 5000);
+        console.error('❌', message);
+        this.bubbleRenderer.showErrorBubble(message);
+        this.resetToForm();
     }
 
-    // ==================== MÉTODOS PÚBLICOS ====================
-
-    setAPIKey(apiKey) {
-        this.apiKey = apiKey;
-        console.log('🔑 API key actualizada');
+    showSuccess(message) {
+        console.log('✅', message);
+        this.bubbleRenderer.showSuccessBubble(message);
     }
 
-    setModel(model) {
-        this.model = model;
-        console.log('🤖 Modelo actualizado:', model);
-    }
+    // ==================== ESTILOS CSS ====================
 
-    // Cleanup
-    destroy() {
-        if (this.floatingButton) {
-            this.floatingButton.remove();
-        }
-        if (this.sidebarContainer) {
-            this.sidebarContainer.remove();
-        }
-        const styles = document.getElementById('ai-sidebar-styles');
-        if (styles) {
-            styles.remove();
-        }
+    addStyles() {
+        if (document.getElementById('ai-analyzer-v2-styles')) return;
+
+        const styles = document.createElement('style');
+        styles.id = 'ai-analyzer-v2-styles';
+        styles.textContent = `
+            /* Botón flotante mejorado */
+            .ai-floating-button-v2 {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: linear-gradient(45deg, #6366f1, #8b5cf6);
+                color: white;
+                border: none;
+                border-radius: 50px;
+                padding: 12px 20px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                z-index: 1000;
+                box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.3s ease;
+                user-select: none;
+            }
+
+            .ai-floating-button-v2:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+            }
+
+            /* Mini panel flotante */
+            .ai-mini-panel {
+                position: fixed;
+                bottom: 80px;
+                right: 20px;
+                width: 280px;
+                max-height: 350px;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+                z-index: 999;
+                transform: translateX(320px);
+                transition: transform 0.3s ease;
+                border: 1px solid #e5e7eb;
+                overflow: hidden;
+                font-family: system-ui, -apple-system, sans-serif;
+            }
+
+            .ai-mini-panel-visible {
+                transform: translateX(0);
+            }
+
+            .ai-mini-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                background: linear-gradient(45deg, #6366f1, #8b5cf6);
+                color: white;
+            }
+
+            .ai-header-left {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .ai-header-title {
+                font-weight: 600;
+                font-size: 14px;
+            }
+
+            .ai-close-btn {
+                background: none;
+                border: none;
+                color: white;
+                cursor: pointer;
+                font-size: 16px;
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: background-color 0.2s;
+            }
+
+            .ai-close-btn:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+
+            .ai-mini-content {
+                padding: 16px;
+            }
+
+            /* Estados del formulario */
+            .ai-context-section {
+                margin-bottom: 16px;
+            }
+
+            .ai-context-label {
+                display: block;
+                font-size: 12px;
+                font-weight: 500;
+                color: #374151;
+                margin-bottom: 6px;
+            }
+
+            .ai-context-input-v2 {
+                width: 100%;
+                padding: 8px 12px;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 12px;
+                resize: vertical;
+                min-height: 60px;
+                max-height: 100px;
+                transition: border-color 0.2s;
+            }
+
+            .ai-context-input-v2:focus {
+                outline: none;
+                border-color: #6366f1;
+                box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+            }
+
+            .ai-char-counter {
+                text-align: right;
+                font-size: 11px;
+                color: #6b7280;
+                margin-top: 4px;
+            }
+
+            .ai-analyze-btn-v2 {
+                width: 100%;
+                background: linear-gradient(45deg, #6366f1, #8b5cf6);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 10px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .ai-analyze-btn-v2:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+            }
+
+            /* Estado de carga */
+            .ai-loading-state {
+                text-align: center;
+            }
+
+            .ai-loading-icon {
+                font-size: 24px;
+                animation: spin 1s linear infinite;
+            }
+
+            .ai-loading-text {
+                margin: 8px 0;
+                font-size: 12px;
+                color: #6b7280;
+            }
+
+            .ai-progress-bar {
+                width: 100%;
+                height: 4px;
+                background: #f3f4f6;
+                border-radius: 2px;
+                overflow: hidden;
+                margin: 12px 0;
+            }
+
+            .ai-progress-fill {
+                height: 100%;
+                background: linear-gradient(45deg, #6366f1, #8b5cf6);
+                border-radius: 2px;
+                transition: width 0.3s ease;
+            }
+
+            /* Estado de resultado */
+            .ai-result-summary {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 16px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            .ai-changes-control {
+                display: flex;
+                gap: 8px;
+                margin-bottom: 12px;
+            }
+
+            .ai-btn {
+                flex: 1;
+                padding: 8px 12px;
+                border: none;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .ai-btn-success {
+                background: #10b981;
+                color: white;
+            }
+
+            .ai-btn-success:hover {
+                background: #059669;
+            }
+
+            .ai-btn-danger {
+                background: #ef4444;
+                color: white;
+            }
+
+            .ai-btn-danger:hover {
+                background: #dc2626;
+            }
+
+            .ai-btn-secondary {
+                width: 100%;
+                background: #f3f4f6;
+                color: #374151;
+            }
+
+            .ai-btn-secondary:hover {
+                background: #e5e7eb;
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+
+        document.head.appendChild(styles);
     }
 }
