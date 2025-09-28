@@ -269,18 +269,24 @@ export class DiagramAIAnalyzer {
         }
     }
 
-    async processAIResponse(response) {
+async processAIResponse(response) {
+    try {
         // Parsear respuesta para extraer comandos
         const parsedResponse = this.responseParser.parseResponse(response);
 
-        // Mostrar burbujas con información general
-        if (parsedResponse.bubbles && parsedResponse.bubbles.length > 0) {
-            this.bubbleRenderer.showBubbles(parsedResponse.bubbles);
+        // Validar cambios antes de mostrar preview
+        if (parsedResponse.changes) {
+            parsedResponse.changes = this.responseParser.validateChanges(parsedResponse.changes);
         }
 
-        // Procesar cambios sugeridos
+        // Solo continuar si hay cambios válidos
         if (parsedResponse.changes && parsedResponse.changes.length > 0) {
             this.pendingChanges = parsedResponse.changes;
+
+            // Mostrar burbujas con información general
+            if (parsedResponse.bubbles && parsedResponse.bubbles.length > 0) {
+                this.bubbleRenderer.showBubbles(parsedResponse.bubbles);
+            }
 
             // Mostrar preview de cambios
             await this.changePreview.showChangesPreview(this.pendingChanges);
@@ -288,12 +294,23 @@ export class DiagramAIAnalyzer {
             // Cambiar a estado de resultado
             this.showResultState();
         } else {
-            // Solo información, no hay cambios
+            // No hay cambios válidos, mostrar mensaje
+            this.bubbleRenderer.showBubbles([{
+                type: 'info',
+                message: '✅ El diagrama está bien diseñado, no se encontraron mejoras necesarias.',
+                targetClass: null
+            }]);
+
             this.resetToForm();
         }
 
         this.currentAnalysis = parsedResponse;
+
+    } catch (error) {
+        console.error('❌ Error procesando respuesta de IA:', error);
+        this.showError(`Error procesando respuesta: ${error.message}`);
     }
+}
 
     // ==================== GESTIÓN DE CAMBIOS ====================
 
@@ -402,53 +419,77 @@ export class DiagramAIAnalyzer {
         return data.choices[0]?.message?.content || 'Sin respuesta';
     }
 
-    buildOptimizedPrompt(diagramData, userContext) {
-        const diagramText = this.formatDiagramForAI(diagramData);
+buildOptimizedPrompt(diagramData, userContext) {
+    const diagramText = this.formatDiagramForAI(diagramData);
 
-        return `Eres un experto en diseño UML. Analiza este diagrama y proporciona:
+    return `Eres un experto en diseño UML. Analiza este diagrama existente y SOLO sugiere mejoras que NO dupliquen lo que ya existe.
 
-1. ANÁLISIS BREVE (máximo 2 líneas)
-2. COMANDOS ESPECÍFICOS para mejorar el diagrama
-
-DIAGRAMA:
+DIAGRAMA ACTUAL:
 ${diagramText}
 
-CONTEXTO: ${userContext || 'Diagrama general'}
+CONTEXTO: ${userContext || 'Análisis general del diagrama'}
+
+REGLAS IMPORTANTES:
+- NO crear clases que ya existen
+- NO agregar atributos que ya están en las clases
+- NO agregar métodos que ya existen
+- SOLO sugerir mejoras reales y nuevas funcionalidades
+- REVISAR cuidadosamente qué ya existe antes de sugerir
 
 RESPONDE EN ESTE FORMATO EXACTO:
-ANÁLISIS: [tu análisis corto]
+ANÁLISIS: [tu análisis corto sobre la calidad del diagrama]
 
 COMANDOS:
-- CREAR_CLASE: [nombre] | ATRIBUTOS: [lista] | MÉTODOS: [lista]
-- AGREGAR_ATRIBUTO: [clase] | [atributo]
-- AGREGAR_MÉTODO: [clase] | [método]
-- CREAR_RELACIÓN: [tipo] | [clase1] -> [clase2] | [multiplicidad]
+- CREAR_CLASE: [nombre] | ATRIBUTOS: [lista] | MÉTODOS: [lista] (SOLO si la clase NO existe)
+- AGREGAR_ATRIBUTO: [clase] | [atributo] (SOLO si el atributo NO existe en esa clase)
+- AGREGAR_MÉTODO: [clase] | [método] (SOLO si el método NO existe en esa clase)
+- CREAR_RELACIÓN: [tipo] | [clase1] -> [clase2] | [multiplicidad] (SOLO si la relación NO existe)
 
-Usa SOLO estos comandos. Máximo 5 comandos.`;
-    }
+Máximo 4 comandos. Si el diagrama está completo, di "COMANDOS: NINGUNO"`;
+}
 
-    formatDiagramForAI(diagramData) {
-        let text = `CLASES (${diagramData.classes.length}):\n`;
+formatDiagramForAI(diagramData) {
+    let text = `=== DIAGRAMA EXISTENTE ===\n\n`;
 
-        diagramData.classes.forEach(cls => {
-            text += `- ${cls.name} (${cls.type})\n`;
-            if (cls.attributes.length > 0) {
-                text += `  Atributos: ${cls.attributes.join(', ')}\n`;
-            }
-            if (cls.methods.length > 0) {
-                text += `  Métodos: ${cls.methods.join(', ')}\n`;
-            }
-        });
+    // Formatear clases con TODOS sus detalles
+    text += `CLASES EXISTENTES (${diagramData.classes.length}):\n`;
+    diagramData.classes.forEach(cls => {
+        text += `\n📦 CLASE: ${cls.name} (${cls.type})\n`;
 
-        if (diagramData.relationships.length > 0) {
-            text += `\nRELACIONES (${diagramData.relationships.length}):\n`;
-            diagramData.relationships.forEach(rel => {
-                text += `- ${rel.source} --${rel.type}--> ${rel.target}\n`;
+        if (cls.attributes && cls.attributes.length > 0) {
+            text += `   ATRIBUTOS EXISTENTES:\n`;
+            cls.attributes.forEach(attr => {
+                text += `   ✓ ${attr}\n`;
             });
+        } else {
+            text += `   ATRIBUTOS: ninguno\n`;
         }
 
-        return text;
+        if (cls.methods && cls.methods.length > 0) {
+            text += `   MÉTODOS EXISTENTES:\n`;
+            cls.methods.forEach(method => {
+                text += `   ✓ ${method}\n`;
+            });
+        } else {
+            text += `   MÉTODOS: ninguno\n`;
+        }
+        text += `\n`;
+    });
+
+    // Formatear relaciones existentes
+    if (diagramData.relationships && diagramData.relationships.length > 0) {
+        text += `RELACIONES EXISTENTES (${diagramData.relationships.length}):\n`;
+        diagramData.relationships.forEach(rel => {
+            text += `🔗 ${rel.source} ---(${rel.type})---> ${rel.target}\n`;
+        });
+    } else {
+        text += `RELACIONES EXISTENTES: ninguna\n`;
     }
+
+    text += `\n=== FIN DEL DIAGRAMA EXISTENTE ===\n`;
+
+    return text;
+}
 
     // ==================== UTILIDADES ====================
 

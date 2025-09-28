@@ -1,6 +1,6 @@
 // resources/js/diagram/modules-ai/AIChangePreview.js
 // Maneja la vista previa de cambios propuestos por IA antes de aplicarlos
-
+import * as joint from 'jointjs';
 export class AIChangePreview {
     constructor(editor) {
         this.editor = editor;

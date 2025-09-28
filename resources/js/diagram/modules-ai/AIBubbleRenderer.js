@@ -82,11 +82,6 @@ export class AIBubbleRenderer {
             bubbleElement.style.transform = 'translateY(0) scale(1)';
         }, 10);
 
-        // Auto-remover después de 10 segundos
-        setTimeout(() => {
-            this.removeBubble(bubbleId);
-        }, 10000);
-
         // Guardar referencia
         this.activeBubbles.set(bubbleId, {
             element: bubbleElement,
@@ -94,8 +89,14 @@ export class AIBubbleRenderer {
             timestamp: Date.now()
         });
 
+        window.aiCurrentInstance = this;
+
         console.log(`💬 Burbuja "${bubbleData.type}" creada en posición:`, position);
     }
+
+    removeBubbleReference(bubbleId) {
+    this.activeBubbles.delete(bubbleId);
+}
 
     // ==================== POSICIONAMIENTO INTELIGENTE ====================
 
@@ -143,23 +144,24 @@ export class AIBubbleRenderer {
         };
     }
 
-    getGeneralPosition() {
-        const paperRect = this.editor.paper.el.getBoundingClientRect();
-        const bubbleCount = this.activeBubbles.size;
+getGeneralPosition() {
+    const paperRect = this.editor.paper.el.getBoundingClientRect();
+    const bubbleCount = this.activeBubbles.size;
 
-        // Distribuir burbujas en una cuadrícula imaginaria
-        const gridCols = 3;
-        const col = bubbleCount % gridCols;
-        const row = Math.floor(bubbleCount / gridCols);
+    // ✅ MEJORAR distribución - evitar superposición con mini-panel
+    const gridCols = 2;
+    const col = bubbleCount % gridCols;
+    const row = Math.floor(bubbleCount / gridCols);
 
-        const baseX = 20 + (col * 220); // 220px de ancho por columna
-        const baseY = 20 + (row * 100); // 100px de alto por fila
+    // Posicionar en lado izquierdo para evitar conflicto con mini-panel IA
+    const baseX = 20 + (col * 260); // 260px de ancho por columna
+    const baseY = 20 + (row * 120); // 120px de alto por fila
 
-        return {
-            x: Math.min(baseX, paperRect.width - 250),
-            y: Math.min(baseY, paperRect.height - 80)
-        };
-    }
+    return {
+        x: Math.min(baseX, Math.max(paperRect.width - 280 - 300, 20)), // Dejar espacio para mini-panel
+        y: Math.min(baseY, paperRect.height - 100)
+    };
+}
 
     // ==================== TIPOS DE BURBUJAS ====================
 
@@ -224,13 +226,27 @@ export class AIBubbleRenderer {
         }, 300);
     }
 
-    clearBubbles() {
-        console.log('🧹 Limpiando todas las burbujas...');
+clearBubbles() {
+    console.log('🧹 Limpiando todas las burbujas...');
 
-        this.activeBubbles.forEach((bubble, bubbleId) => {
-            this.removeBubble(bubbleId);
-        });
-    }
+    // Animar salida de todas las burbujas
+    this.activeBubbles.forEach((bubble, bubbleId) => {
+        const element = bubble.element;
+        if (element && element.parentNode) {
+            element.style.opacity = '0';
+            element.style.transform = 'translateY(-10px) scale(0.95)';
+
+            setTimeout(() => {
+                if (element.parentNode) {
+                    element.parentNode.removeChild(element);
+                }
+            }, 300);
+        }
+    });
+
+    // Limpiar referencias
+    this.activeBubbles.clear();
+}
 
     // ==================== ANIMACIONES ESPECIALES ====================
 
@@ -259,181 +275,169 @@ export class AIBubbleRenderer {
 
     // ==================== ESTILOS CSS ====================
 
-    static addBubbleStyles() {
-        if (document.getElementById('ai-bubble-styles')) return;
+static addBubbleStyles() {
+    if (document.getElementById('ai-bubble-styles')) return;
 
-        const styles = document.createElement('style');
-        styles.id = 'ai-bubble-styles';
-        styles.textContent = `
-            /* Contenedor base de burbujas */
-            .ai-bubble-container {
-                font-family: system-ui, -apple-system, sans-serif;
+    const styles = document.createElement('style');
+    styles.id = 'ai-bubble-styles';
+    styles.textContent = `
+        /* Contenedor base de burbujas */
+        .ai-bubble-container {
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        /* Estilos base de burbuja - MEJORADOS */
+        .ai-bubble {
+            max-width: 250px;
+            min-width: 200px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            border: 1px solid #e5e7eb;
+            position: relative;
+            z-index: 201;
+            animation: aiBubbleFloat 4s ease-in-out infinite;
+            /* ✅ AGREGAR: Evitar que se desvanezcan */
+            opacity: 1 !important;
+        }
+
+        .ai-bubble-content {
+            padding: 14px 18px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .ai-bubble-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .ai-bubble-text {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #374151;
+            flex: 1;
+            /* ✅ MEJORAR: Permitir texto más largo */
+            word-wrap: break-word;
+            max-height: none;
+            overflow: visible;
+        }
+
+        .ai-bubble-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.1);
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 16px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+            opacity: 0.8;
+            font-weight: bold;
+        }
+
+        .ai-bubble-close:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        /* Flecha de la burbuja */
+        .ai-bubble-arrow {
+            position: absolute;
+            left: 20px;
+            bottom: -8px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid white;
+            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.1));
+        }
+
+        /* Tipos de burbujas - COLORES MEJORADOS */
+        .ai-bubble-info {
+            border-left: 4px solid #3b82f6;
+            background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);
+        }
+
+        .ai-bubble-suggestion {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(135deg, #fff 0%, #fefbf3 100%);
+        }
+
+        .ai-bubble-warning {
+            border-left: 4px solid #ef4444;
+            background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
+        }
+
+        .ai-bubble-error {
+            border-left: 4px solid #dc2626;
+            background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
+            border-color: #fecaca;
+        }
+
+        .ai-bubble-success {
+            border-left: 4px solid #10b981;
+            background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
+        }
+
+        .ai-bubble-change {
+            border-left: 4px solid #8b5cf6;
+            background: linear-gradient(135deg, #fff 0%, #faf5ff 100%);
+        }
+
+        /* Animaciones de burbujas - MÁS SUTILES */
+        @keyframes aiBubbleFloat {
+            0%, 100% {
+                transform: translateY(0px);
             }
+            50% {
+                transform: translateY(-1px);
+            }
+        }
 
-            /* Estilos base de burbuja */
+        /* Efectos hover en burbujas */
+        .ai-bubble:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ✅ NUEVO: Indicador de burbuja persistente */
+        .ai-bubble::before {
+            content: "📌";
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            font-size: 12px;
+            opacity: 0.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
             .ai-bubble {
-                max-width: 240px;
+                max-width: 220px;
                 min-width: 180px;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-                border: 1px solid #e5e7eb;
-                position: relative;
-                z-index: 201;
-                animation: aiBubbleFloat 3s ease-in-out infinite;
-            }
-
-            .ai-bubble-content {
-                padding: 12px 16px;
-                display: flex;
-                align-items: flex-start;
-                gap: 10px;
-            }
-
-            .ai-bubble-icon {
-                font-size: 16px;
-                flex-shrink: 0;
-                margin-top: 2px;
             }
 
             .ai-bubble-text {
-                font-size: 13px;
-                line-height: 1.4;
-                color: #374151;
-                flex: 1;
+                font-size: 12px;
             }
+        }
+    `;
 
-            .ai-bubble-close {
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                background: none;
-                border: none;
-                color: #9ca3af;
-                cursor: pointer;
-                font-size: 14px;
-                width: 20px;
-                height: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 50%;
-                transition: all 0.2s;
-                opacity: 0.7;
-            }
-
-            .ai-bubble-close:hover {
-                background: #f3f4f6;
-                opacity: 1;
-            }
-
-            /* Flecha de la burbuja */
-            .ai-bubble-arrow {
-                position: absolute;
-                left: 16px;
-                bottom: -8px;
-                width: 0;
-                height: 0;
-                border-left: 8px solid transparent;
-                border-right: 8px solid transparent;
-                border-top: 8px solid white;
-                filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.1));
-            }
-
-            /* Tipos de burbujas */
-            .ai-bubble-info {
-                border-left: 4px solid #3b82f6;
-            }
-
-            .ai-bubble-suggestion {
-                border-left: 4px solid #f59e0b;
-                background: linear-gradient(135deg, #fff 0%, #fefbf3 100%);
-            }
-
-            .ai-bubble-warning {
-                border-left: 4px solid #ef4444;
-                background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
-            }
-
-            .ai-bubble-error {
-                border-left: 4px solid #dc2626;
-                background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
-                border-color: #fecaca;
-            }
-
-            .ai-bubble-success {
-                border-left: 4px solid #10b981;
-                background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
-            }
-
-            .ai-bubble-change {
-                border-left: 4px solid #8b5cf6;
-                background: linear-gradient(135deg, #fff 0%, #faf5ff 100%);
-            }
-
-            /* Estado destacado */
-            .ai-bubble-highlighted {
-                animation: aiBubbleHighlight 0.6s ease-in-out;
-                box-shadow: 0 6px 25px rgba(99, 102, 241, 0.3);
-            }
-
-            /* Animaciones */
-            @keyframes aiBubbleFloat {
-                0%, 100% {
-                    transform: translateY(0px);
-                }
-                50% {
-                    transform: translateY(-2px);
-                }
-            }
-
-            @keyframes aiBubbleHighlight {
-                0%, 100% {
-                    transform: scale(1);
-                }
-                50% {
-                    transform: scale(1.05);
-                    box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
-                }
-            }
-
-            /* Responsive */
-            @media (max-width: 768px) {
-                .ai-bubble {
-                    max-width: 200px;
-                    min-width: 160px;
-                }
-
-                .ai-bubble-text {
-                    font-size: 12px;
-                }
-            }
-
-            /* Efectos hover en burbujas */
-            .ai-bubble:hover {
-                transform: translateY(-1px);
-                box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
-            }
-
-            /* Indicador de burbuja nueva */
-            .ai-bubble-new {
-                animation: aiBubbleEntrance 0.5s ease-out;
-            }
-
-            @keyframes aiBubbleEntrance {
-                0% {
-                    opacity: 0;
-                    transform: translateY(20px) scale(0.9);
-                }
-                100% {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                }
-            }
-        `;
-
-        document.head.appendChild(styles);
-    }
+    document.head.appendChild(styles);
+}
 
     // ==================== UTILIDADES ====================
 

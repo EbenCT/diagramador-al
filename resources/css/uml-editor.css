@@ -1,4 +1,4 @@
-/* resources/css/uml-editor.css - VERSIÓN LIMPIA Y FUNCIONAL */
+/* resources/css/uml-editor.css - VERSIÓN ACTUALIZADA CON MÓDULOS DE IA */
 
 /* ==================== FUENTES PROFESIONALES ==================== */
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
@@ -18,6 +18,11 @@
     --uml-bg-secondary: #f8fafc;
     --uml-bg-canvas: #fdfdfe;
 
+    /* Colores IA */
+    --ai-primary: #6366f1;
+    --ai-secondary: #8b5cf6;
+    --ai-gradient: linear-gradient(45deg, #6366f1, #8b5cf6);
+
     /* Relaciones */
     --uml-relation-color: #1e40af;
     --uml-relation-width: 2px;
@@ -26,6 +31,7 @@
     --uml-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --uml-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     --uml-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --uml-shadow-ai: 0 4px 15px rgba(99, 102, 241, 0.3);
 
     /* Espaciado */
     --uml-spacing-xs: 4px;
@@ -77,181 +83,743 @@
     cursor: crosshair;
 }
 
-/* ==================== ELEMENTOS JOINTJS MEJORADOS ==================== */
+/* ==================== ESTILOS DE IA - BOTÓN FLOTANTE ==================== */
 
-/* CRÍTICO: Configuración correcta del texto */
-.joint-element text {
-    font-family: 'Fira Code', 'Consolas', monospace !important;
-    font-size: 12px !important;
-    dominant-baseline: hanging !important;
-    text-anchor: start !important;
+.ai-floating-button-v2 {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--ai-gradient);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: var(--uml-shadow-ai);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    user-select: none;
+    font-family: var(--uml-font-sans);
 }
 
-/* Efectos de selección */
-.joint-element.selected rect {
-    stroke: #007bff !important;
-    stroke-width: 3px !important;
-    filter: drop-shadow(0 0 8px rgba(0, 123, 255, 0.4)) !important;
+.ai-floating-button-v2:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
 }
 
-/* Hover effects */
-.joint-element:hover rect {
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15)) !important;
-    transition: all 0.2s ease !important;
+.ai-floating-button-v2 .ai-icon {
+    font-size: 16px;
 }
 
-/* Cursor para elementos */
-.joint-element {
-    cursor: move;
+/* ==================== ESTILOS DE IA - MINI PANEL ==================== */
+
+.ai-mini-panel {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 280px;
+    max-height: 350px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    z-index: 999;
+    transform: translateX(320px);
+    transition: transform 0.3s ease;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    font-family: var(--uml-font-sans);
 }
 
-/* ==================== TOOLBAR MEJORADO ==================== */
+.ai-mini-panel-visible {
+    transform: translateX(0);
+}
+
+.ai-mini-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--ai-gradient);
+    color: white;
+}
+
+.ai-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ai-header-title {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.ai-close-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.ai-close-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.ai-mini-content {
+    padding: 16px;
+}
+
+/* Estados del formulario */
+.ai-context-section {
+    margin-bottom: 16px;
+}
+
+.ai-context-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.ai-context-input-v2 {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 12px;
+    resize: vertical;
+    min-height: 60px;
+    max-height: 100px;
+    transition: border-color 0.2s;
+    font-family: var(--uml-font-sans);
+}
+
+.ai-context-input-v2:focus {
+    outline: none;
+    border-color: var(--ai-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.ai-char-counter {
+    text-align: right;
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.ai-analyze-btn-v2 {
+    width: 100%;
+    background: var(--ai-gradient);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-analyze-btn-v2:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+/* Estado de carga */
+.ai-loading-state {
+    text-align: center;
+}
+
+.ai-loading-icon {
+    font-size: 24px;
+    animation: spin 1s linear infinite;
+}
+
+.ai-loading-text {
+    margin: 8px 0;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.ai-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #f3f4f6;
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 12px 0;
+}
+
+.ai-progress-fill {
+    height: 100%;
+    background: var(--ai-gradient);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+/* Estado de resultado */
+.ai-result-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.ai-changes-control {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ai-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-btn-success {
+    background: var(--uml-success);
+    color: white;
+}
+
+.ai-btn-success:hover {
+    background: #059669;
+}
+
+.ai-btn-danger {
+    background: var(--uml-error);
+    color: white;
+}
+
+.ai-btn-danger:hover {
+    background: #dc2626;
+}
+
+.ai-btn-secondary {
+    width: 100%;
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.ai-btn-secondary:hover {
+    background: #e5e7eb;
+}
+
+/* ==================== ESTILOS DE IA - ANIMACIONES DE ESCANEO ==================== */
+
+.ai-scan-overlay {
+    animation: aiScanOverlayPulse 3s ease-in-out infinite;
+}
+
+@keyframes aiScanOverlayPulse {
+    0%, 100% {
+        background: rgba(99, 102, 241, 0.05);
+    }
+    50% {
+        background: rgba(99, 102, 241, 0.08);
+    }
+}
+
+/* Animaciones para elementos durante escaneo */
+.ai-scanning-element {
+    transition: all 0.3s ease;
+}
+
+.ai-element-active-pulse {
+    animation: aiElementPulse 1.5s ease-in-out infinite;
+}
+
+.ai-element-scanning-now {
+    animation: aiElementHighlight 0.5s ease-in-out;
+    filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
+}
+
+@keyframes aiElementPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.02);
+        opacity: 0.9;
+    }
+}
+
+@keyframes aiElementHighlight {
+    0% {
+        filter: drop-shadow(0 0 0px rgba(99, 102, 241, 0));
+    }
+    50% {
+        filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.8));
+    }
+    100% {
+        filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
+    }
+}
+
+/* ==================== ESTILOS DE IA - BURBUJAS ==================== */
+
+.ai-bubble-container {
+    font-family: var(--uml-font-sans);
+}
+
+.ai-bubble {
+    max-width: 240px;
+    min-width: 180px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e5e7eb;
+    position: relative;
+    z-index: 201;
+    animation: aiBubbleFloat 3s ease-in-out infinite;
+}
+
+.ai-bubble-content {
+    padding: 12px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.ai-bubble-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.ai-bubble-text {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #374151;
+    flex: 1;
+}
+
+.ai-bubble-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 14px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+    opacity: 0.7;
+}
+
+.ai-bubble-close:hover {
+    background: #f3f4f6;
+    opacity: 1;
+}
+
+/* Flecha de la burbuja */
+.ai-bubble-arrow {
+    position: absolute;
+    left: 16px;
+    bottom: -8px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid white;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.1));
+}
+
+/* Tipos de burbujas */
+.ai-bubble-info {
+    border-left: 4px solid #3b82f6;
+}
+
+.ai-bubble-suggestion {
+    border-left: 4px solid #f59e0b;
+    background: linear-gradient(135deg, #fff 0%, #fefbf3 100%);
+}
+
+.ai-bubble-warning {
+    border-left: 4px solid #ef4444;
+    background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
+}
+
+.ai-bubble-error {
+    border-left: 4px solid #dc2626;
+    background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
+    border-color: #fecaca;
+}
+
+.ai-bubble-success {
+    border-left: 4px solid #10b981;
+    background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
+}
+
+.ai-bubble-change {
+    border-left: 4px solid #8b5cf6;
+    background: linear-gradient(135deg, #fff 0%, #faf5ff 100%);
+}
+
+/* Estado destacado */
+.ai-bubble-highlighted {
+    animation: aiBubbleHighlight 0.6s ease-in-out;
+    box-shadow: 0 6px 25px rgba(99, 102, 241, 0.3);
+}
+
+/* Animaciones de burbujas */
+@keyframes aiBubbleFloat {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+@keyframes aiBubbleHighlight {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+    }
+}
+
+/* Efectos hover en burbujas */
+.ai-bubble:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Indicador de burbuja nueva */
+.ai-bubble-new {
+    animation: aiBubbleEntrance 0.5s ease-out;
+}
+
+@keyframes aiBubbleEntrance {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ==================== ESTILOS DE IA - PREVIEW DE CAMBIOS ==================== */
+
+.ai-change-overlay {
+    font-family: var(--uml-font-sans);
+}
+
+.ai-change-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.ai-change-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.ai-change-btn {
+    flex: 1;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-change-accept {
+    background: var(--uml-success);
+    color: white;
+}
+
+.ai-change-accept:hover {
+    background: #059669;
+}
+
+.ai-change-reject {
+    background: var(--uml-error);
+    color: white;
+}
+
+.ai-change-reject:hover {
+    background: #dc2626;
+}
+
+.ai-preview-global-controls {
+    font-family: var(--uml-font-sans);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 180px;
+}
+
+.ai-preview-summary {
+    text-align: center;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.ai-preview-count {
+    font-weight: 600;
+    color: var(--ai-secondary);
+}
+
+.ai-preview-accept-all,
+.ai-preview-reject-all {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-preview-accept-all {
+    background: var(--uml-success);
+    color: white;
+}
+
+.ai-preview-accept-all:hover {
+    background: #059669;
+}
+
+.ai-preview-reject-all {
+    background: var(--uml-error);
+    color: white;
+}
+
+.ai-preview-reject-all:hover {
+    background: #dc2626;
+}
+
+/* Highlights para atributos y métodos */
+.ai-attribute-highlight,
+.ai-method-highlight {
+    font-family: var(--uml-font-mono);
+}
+
+.ai-new-attribute {
+    color: #92400e;
+}
+
+.ai-new-method {
+    color: #6b21a8;
+}
+
+/* ==================== ANIMACIONES GENERALES ==================== */
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==================== TOOLBAR ORIGINAL (MANTENER) ==================== */
+
 .toolbar-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(30, 64, 175, 0.1);
-    border-radius: 16px;
-    padding: var(--uml-spacing-md);
-    box-shadow: var(--uml-shadow-md);
+    border-radius: 12px;
+    box-shadow: var(--uml-shadow-lg);
+    border: 1px solid rgba(229, 231, 235, 0.8);
+    display: flex;
+    gap: var(--uml-spacing-xs);
+    padding: var(--uml-spacing-sm);
+    z-index: 100;
+    transition: all 0.3s ease;
 }
 
 .tool-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 48px;
-    height: 48px;
-    padding: var(--uml-spacing-sm) var(--uml-spacing-md);
-    border: 2px solid transparent;
-    border-radius: 12px;
     background: rgba(248, 250, 252, 0.8);
-    color: var(--uml-primary);
-    font-family: var(--uml-font-sans);
-    font-size: 14px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: var(--uml-spacing-sm) 12px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
+    color: #374151;
     user-select: none;
-    position: relative;
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 80px;
+    justify-content: center;
 }
 
 .tool-btn:hover {
-    background: rgba(30, 64, 175, 0.05);
-    border-color: rgba(30, 64, 175, 0.2);
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+    color: var(--uml-primary);
     transform: translateY(-1px);
-    box-shadow: var(--uml-shadow-md);
 }
 
 .tool-btn.active {
     background: var(--uml-primary);
     color: white;
     border-color: var(--uml-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px -8px var(--uml-primary);
-}
-
-/* ==================== RELACIONES UML ==================== */
-
-/* Enlaces/Relaciones */
-.joint-link .connection {
-    stroke: var(--uml-relation-color) !important;
-    stroke-width: var(--uml-relation-width) !important;
-    fill: none !important;
-}
-
-/* Marcadores de flecha */
-.joint-link .marker-target,
-.joint-link .marker-source {
-    fill: var(--uml-relation-color) !important;
-    stroke: var(--uml-relation-color) !important;
-}
-
-/* ==================== INFORMACIÓN DEL CANVAS ==================== */
-#canvas-info {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(30, 64, 175, 0.1);
-    border-radius: 8px;
-    padding: var(--uml-spacing-sm) var(--uml-spacing-md);
-    font-family: var(--uml-font-mono);
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--uml-primary);
-    box-shadow: var(--uml-shadow-sm);
+    box-shadow: 0 2px 8px rgba(30, 64, 175, 0.3);
 }
 
 /* ==================== CONTROLES DE ZOOM ==================== */
+
 .zoom-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
     display: flex;
-    flex-direction: column;
     gap: var(--uml-spacing-xs);
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(30, 64, 175, 0.1);
-    border-radius: 12px;
-    padding: var(--uml-spacing-sm);
+    border-radius: 8px;
     box-shadow: var(--uml-shadow-md);
+    border: 1px solid rgba(229, 231, 235, 0.8);
+    z-index: 100;
 }
 
 .zoom-btn {
+    background: none;
+    border: none;
     width: 40px;
     height: 40px;
-    border: none;
-    border-radius: 8px;
-    background: rgba(248, 250, 252, 0.8);
-    color: var(--uml-primary);
-    font-size: 16px;
-    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #374151;
+    font-weight: 600;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    border-radius: 6px;
 }
 
 .zoom-btn:hover {
-    background: var(--uml-primary);
-    color: white;
-    transform: scale(1.05);
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--uml-primary);
+}
+
+.zoom-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ==================== INFO DEL CANVAS ==================== */
+
+#canvas-info {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
     box-shadow: var(--uml-shadow-md);
+    border: 1px solid rgba(229, 231, 235, 0.8);
+    padding: var(--uml-spacing-sm) var(--uml-spacing-md);
+    font-size: 12px;
+    color: #6b7280;
+    z-index: 100;
+    font-family: var(--uml-font-mono);
 }
 
-/* ==================== ANIMACIONES ==================== */
+/* ==================== ELEMENTOS UML MEJORADOS ==================== */
 
-/* Animación de aparición */
 .joint-element {
-    animation: element-appear 0.3s ease;
+    transition: all 0.2s ease;
 }
 
-@keyframes element-appear {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+.joint-element:hover {
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+}
+
+.joint-element text {
+    font-family: var(--uml-font-mono);
+    font-size: 11px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+.joint-link {
+    transition: all 0.2s ease;
+}
+
+.joint-link:hover {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
 }
 
 /* ==================== RESPONSIVE ==================== */
 
 @media (max-width: 768px) {
     .toolbar-container {
-        padding: var(--uml-spacing-sm);
-        border-radius: 12px;
+        flex-wrap: wrap;
+        max-width: calc(100vw - 40px);
     }
 
     .tool-btn {
-        min-width: 40px;
-        height: 40px;
-        padding: var(--uml-spacing-xs);
+        min-width: 70px;
         font-size: 12px;
     }
 
-    .joint-element text {
-        font-size: 10px !important;
+    .ai-floating-button-v2 {
+        bottom: 15px;
+        right: 15px;
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+
+    .ai-mini-panel {
+        width: 260px;
+        bottom: 70px;
+        right: 15px;
+    }
+
+    .ai-bubble {
+        max-width: 200px;
+        min-width: 160px;
+    }
+
+    .ai-bubble-text {
+        font-size: 12px;
     }
 
     #canvas-info {
@@ -310,11 +878,24 @@
         color: #e5e7eb;
         border-color: rgba(96, 165, 250, 0.2);
     }
+
+    .ai-mini-panel {
+        background: #1f2937;
+        border-color: rgba(96, 165, 250, 0.2);
+    }
+
+    .ai-bubble {
+        background: #374151;
+        border-color: rgba(96, 165, 250, 0.2);
+    }
+
+    .ai-bubble-text {
+        color: #e5e7eb;
+    }
 }
 
 /* ==================== LIMPIAR ESTILOS ANTIGUOS ==================== */
 
-/* Eliminar cualquier overlay o elemento conflictivo */
 .class-box,
 .uml-class-overlay,
 .editable,
@@ -336,7 +917,11 @@
 @media print {
     .toolbar-container,
     .zoom-controls,
-    #canvas-info {
+    #canvas-info,
+    .ai-floating-button-v2,
+    .ai-mini-panel,
+    .ai-bubble,
+    .ai-change-overlay {
         display: none !important;
     }
 

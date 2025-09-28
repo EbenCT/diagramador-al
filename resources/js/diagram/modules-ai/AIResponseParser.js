@@ -369,20 +369,55 @@ export class AIResponseParser {
 
     // ==================== VALIDACIÓN DE CAMBIOS ====================
 
-    validateChanges(changes) {
-        const validatedChanges = [];
+validateChanges(changes) {
+    const validatedChanges = [];
 
-        changes.forEach(change => {
-            if (this.isValidChange(change)) {
-                validatedChanges.push(change);
-            } else {
-                console.warn('⚠️ Cambio inválido ignorado:', change);
-            }
-        });
+    changes.forEach(change => {
+        if (this.isValidChange(change) && this.isUniqueChange(change)) {
+            validatedChanges.push(change);
+        } else {
+            console.warn('⚠️ Cambio inválido o duplicado ignorado:', change);
+        }
+    });
 
-        return validatedChanges;
+    return validatedChanges;
+}
+isUniqueChange(change) {
+    switch (change.type) {
+        case 'CREATE_CLASS':
+            // Verificar que la clase no exista
+            return !this.findElementByClassName(change.className);
+
+        case 'ADD_ATTRIBUTE':
+            const element = this.findElementByClassName(change.className);
+            if (!element) return false;
+            const attributes = element.get('umlData')?.attributes || [];
+            return !attributes.includes(change.attribute);
+
+        case 'ADD_METHOD':
+            const elementM = this.findElementByClassName(change.className);
+            if (!elementM) return false;
+            const methods = elementM.get('umlData')?.methods || [];
+            return !methods.includes(change.method);
+
+        case 'CREATE_RELATION':
+            const sourceEl = this.findElementByClassName(change.sourceClass);
+            const targetEl = this.findElementByClassName(change.targetClass);
+            if (!sourceEl || !targetEl) return false;
+
+            // Verificar que no exista ya esta relación
+            const links = this.editor.graph.getLinks();
+            return !links.some(link => {
+                const linkData = link.get('linkData') || {};
+                return link.getSourceElement()?.id === sourceEl.id &&
+                       link.getTargetElement()?.id === targetEl.id &&
+                       linkData.type === change.relationType;
+            });
+
+        default:
+            return true;
     }
-
+}
     isValidChange(change) {
         switch (change.type) {
             case 'CREATE_CLASS':

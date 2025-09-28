@@ -29,13 +29,15 @@ export class AIAnimationManager {
         this.startElementPulse();
 
         // Programar animaciones
-        await this.runScanSequence();
+        const animationPromise = this.runScanSequence();
+        const minimumDuration = new Promise(resolve => setTimeout(resolve, 3000));
+        await Promise.all([animationPromise, minimumDuration]);
     }
 
     async runScanSequence() {
         return new Promise((resolve) => {
             let progress = 0;
-            const duration = 2000; // 2 segundos
+            const duration = 5000; // 2 segundos
             const startTime = Date.now();
 
             const animate = () => {
@@ -157,55 +159,83 @@ export class AIAnimationManager {
 
     // ==================== PULSO EN ELEMENTOS UML ====================
 
-    startElementPulse() {
-        const elements = this.editor.graph.getElements();
+startElementPulse() {
+    const elements = this.editor.graph.getElements();
 
-        elements.forEach((element, index) => {
-            const elementView = this.editor.paper.findViewByModel(element);
-            if (!elementView) return;
+    elements.forEach((element, index) => {
+        const elementView = this.editor.paper.findViewByModel(element);
+        if (!elementView) return;
 
-            const elementNode = elementView.el;
-            if (!elementNode) return;
+        const elementNode = elementView.el;
+        if (!elementNode) return;
 
-            // Agregar clase CSS para animación
-            elementNode.classList.add('ai-scanning-element');
-            this.pulseElements.add(elementNode);
+        // ✅ SOLO agregar clases CSS, NO modificar visibility
+        elementNode.classList.add('ai-scanning-element');
+        this.pulseElements.add(elementNode);
 
-            // Pulso escalonado
-            setTimeout(() => {
-                if (elementNode.classList.contains('ai-scanning-element')) {
-                    elementNode.classList.add('ai-element-active-pulse');
-                }
-            }, index * 100); // Escalonar por 100ms
-        });
-    }
+        // Efecto de "preparación para escaneo" escalonado
+        setTimeout(() => {
+            if (elementNode.classList.contains('ai-scanning-element')) {
+                // Efecto sutil de preparación
+                element.attr('body/opacity', 0.9); // Ligeramente transparente
+                element.attr('body/strokeDasharray', '2,2'); // Línea punteada sutil
 
-    updateElementPulse(progress) {
-        // Activar/desactivar pulso basado en la posición de la línea de escaneo
-        const elements = this.editor.graph.getElements();
-
-        elements.forEach((element) => {
-            const elementView = this.editor.paper.findViewByModel(element);
-            if (!elementView) return;
-
-            const elementNode = elementView.el;
-            const elementRect = elementNode.getBoundingClientRect();
-            const overlayRect = this.scanOverlay.getBoundingClientRect();
-
-            // Calcular si la línea de escaneo está pasando por el elemento
-            const relativeElementTop = elementRect.top - overlayRect.top;
-            const scanLinePosition = overlayRect.height * progress;
-
-            const isBeingScanned = scanLinePosition >= relativeElementTop &&
-                                 scanLinePosition <= (relativeElementTop + elementRect.height);
-
-            if (isBeingScanned) {
-                elementNode.classList.add('ai-element-scanning-now');
-            } else {
-                elementNode.classList.remove('ai-element-scanning-now');
+                setTimeout(() => {
+                    element.attr('body/opacity', 1);
+                    element.attr('body/strokeDasharray', 'none');
+                }, 200);
             }
-        });
-    }
+        }, index * 50); // Escalonar por 50ms
+    });
+}
+
+updateElementPulse(progress) {
+    // NO modificar visibility/opacity de elementos, solo agregar efectos
+    const elements = this.editor.graph.getElements();
+
+    elements.forEach((element) => {
+        const elementView = this.editor.paper.findViewByModel(element);
+        if (!elementView) return;
+
+        const elementNode = elementView.el;
+        const elementRect = elementNode.getBoundingClientRect();
+        const overlayRect = this.scanOverlay.getBoundingClientRect();
+
+        // Calcular si la línea de escaneo está pasando por el elemento
+        const relativeElementTop = elementRect.top - overlayRect.top;
+        const relativeElementBottom = elementRect.bottom - overlayRect.top;
+        const scanLinePosition = overlayRect.height * progress;
+
+        const isBeingScanned = scanLinePosition >= relativeElementTop &&
+                             scanLinePosition <= relativeElementBottom;
+
+        if (isBeingScanned) {
+            // ✅ AGREGAR efecto de escaneo sin ocultar el elemento
+            elementNode.classList.add('ai-element-scanning-now');
+
+            // Aplicar efecto visual temporal al elemento JointJS
+            element.attr('body/filter', {
+                name: 'dropShadow',
+                args: { dx: 0, dy: 0, blur: 12, color: 'rgba(99, 102, 241, 0.8)' }
+            });
+
+            // Aplicar pulso de color
+            const originalStroke = element.attr('body/stroke') || '#1e40af';
+            element.attr('body/stroke', '#6366f1');
+            element.attr('body/strokeWidth', 3);
+
+            // Remover efectos después de un momento
+            setTimeout(() => {
+                element.attr('body/stroke', originalStroke);
+                element.attr('body/strokeWidth', 2);
+                element.attr('body/filter', null);
+            }, 500);
+
+        } else {
+            elementNode.classList.remove('ai-element-scanning-now');
+        }
+    });
+}
 
     stopElementPulse() {
         this.pulseElements.forEach(elementNode => {
@@ -232,66 +262,77 @@ export class AIAnimationManager {
 
     // ==================== ESTILOS CSS ESPECÍFICOS ====================
 
-    static addAnimationStyles() {
-        if (document.getElementById('ai-animation-styles')) return;
+static addAnimationStyles() {
+    if (document.getElementById('ai-animation-styles')) return;
 
-        const styles = document.createElement('style');
-        styles.id = 'ai-animation-styles';
-        styles.textContent = `
-            /* Animaciones para elementos durante escaneo */
-            .ai-scanning-element {
-                transition: all 0.3s ease;
+    const styles = document.createElement('style');
+    styles.id = 'ai-animation-styles';
+    styles.textContent = `
+        /* Animaciones para elementos durante escaneo - MEJORADAS */
+        .ai-scanning-element {
+            transition: all 0.3s ease;
+        }
+
+        .ai-element-active-pulse {
+            animation: aiElementPulse 1.5s ease-in-out infinite;
+        }
+
+        .ai-element-scanning-now {
+            animation: aiElementScanEffect 0.8s ease-in-out;
+        }
+
+        @keyframes aiElementPulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
             }
-
-            .ai-element-active-pulse {
-                animation: aiElementPulse 1.5s ease-in-out infinite;
+            50% {
+                transform: scale(1.01);
+                opacity: 0.95;
             }
+        }
 
-            .ai-element-scanning-now {
-                animation: aiElementHighlight 0.5s ease-in-out;
-                filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
+        /* ✅ NUEVA animación de escaneo más visible */
+        @keyframes aiElementScanEffect {
+            0% {
+                transform: scale(1);
+                filter: brightness(1);
             }
-
-            @keyframes aiElementPulse {
-                0%, 100% {
-                    transform: scale(1);
-                    opacity: 1;
-                }
-                50% {
-                    transform: scale(1.02);
-                    opacity: 0.9;
-                }
+            25% {
+                transform: scale(1.02);
+                filter: brightness(1.1);
             }
-
-            @keyframes aiElementHighlight {
-                0% {
-                    filter: drop-shadow(0 0 0px rgba(99, 102, 241, 0));
-                }
-                50% {
-                    filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.8));
-                }
-                100% {
-                    filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
-                }
+            50% {
+                transform: scale(1.03);
+                filter: brightness(1.2);
             }
-
-            /* Efecto de escaneo en el overlay */
-            .ai-scan-overlay {
-                animation: aiScanOverlayPulse 3s ease-in-out infinite;
+            75% {
+                transform: scale(1.02);
+                filter: brightness(1.1);
             }
-
-            @keyframes aiScanOverlayPulse {
-                0%, 100% {
-                    background: rgba(99, 102, 241, 0.05);
-                }
-                50% {
-                    background: rgba(99, 102, 241, 0.08);
-                }
+            100% {
+                transform: scale(1);
+                filter: brightness(1);
             }
-        `;
+        }
 
-        document.head.appendChild(styles);
-    }
+        /* Efecto de escaneo en el overlay - sin cambios */
+        .ai-scan-overlay {
+            animation: aiScanOverlayPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes aiScanOverlayPulse {
+            0%, 100% {
+                background: rgba(99, 102, 241, 0.05);
+            }
+            50% {
+                background: rgba(99, 102, 241, 0.08);
+            }
+        }
+    `;
+
+    document.head.appendChild(styles);
+}
 
     // ==================== EFECTOS ADICIONALES ====================
 

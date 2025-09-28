@@ -51,13 +51,14 @@ class UMLDiagramEditor {
         this.zoomManager = new DiagramZoomManager(this);
         this.classManager = new DiagramClassManager(this);
         this.relationshipManager = new DiagramRelationshipManager(this);
-        this.aiAnalyzer = new DiagramAIAnalyzer(this);
+        //this.aiAnalyzer = new DiagramAIAnalyzer(this);
 
         this.init();
     }
 
     init() {
         this.createPaper();
+        this.aiAnalyzer = new DiagramAIAnalyzer(this);
         this.setupEventListeners();
         this.zoomManager.setupZoomButtons();
         this.zoomManager.setupPanNavigation();
