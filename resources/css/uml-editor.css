@@ -378,158 +378,413 @@
     }
 }
 
-/* ==================== ESTILOS DE IA - BURBUJAS ==================== */
+/* ==================== ESTILOS DE IA - BURBUJAS MEJORADAS ==================== */
 
 .ai-bubble-container {
     font-family: var(--uml-font-sans);
+    position: relative;
+    z-index: 200;
 }
 
+/* ✅ BURBUJAS BASE - TAMAÑOS AUMENTADOS */
 .ai-bubble {
-    max-width: 240px;
-    min-width: 180px;
+    max-width: 380px;  /* ✅ Aumentado de 240px */
+    min-width: 250px;  /* ✅ Aumentado de 180px */
     background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-radius: 16px;  /* ✅ Más redondeado */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);  /* ✅ Sombra mejorada */
     border: 1px solid #e5e7eb;
     position: relative;
     z-index: 201;
-    animation: aiBubbleFloat 3s ease-in-out infinite;
+    animation: aiBubbleFloat 4s ease-in-out infinite;
+    backdrop-filter: blur(8px);  /* ✅ Efecto glassmorphism */
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ✅ HEADER MEJORADO PARA DRAG & DROP */
+.ai-bubble-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px 6px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: grab;
+    background: linear-gradient(135deg, #fafafa 0%, #f8fafc 100%);
+    border-radius: 16px 16px 0 0;
+    user-select: none;
+}
+
+.ai-bubble-header:active {
+    cursor: grabbing;
+}
+
+.ai-bubble-drag-handle {
+    color: #94a3b8;
+    font-size: 14px;
+    cursor: grab;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.ai-bubble-drag-handle:hover {
+    background: #e2e8f0;
+    color: #64748b;
+    transform: scale(1.1);
+}
+
+/* ✅ CONTENIDO MEJORADO */
 .ai-bubble-content {
-    padding: 12px 16px;
+    padding: 16px 18px 18px 18px;  /* ✅ Más espacioso */
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: 14px;  /* ✅ Más separación */
 }
 
 .ai-bubble-icon {
-    font-size: 16px;
+    font-size: 20px;  /* ✅ Íconos más grandes */
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: 1px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 
 .ai-bubble-text {
-    font-size: 13px;
-    line-height: 1.4;
+    font-size: 14px;  /* ✅ Texto más legible */
+    line-height: 1.6;  /* ✅ Mejor interlineado */
     color: #374151;
     flex: 1;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
-.ai-bubble-close {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: none;
-    border: none;
-    color: #9ca3af;
+.ai-bubble-text-container {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-bubble-text-content {
+    display: block;
+    margin-bottom: 8px;
+}
+
+/* ✅ BOTÓN "VER MÁS" COMPLETAMENTE REDISEÑADO */
+.ai-bubble-expand-btn {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border: 1px solid #cbd5e1;
+    color: #4f46e5;
     cursor: pointer;
-    font-size: 14px;
-    width: 20px;
-    height: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    text-transform: lowercase;
+    letter-spacing: 0.5px;
+    font-family: var(--uml-font-sans);
+}
+
+.ai-bubble-expand-btn:hover {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    border-color: #6366f1;
+}
+
+.ai-bubble-expand-btn .expand-icon {
+    font-size: 10px;
+    transition: transform 0.3s ease;
+    font-weight: bold;
+}
+
+.ai-bubble-expand-btn:hover .expand-icon {
+    transform: scale(1.2);
+}
+
+/* ✅ ESTADO EXPANDIDO MEJORADO */
+.ai-bubble-expanded {
+    max-width: 480px;  /* ✅ Mucho más ancho al expandir */
+    min-width: 400px;
+    transform: scale(1.01);
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.15);
+    z-index: 205;
+}
+
+.ai-bubble-expanded .ai-bubble-text {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* ✅ SCROLLBAR PERSONALIZADA PARA CONTENIDO EXPANDIDO */
+.ai-bubble-expanded .ai-bubble-text::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ai-bubble-expanded .ai-bubble-text::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.ai-bubble-expanded .ai-bubble-text::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.ai-bubble-expanded .ai-bubble-text::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ✅ BOTÓN CERRAR MEJORADO */
+.ai-bubble-close {
+    background: rgba(239, 68, 68, 0.1);
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 16px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    transition: all 0.2s;
-    opacity: 0.7;
+    transition: all 0.3s ease;
+    font-weight: bold;
 }
 
 .ai-bubble-close:hover {
-    background: #f3f4f6;
-    opacity: 1;
+    background: #ef4444;
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
-/* Flecha de la burbuja */
+/* Flecha de la burbuja mejorada */
 .ai-bubble-arrow {
     position: absolute;
-    left: 16px;
-    bottom: -8px;
+    left: 20px;
+    bottom: -9px;
     width: 0;
     height: 0;
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-top: 8px solid white;
-    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.1));
+    border-left: 9px solid transparent;
+    border-right: 9px solid transparent;
+    border-top: 9px solid white;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.1));
 }
 
-/* Tipos de burbujas */
+/* ✅ TIPOS DE BURBUJAS CON GRADIENTES MEJORADOS */
 .ai-bubble-info {
-    border-left: 4px solid #3b82f6;
+    border-left: 5px solid #3b82f6;  /* ✅ Bordes más gruesos */
+    background: linear-gradient(135deg, #fff 0%, #eff6ff 100%);
 }
 
 .ai-bubble-suggestion {
-    border-left: 4px solid #f59e0b;
-    background: linear-gradient(135deg, #fff 0%, #fefbf3 100%);
+    border-left: 5px solid #f59e0b;
+    background: linear-gradient(135deg, #fff 0%, #fffbeb 100%);
 }
 
 .ai-bubble-warning {
-    border-left: 4px solid #ef4444;
+    border-left: 5px solid #ef4444;
     background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
 }
 
 .ai-bubble-error {
-    border-left: 4px solid #dc2626;
+    border-left: 5px solid #dc2626;
     background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
     border-color: #fecaca;
 }
 
 .ai-bubble-success {
-    border-left: 4px solid #10b981;
-    background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
+    border-left: 5px solid #10b981;
+    background: linear-gradient(135deg, #fff 0%, #ecfdf5 100%);
 }
 
 .ai-bubble-change {
-    border-left: 4px solid #8b5cf6;
+    border-left: 5px solid #8b5cf6;
     background: linear-gradient(135deg, #fff 0%, #faf5ff 100%);
 }
 
-/* Estado destacado */
+/* ✅ ESTADO DESTACADO MEJORADO */
 .ai-bubble-highlighted {
-    animation: aiBubbleHighlight 0.6s ease-in-out;
-    box-shadow: 0 6px 25px rgba(99, 102, 241, 0.3);
+    animation: aiBubbleHighlight 0.8s ease-in-out;
+    box-shadow: 0 12px 40px rgba(99, 102, 241, 0.4);
 }
 
-/* Animaciones de burbujas */
+/* ✅ ANIMACIONES MEJORADAS */
 @keyframes aiBubbleFloat {
     0%, 100% {
         transform: translateY(0px);
     }
     50% {
-        transform: translateY(-2px);
+        transform: translateY(-3px);
     }
 }
 
 @keyframes aiBubbleHighlight {
     0%, 100% {
         transform: scale(1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     }
     50% {
         transform: scale(1.05);
-        box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+        box-shadow: 0 20px 60px rgba(99, 102, 241, 0.4);
     }
 }
 
-/* Efectos hover en burbujas */
+/* ✅ EFECTOS HOVER MEJORADOS */
 .ai-bubble:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);  /* ✅ Más movimiento */
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
 }
 
-/* Indicador de burbuja nueva */
+.ai-bubble:hover .ai-bubble-arrow {
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+}
+
+/* Indicador de burbuja nueva mejorado */
 .ai-bubble-new {
-    animation: aiBubbleEntrance 0.5s ease-out;
+    animation: aiBubbleEntrance 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes aiBubbleEntrance {
     0% {
         opacity: 0;
-        transform: translateY(20px) scale(0.9);
+        transform: translateY(25px) scale(0.8);
     }
     100% {
         opacity: 1;
         transform: translateY(0) scale(1);
     }
+}
+
+/* ✅ CLASES PARA ESTADO ARRASTRABLE */
+.ai-bubble-draggable {
+    cursor: move;
+    user-select: none;
+}
+
+.ai-bubble-draggable:active {
+    cursor: grabbing;
+    transform: scale(1.02);
+}
+
+/* ✅ RESPONSIVE MEJORADO */
+@media (max-width: 768px) {
+    .ai-bubble {
+        max-width: 300px;  /* ✅ Optimizado para móvil */
+        min-width: 200px;
+    }
+
+    .ai-bubble-expanded {
+        max-width: 320px;
+        min-width: 280px;
+    }
+
+    .ai-bubble-text {
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .ai-bubble-content {
+        padding: 12px 14px;
+        gap: 10px;
+    }
+
+    .ai-bubble-icon {
+        font-size: 18px;
+    }
+
+    .ai-bubble-expand-btn {
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ai-bubble {
+        max-width: 260px;
+        min-width: 180px;
+    }
+
+    .ai-bubble-expanded {
+        max-width: 280px;
+        min-width: 240px;
+    }
+
+    .ai-bubble-content {
+        padding: 10px 12px;
+    }
+}
+
+/* ✅ ESTADOS DE CARGA Y TRANSICIONES */
+.ai-bubble-loading {
+    opacity: 0.7;
+    animation: aiBubblePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes aiBubblePulse {
+    0%, 100% {
+        opacity: 0.7;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+/* ✅ MEJORAS DE ACCESIBILIDAD */
+.ai-bubble:focus-within {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.ai-bubble-expand-btn:focus {
+    outline: 2px solid #6366f1;
+    outline-offset: 1px;
+}
+
+.ai-bubble-close:focus {
+    outline: 2px solid #ef4444;
+    outline-offset: 1px;
+}
+
+/* ✅ EFECTOS DE PROFUNDIDAD */
+.ai-bubble::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.2) 100%);
+    border-radius: 16px;
+    pointer-events: none;
+    opacity: 0.3;
+}
+
+/* ✅ ANIMACIÓN SUAVE PARA CAMBIOS DE TAMAÑO */
+.ai-bubble-text-content {
+    transition: all 0.3s ease;
+}
+
+/* ✅ INDICADORES VISUALES ADICIONALES */
+.ai-bubble-priority-high {
+    border-left-width: 6px !important;
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
+}
+
+.ai-bubble-priority-medium {
+    border-left-width: 4px !important;
+}
+
+.ai-bubble-priority-low {
+    border-left-width: 3px !important;
+    opacity: 0.9;
 }
 
 /* ==================== ESTILOS DE IA - PREVIEW DE CAMBIOS ==================== */

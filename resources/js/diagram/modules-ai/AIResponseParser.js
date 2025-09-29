@@ -63,7 +63,7 @@ export class AIResponseParser {
         if (analysis && analysis !== 'Análisis completado') {
             bubbles.push({
                 type: 'info',
-                message: this.truncateMessage(analysis, 60),
+                message: analysis,
                 targetClass: null
             });
         }
@@ -392,7 +392,9 @@ calculateNewClassPosition() {
     // ==================== UTILIDADES DE TEXTO ====================
 
     truncateMessage(message, maxLength) {
-        if (message.length <= maxLength) return message;
+
+        const newMaxLength = Math.max(maxLength, 200);
+        if (message.length <= newMaxLength) return message;
 
         const truncated = message.substring(0, maxLength - 3);
         const lastSpace = truncated.lastIndexOf(' ');
