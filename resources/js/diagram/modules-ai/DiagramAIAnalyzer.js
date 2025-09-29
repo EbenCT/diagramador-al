@@ -422,30 +422,97 @@ async processAIResponse(response) {
 buildOptimizedPrompt(diagramData, userContext) {
     const diagramText = this.formatDiagramForAI(diagramData);
 
-    return `Eres un experto en diseño UML. Analiza este diagrama existente y SOLO sugiere mejoras que NO dupliquen lo que ya existe.
+    return `Eres un experto en DISEÑO CONCEPTUAL DE BASES DE DATOS relacionales. Analiza este diagrama UML como modelo conceptual de BD y sugiere mejoras enfocadas en ESTRUCTURA DE DATOS, RELACIONES y INTEGRIDAD.
 
 DIAGRAMA ACTUAL:
 ${diagramText}
 
-CONTEXTO: ${userContext || 'Análisis general del diagrama'}
+CONTEXTO: ${userContext || 'Diseño conceptual de base de datos'}
+
+🎯 ENFOQUE PRINCIPAL - ANALIZAR:
+1. **RELACIONES Y MULTIPLICIDADES**: ¿Están todas las relaciones necesarias? ¿Las multiplicidades son correctas (1:1, 1:N, N:M)?
+2. **CLAVES Y ATRIBUTOS**: ¿Faltan claves primarias, foráneas o atributos esenciales?
+3. **ENTIDADES FALTANTES**: ¿Se necesitan nuevas entidades para completar el modelo conceptual?
+4. **INTEGRIDAD REFERENCIAL**: ¿Las relaciones mantienen consistencia de datos?
+5. **NORMALIZACIÓN**: ¿El diseño evita redundancia y mantiene integridad?
+
+PATRONES COMUNES A VERIFICAR:
+- Relaciones Uno-a-Muchos (1:N) con claves foráneas
+- Relaciones Muchos-a-Muchos (N:M) que requieren tabla intermedia
+- Entidades débiles que dependen de otras entidades
+- Jerarquías y herencia (IS-A relationships)
+- Atributos de identificación únicos (PK)
 
 REGLAS IMPORTANTES:
-- NO crear clases que ya existen
-- NO agregar atributos que ya están en las clases
-- NO agregar métodos que ya existen
-- SOLO sugerir mejoras reales y nuevas funcionalidades
-- REVISAR cuidadosamente qué ya existe antes de sugerir
+- NO duplicar entidades, atributos o relaciones existentes
+- PRIORIZAR relaciones y multiplicidades sobre métodos
+- ENFOCAR en estructura de datos, no en comportamiento
+- VERIFICAR integridad referencial en todas las sugerencias
+- CONSIDERAR el modelo como esquema de base de datos
 
-RESPONDE EN ESTE FORMATO EXACTO:
-ANÁLISIS: [tu análisis corto sobre la calidad del diagrama]
+🎭 RESPONDE EN ESTE FORMATO ESTRUCTURADO EXACTO:
+
+ANÁLISIS: [Evaluación breve del modelo conceptual]
+
+ERRORES:
+ERROR: [Descripción del error crítico en el modelo].
+ERROR: [Otro error importante si existe].
+
+ADVERTENCIAS:
+ADVERTENCIA: [Problema que necesita atención].
+ADVERTENCIA: [Otra advertencia importante].
+
+SUGERENCIAS:
+SUGERENCIA: [Mejora recomendada para el modelo].
+SUGERENCIA: [Otra sugerencia de optimización].
 
 COMANDOS:
-- CREAR_CLASE: [nombre] | ATRIBUTOS: [lista] | MÉTODOS: [lista] (SOLO si la clase NO existe)
-- AGREGAR_ATRIBUTO: [clase] | [atributo] (SOLO si el atributo NO existe en esa clase)
-- AGREGAR_MÉTODO: [clase] | [método] (SOLO si el método NO existe en esa clase)
-- CREAR_RELACIÓN: [tipo] | [clase1] -> [clase2] | [multiplicidad] (SOLO si la relación NO existe)
+- CREAR_CLASE: [NombreEntidad] | ATRIBUTOS: [pk_id, atributo1, atributo2] | MÉTODOS: [] (Nueva entidad necesaria)
+- AGREGAR_ATRIBUTO: [Entidad] | [nuevo_atributo] (Atributo esencial faltante, especialmente claves)
+- CREAR_RELACIÓN: [tipo] | [EntidadOrigen] -> [EntidadDestino] | [multiplicidad_origen:multiplicidad_destino] (Relación faltante crítica)
+- AGREGAR_MÉTODO: [Entidad] | [método] (Solo si es esencial para integridad)
 
-Máximo 4 comandos. Si el diagrama está completo, di "COMANDOS: NINGUNO"`;
+TIPOS DE RELACIÓN VÁLIDOS:
+- association (relación simple)
+- aggregation (relación parte-todo débil)
+- composition (relación parte-todo fuerte)
+- inheritance (herencia IS-A)
+
+FORMATO DE MULTIPLICIDAD:
+- 1:1 (uno a uno)
+- 1:N (uno a muchos)
+- N:M (muchos a muchos)
+- 0..1 (cero o uno)
+- 1..* (uno o más)
+
+EJEMPLOS DE RESPUESTA ESTRUCTURADA:
+
+ANÁLISIS: El modelo conceptual necesita relaciones críticas entre entidades principales.
+
+ERRORES:
+ERROR: La entidad Usuario no tiene clave primaria definida.
+ERROR: Relación N:M entre Estudiante y Curso requiere tabla intermedia.
+
+ADVERTENCIAS:
+ADVERTENCIA: Falta definir multiplicidades en la relación Profesor-Curso.
+ADVERTENCIA: La entidad Departamento no está conectada con Universidad.
+
+SUGERENCIAS:
+SUGERENCIA: Agregar atributo fecha_creacion para auditoría en tablas principales.
+SUGERENCIA: Considerar entidad Categoria para organizar mejor los cursos.
+
+COMANDOS:
+- CREAR_RELACIÓN: association | Usuario -> Pedido | 1:N
+- AGREGAR_ATRIBUTO: Usuario | email_verificado
+- CREAR_CLASE: Categoria | ATRIBUTOS: [categoria_id, nombre, descripcion] | MÉTODOS: []
+
+NOTAS IMPORTANTES:
+- Si NO hay errores, omite la sección "ERRORES:"
+- Si NO hay advertencias, omite la sección "ADVERTENCIAS:"
+- Si NO hay sugerencias, omite la sección "SUGERENCIAS:"
+- Si el modelo está completo, responde "COMANDOS: NINGUNO"
+- Máximo 1 elemento por cada sección (ERRORES, ADVERTENCIAS, SUGERENCIAS)
+- Máximo 5 comandos priorizando RELACIONES y NUEVAS ENTIDADES`;
 }
 
 formatDiagramForAI(diagramData) {

@@ -55,31 +55,44 @@ export class AIResponseParser {
 
     // ==================== EXTRACCIÓN DE BURBUJAS ====================
 
-    extractBubbles(text) {
-        const bubbles = [];
-        const analysis = this.extractAnalysis(text);
+extractBubbles(text) {
+    const bubbles = [];
+    const analysis = this.extractAnalysis(text);
 
-        // Burbuja principal con el análisis
-        if (analysis && analysis !== 'Análisis completado') {
-            bubbles.push({
-                type: 'info',
-                message: analysis,
-                targetClass: null
-            });
-        }
+    // Burbuja principal con análisis
+    if (analysis && analysis !== 'Análisis completado') {
+        bubbles.push({
+            type: 'info',
+            message: analysis,
+            targetClass: null
+        });
+    }
 
-        // Buscar problemas específicos mencionados
-        const problems = this.extractProblems(text);
-        problems.forEach(problem => {
+    // ✅ NUEVO: Mensajes estructurados
+    if (text.includes('ERROR:')) {
+        const errors = this.extractStructuredMessages(text, 'ERROR');
+        errors.forEach(error => {
             bubbles.push({
-                type: 'warning',
-                message: problem.message,
-                targetClass: problem.targetClass
+                type: 'error',
+                message: error.message,
+                targetClass: error.targetClass
             });
         });
+    }
 
-        // Buscar sugerencias específicas
-        const suggestions = this.extractSuggestions(text);
+    if (text.includes('ADVERTENCIA:')) {
+        const warnings = this.extractStructuredMessages(text, 'ADVERTENCIA');
+        warnings.forEach(warning => {
+            bubbles.push({
+                type: 'warning',
+                message: warning.message,
+                targetClass: warning.targetClass
+            });
+        });
+    }
+
+    if (text.includes('SUGERENCIA:')) {
+        const suggestions = this.extractStructuredMessages(text, 'SUGERENCIA');
         suggestions.forEach(suggestion => {
             bubbles.push({
                 type: 'suggestion',
@@ -87,51 +100,65 @@ export class AIResponseParser {
                 targetClass: suggestion.targetClass
             });
         });
-
-        return bubbles;
+    } else {
+        // ✅ FALLBACK: Usar método anterior si no hay formato estructurado
+        const oldSuggestions = this.extractSuggestions ? this.extractSuggestions(text) : [];
+        oldSuggestions.forEach(suggestion => {
+            bubbles.push({
+                type: 'suggestion',
+                message: suggestion.message,
+                targetClass: suggestion.targetClass
+            });
+        });
     }
 
-    extractProblems(text) {
-        const problems = [];
-        const problemIndicators = [
-            /falta(?:n)?\s+(.+?)(?:\s+en\s+(\w+))?/gi,
-            /no\s+tiene(?:n)?\s+(.+?)(?:\s+(\w+))?/gi,
-            /debería(?:n)?\s+tener\s+(.+?)(?:\s+(\w+))?/gi
-        ];
+    return bubbles;
+}
 
-        problemIndicators.forEach(pattern => {
-            let match;
-            while ((match = pattern.exec(text)) !== null) {
-                problems.push({
-                    message: `Falta: ${match[1].trim()}`,
-                    targetClass: match[2] || null
+extractProblems(text) {
+    // ✅ USAR el nuevo método estructurado para advertencias
+    return this.extractStructuredMessages(text, 'ADVERTENCIA');
+}
+
+extractSuggestions(text) {
+    // ✅ USAR el nuevo método estructurado para sugerencias
+    return this.extractStructuredMessages(text, 'SUGERENCIA');
+}
+extractErrors(text) {
+    // ✅ USAR el nuevo método estructurado para errores
+    return this.extractStructuredMessages(text, 'ERROR');
+}
+    extractStructuredMessages(text, messageType) {
+    const messages = [];
+    const lines = text.split('\n');
+
+    lines.forEach(line => {
+        const trimmedLine = line.trim();
+
+        // Buscar líneas que empiecen con el tipo específico
+        if (trimmedLine.startsWith(`${messageType}:`)) {
+            // Extraer el mensaje después del prefijo
+            let message = trimmedLine.substring(`${messageType}:`.length).trim();
+
+            // Quitar punto final si existe
+            message = message.replace(/\.$/, '');
+
+            // Extraer posible nombre de clase mencionado
+            const classMatch = message.match(/\b([A-Z][a-zA-Z]*)\b/);
+            const targetClass = classMatch ? classMatch[1] : null;
+
+            if (message.length > 3) {  // Verificar que no esté vacío
+                messages.push({
+                    message: message,
+                    targetClass: targetClass
                 });
             }
-        });
+        }
+    });
 
-        return problems;
-    }
-
-    extractSuggestions(text) {
-        const suggestions = [];
-        const suggestionIndicators = [
-            /recomiendo\s+(.+?)(?:\s+para\s+(\w+))?/gi,
-            /sugiero\s+(.+?)(?:\s+en\s+(\w+))?/gi,
-            /considera\s+(.+?)(?:\s+para\s+(\w+))?/gi
-        ];
-
-        suggestionIndicators.forEach(pattern => {
-            let match;
-            while ((match = pattern.exec(text)) !== null) {
-                suggestions.push({
-                    message: `💡 ${match[1].trim()}`,
-                    targetClass: match[2] || null
-                });
-            }
-        });
-
-        return suggestions;
-    }
+    console.log(`📝 Encontrados ${messages.length} mensajes de tipo "${messageType}"`);
+    return messages;
+}
 
     // ==================== EXTRACCIÓN DE CAMBIOS ====================
 
