@@ -47,52 +47,154 @@ export class AIBubbleRenderer {
         });
     }
 
-    createBubble(bubbleData) {
-        const bubbleId = `bubble-${++this.bubbleCounter}`;
-        const position = this.calculateBubblePosition(bubbleData);
+createBubble(bubbleData) {
+    const bubbleId = `bubble-${++this.bubbleCounter}`;
+    const position = this.calculateBubblePosition(bubbleData);
 
-        const bubbleElement = document.createElement('div');
-        bubbleElement.id = bubbleId;
-        bubbleElement.className = `ai-bubble ai-bubble-${bubbleData.type}`;
-        bubbleElement.innerHTML = `
-            <div class="ai-bubble-content">
-                <div class="ai-bubble-icon">${this.getBubbleIcon(bubbleData.type)}</div>
-                <div class="ai-bubble-text">${bubbleData.message}</div>
+    // ✅ NUEVO: Detectar si el texto es largo
+    const isLongText = bubbleData.message.length > 80;
+    const truncatedMessage = isLongText ?
+        bubbleData.message.substring(0, 80) + '...' :
+        bubbleData.message;
+
+    const bubbleElement = document.createElement('div');
+    bubbleElement.id = bubbleId;
+    bubbleElement.className = `ai-bubble ai-bubble-${bubbleData.type} ai-bubble-draggable`;
+    bubbleElement.innerHTML = `
+        <div class="ai-bubble-header" data-bubble-id="${bubbleId}">
+            <div class="ai-bubble-drag-handle">⋮⋮</div>
+            <button class="ai-bubble-close" onclick="this.closest('.ai-bubble').remove(); window.aiCurrentInstance.removeBubbleReference('${bubbleId}')">×</button>
+        </div>
+        <div class="ai-bubble-content">
+            <div class="ai-bubble-icon">${this.getBubbleIcon(bubbleData.type)}</div>
+            <div class="ai-bubble-text-container">
+                <div class="ai-bubble-text" id="text-${bubbleId}">
+                    <span class="ai-bubble-text-content">${truncatedMessage}</span>
+                    ${isLongText ? `
+                        <button class="ai-bubble-expand-btn" onclick="window.aiCurrentInstance.toggleBubbleText('${bubbleId}', \`${bubbleData.message.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                            ver más
+                        </button>
+                    ` : ''}
+                </div>
             </div>
-            <div class="ai-bubble-arrow"></div>
-            <button class="ai-bubble-close" onclick="this.parentElement.remove()">×</button>
-        `;
+        </div>
+        <div class="ai-bubble-arrow"></div>
+    `;
 
-        // Posicionar burbuja
-        bubbleElement.style.cssText += `
-            position: absolute;
-            left: ${position.x}px;
-            top: ${position.y}px;
-            opacity: 0;
-            transform: translateY(10px) scale(0.95);
-            transition: all 0.3s ease;
-            pointer-events: auto;
-        `;
+    // Posicionar burbuja
+    bubbleElement.style.cssText += `
+        position: absolute;
+        left: ${position.x}px;
+        top: ${position.y}px;
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+        transition: all 0.3s ease;
+        pointer-events: auto;
+        cursor: move;
+        z-index: 201;
+    `;
 
-        this.bubbleContainer.appendChild(bubbleElement);
+    this.bubbleContainer.appendChild(bubbleElement);
 
-        // Animar entrada
-        setTimeout(() => {
-            bubbleElement.style.opacity = '1';
-            bubbleElement.style.transform = 'translateY(0) scale(1)';
-        }, 10);
+    // ✅ NUEVO: Hacer la burbuja arrastrable
+    this.makeBubbleDraggable(bubbleElement, bubbleId);
 
-        // Guardar referencia
-        this.activeBubbles.set(bubbleId, {
-            element: bubbleElement,
-            data: bubbleData,
-            timestamp: Date.now()
-        });
+    // Animar entrada
+    setTimeout(() => {
+        bubbleElement.style.opacity = '1';
+        bubbleElement.style.transform = 'translateY(0) scale(1)';
+    }, 10);
 
-        window.aiCurrentInstance = this;
+    // Guardar referencia con datos completos
+    this.activeBubbles.set(bubbleId, {
+        element: bubbleElement,
+        data: bubbleData,
+        timestamp: Date.now(),
+        isExpanded: false,
+        originalMessage: bubbleData.message,
+        truncatedMessage: truncatedMessage
+    });
 
-        console.log(`💬 Burbuja "${bubbleData.type}" creada en posición:`, position);
+    // Hacer disponible globalmente
+    window.aiCurrentInstance = this;
+
+    console.log(`💬 Burbuja "${bubbleData.type}" creada en posición:`, position);
+}
+
+makeBubbleDraggable(bubbleElement, bubbleId) {
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    const header = bubbleElement.querySelector('.ai-bubble-header');
+
+    header.addEventListener('mousedown', (e) => {
+        // Solo permitir drag desde el handle
+        if (!e.target.classList.contains('ai-bubble-drag-handle') &&
+            !e.target.classList.contains('ai-bubble-header')) {
+            return;
+        }
+
+        isDragging = true;
+        const rect = bubbleElement.getBoundingClientRect();
+        const containerRect = this.bubbleContainer.getBoundingClientRect();
+
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+
+        bubbleElement.style.cursor = 'grabbing';
+        bubbleElement.style.zIndex = '210'; // Traer al frente
+
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+
+        const containerRect = this.bubbleContainer.getBoundingClientRect();
+        let newX = e.clientX - containerRect.left - dragOffset.x;
+        let newY = e.clientY - containerRect.top - dragOffset.y;
+
+        // Limitar dentro del container
+        const bubbleRect = bubbleElement.getBoundingClientRect();
+        newX = Math.max(0, Math.min(newX, containerRect.width - bubbleRect.width));
+        newY = Math.max(0, Math.min(newY, containerRect.height - bubbleRect.height));
+
+        bubbleElement.style.left = newX + 'px';
+        bubbleElement.style.top = newY + 'px';
+        bubbleElement.style.transition = 'none'; // Disable transition while dragging
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            bubbleElement.style.cursor = 'move';
+            bubbleElement.style.zIndex = '201';
+            bubbleElement.style.transition = 'all 0.3s ease'; // Re-enable transition
+        }
+    });
+}
+
+toggleBubbleText(bubbleId, fullMessage) {
+    const bubble = this.activeBubbles.get(bubbleId);
+    if (!bubble) return;
+
+    const textElement = document.querySelector(`#text-${bubbleId} .ai-bubble-text-content`);
+    const expandBtn = document.querySelector(`#text-${bubbleId} .ai-bubble-expand-btn`);
+
+    if (!textElement || !expandBtn) return;
+
+    bubble.isExpanded = !bubble.isExpanded;
+
+    if (bubble.isExpanded) {
+        textElement.textContent = fullMessage;
+        expandBtn.textContent = 'ver menos';
+        bubble.element.classList.add('ai-bubble-expanded');
+    } else {
+        textElement.textContent = bubble.truncatedMessage;
+        expandBtn.textContent = 'ver más';
+        bubble.element.classList.remove('ai-bubble-expanded');
     }
+}
 
     removeBubbleReference(bubbleId) {
     this.activeBubbles.delete(bubbleId);
@@ -281,28 +383,56 @@ static addBubbleStyles() {
     const styles = document.createElement('style');
     styles.id = 'ai-bubble-styles';
     styles.textContent = `
-        /* Contenedor base de burbujas */
-        .ai-bubble-container {
-            font-family: system-ui, -apple-system, sans-serif;
-        }
-
-        /* Estilos base de burbuja - MEJORADOS */
-        .ai-bubble {
-            max-width: 250px;
-            min-width: 200px;
+        /* Estilos base de burbuja - MEJORADOS PARA DRAG & DROP */
+        .ai-bubble-draggable {
+            max-width: 280px;
+            min-width: 220px;
             background: white;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             border: 1px solid #e5e7eb;
             position: relative;
             z-index: 201;
-            animation: aiBubbleFloat 4s ease-in-out infinite;
-            /* ✅ AGREGAR: Evitar que se desvanezcan */
-            opacity: 1 !important;
+            cursor: move;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+
+        .ai-bubble-draggable:hover {
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+            transform: translateY(-1px);
+        }
+
+        /* ✅ NUEVO: Header con drag handle */
+        .ai-bubble-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px 4px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: grab;
+        }
+
+        .ai-bubble-header:active {
+            cursor: grabbing;
+        }
+
+        .ai-bubble-drag-handle {
+            color: #9ca3af;
+            font-size: 12px;
+            cursor: grab;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .ai-bubble-drag-handle:hover {
+            background: #f3f4f6;
+            color: #6b7280;
         }
 
         .ai-bubble-content {
-            padding: 14px 18px;
+            padding: 12px 16px 16px 16px;
             display: flex;
             align-items: flex-start;
             gap: 12px;
@@ -314,21 +444,44 @@ static addBubbleStyles() {
             margin-top: 2px;
         }
 
+        .ai-bubble-text-container {
+            flex: 1;
+        }
+
         .ai-bubble-text {
             font-size: 13px;
             line-height: 1.5;
             color: #374151;
-            flex: 1;
-            /* ✅ MEJORAR: Permitir texto más largo */
             word-wrap: break-word;
-            max-height: none;
-            overflow: visible;
+        }
+
+        /* ✅ NUEVO: Botón expandir */
+        .ai-bubble-expand-btn {
+            background: none;
+            border: none;
+            color: #6366f1;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+            text-decoration: underline;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .ai-bubble-expand-btn:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: #4f46e5;
+        }
+
+        /* ✅ NUEVO: Estado expandido */
+        .ai-bubble-expanded {
+            max-width: 350px;
+            min-width: 300px;
         }
 
         .ai-bubble-close {
-            position: absolute;
-            top: 10px;
-            right: 10px;
             background: rgba(0, 0, 0, 0.1);
             border: none;
             color: #6b7280;
@@ -341,31 +494,16 @@ static addBubbleStyles() {
             justify-content: center;
             border-radius: 50%;
             transition: all 0.2s;
-            opacity: 0.8;
             font-weight: bold;
         }
 
         .ai-bubble-close:hover {
             background: rgba(239, 68, 68, 0.1);
             color: #ef4444;
-            opacity: 1;
             transform: scale(1.1);
         }
 
-        /* Flecha de la burbuja */
-        .ai-bubble-arrow {
-            position: absolute;
-            left: 20px;
-            bottom: -8px;
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 8px solid white;
-            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.1));
-        }
-
-        /* Tipos de burbujas - COLORES MEJORADOS */
+        /* Tipos de burbujas con gradientes sutiles */
         .ai-bubble-info {
             border-left: 4px solid #3b82f6;
             background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);
@@ -381,12 +519,6 @@ static addBubbleStyles() {
             background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
         }
 
-        .ai-bubble-error {
-            border-left: 4px solid #dc2626;
-            background: linear-gradient(135deg, #fff 0%, #fef2f2 100%);
-            border-color: #fecaca;
-        }
-
         .ai-bubble-success {
             border-left: 4px solid #10b981;
             background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
@@ -397,42 +529,17 @@ static addBubbleStyles() {
             background: linear-gradient(135deg, #fff 0%, #faf5ff 100%);
         }
 
-        /* Animaciones de burbujas - MÁS SUTILES */
-        @keyframes aiBubbleFloat {
-            0%, 100% {
-                transform: translateY(0px);
-            }
-            50% {
-                transform: translateY(-1px);
-            }
-        }
-
-        /* Efectos hover en burbujas */
-        .ai-bubble:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-        }
-
-        /* ✅ NUEVO: Indicador de burbuja persistente */
-        .ai-bubble::before {
-            content: "📌";
+        /* Flecha */
+        .ai-bubble-arrow {
             position: absolute;
-            top: -5px;
-            left: -5px;
-            font-size: 12px;
-            opacity: 0.6;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .ai-bubble {
-                max-width: 220px;
-                min-width: 180px;
-            }
-
-            .ai-bubble-text {
-                font-size: 12px;
-            }
+            left: 20px;
+            bottom: -8px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid white;
+            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.1));
         }
     `;
 

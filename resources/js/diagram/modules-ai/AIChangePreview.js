@@ -210,57 +210,117 @@ export class AIChangePreview {
 
     // ==================== OVERLAYS DE CONTROL ====================
 
-    createChangeOverlay(change, index, previewId) {
-        const overlay = document.createElement('div');
-        overlay.className = 'ai-change-overlay';
-        overlay.innerHTML = `
-            <div class="ai-change-header">
+createChangeOverlay(change, index, previewId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'ai-change-overlay ai-change-draggable';
+    overlay.innerHTML = `
+        <div class="ai-change-header-drag" data-overlay-id="${previewId}">
+            <div class="ai-change-drag-handle">⋮⋮</div>
+            <div class="ai-change-title-container">
                 <span class="ai-change-icon">${this.getChangeIcon(change.type)}</span>
                 <span class="ai-change-title">${change.description}</span>
             </div>
-            <div class="ai-change-controls">
-                <button class="ai-change-btn ai-change-accept" data-preview-id="${previewId}">
-                    ✓ Aplicar
-                </button>
-                <button class="ai-change-btn ai-change-reject" data-preview-id="${previewId}">
-                    ✗ Descartar
-                </button>
-            </div>
-        `;
+        </div>
+        <div class="ai-change-controls">
+            <button class="ai-change-btn ai-change-accept" data-preview-id="${previewId}">
+                ✓ Aplicar
+            </button>
+            <button class="ai-change-btn ai-change-reject" data-preview-id="${previewId}">
+                ✗ Descartar
+            </button>
+        </div>
+    `;
 
-        // Posicionar overlay
-        const position = this.calculateOverlayPosition(change, index);
-        overlay.style.cssText = `
-            position: absolute;
-            left: ${position.x}px;
-            top: ${position.y}px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            border: 1px solid #e5e7eb;
-            padding: 12px;
-            z-index: 151;
-            pointer-events: auto;
-            min-width: 200px;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: all 0.3s ease;
-        `;
+    // Posicionar overlay
+    const position = this.calculateOverlayPosition(change, index);
+    overlay.style.cssText = `
+        position: absolute;
+        left: ${position.x}px;
+        top: ${position.y}px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        border: 1px solid #e5e7eb;
+        padding: 12px;
+        z-index: 151;
+        pointer-events: auto;
+        min-width: 200px;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: all 0.3s ease;
+        cursor: move;
+    `;
 
-        this.previewContainer.appendChild(overlay);
+    this.previewContainer.appendChild(overlay);
 
-        // Animar entrada
-        setTimeout(() => {
-            overlay.style.opacity = '1';
-            overlay.style.transform = 'translateY(0)';
-        }, 50);
+    // ✅ NUEVO: Hacer overlay arrastrable
+    this.makeOverlayDraggable(overlay, previewId);
 
-        // Configurar eventos
-        this.setupOverlayEvents(overlay, previewId);
+    // Animar entrada
+    setTimeout(() => {
+        overlay.style.opacity = '1';
+        overlay.style.transform = 'translateY(0)';
+    }, 50);
 
-        // Guardar referencia
-        this.previewOverlays.set(previewId, overlay);
-    }
+    // Configurar eventos
+    this.setupOverlayEvents(overlay, previewId);
+
+    // Guardar referencia
+    this.previewOverlays.set(previewId, overlay);
+}
+
+makeOverlayDraggable(overlay, previewId) {
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    const header = overlay.querySelector('.ai-change-header-drag');
+
+    header.addEventListener('mousedown', (e) => {
+        // Solo permitir drag desde el handle o header
+        if (!e.target.classList.contains('ai-change-drag-handle') &&
+            !e.target.classList.contains('ai-change-header-drag')) {
+            return;
+        }
+
+        isDragging = true;
+        const rect = overlay.getBoundingClientRect();
+        const containerRect = this.previewContainer.getBoundingClientRect();
+
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+
+        overlay.style.cursor = 'grabbing';
+        overlay.style.zIndex = '160'; // Traer al frente
+
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+
+        const containerRect = this.previewContainer.getBoundingClientRect();
+        let newX = e.clientX - containerRect.left - dragOffset.x;
+        let newY = e.clientY - containerRect.top - dragOffset.y;
+
+        // Limitar dentro del container
+        const overlayRect = overlay.getBoundingClientRect();
+        newX = Math.max(0, Math.min(newX, containerRect.width - overlayRect.width));
+        newY = Math.max(0, Math.min(newY, containerRect.height - overlayRect.height));
+
+        overlay.style.left = newX + 'px';
+        overlay.style.top = newY + 'px';
+        overlay.style.transition = 'none';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            overlay.style.cursor = 'move';
+            overlay.style.zIndex = '151';
+            overlay.style.transition = 'all 0.3s ease';
+        }
+    });
+}
 
     setupOverlayEvents(overlay, previewId) {
         const acceptBtn = overlay.querySelector('.ai-change-accept');
@@ -595,6 +655,8 @@ export class AIChangePreview {
 }
 
 // Agregar estilos CSS
+// REEMPLAZAR COMPLETAMENTE el método addPreviewStyles en AIChangePreview.js:
+
 AIChangePreview.addPreviewStyles = function() {
     if (document.getElementById('ai-preview-styles')) return;
 
@@ -603,8 +665,54 @@ AIChangePreview.addPreviewStyles = function() {
     styles.textContent = `
         .ai-change-overlay {
             font-family: system-ui, -apple-system, sans-serif;
+            cursor: move;
+            user-select: none;
         }
 
+        .ai-change-overlay:hover {
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ✅ NUEVO: Header arrastrable */
+        .ai-change-header-drag {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+
+        .ai-change-header-drag:hover {
+            background: #f9fafb;
+        }
+
+        .ai-change-header-drag:active {
+            cursor: grabbing;
+        }
+
+        .ai-change-drag-handle {
+            color: #9ca3af;
+            font-size: 12px;
+            cursor: grab;
+        }
+
+        .ai-change-title-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .ai-change-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        /* Estilos originales mantenidos */
         .ai-change-header {
             display: flex;
             align-items: center;
@@ -638,6 +746,7 @@ AIChangePreview.addPreviewStyles = function() {
 
         .ai-change-accept:hover {
             background: #059669;
+            transform: translateY(-1px);
         }
 
         .ai-change-reject {
@@ -647,14 +756,21 @@ AIChangePreview.addPreviewStyles = function() {
 
         .ai-change-reject:hover {
             background: #dc2626;
+            transform: translateY(-1px);
         }
 
+        /* Controles globales */
         .ai-preview-global-controls {
             font-family: system-ui, -apple-system, sans-serif;
             display: flex;
             flex-direction: column;
             gap: 8px;
             min-width: 180px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            border: 1px solid #e5e7eb;
+            padding: 16px;
         }
 
         .ai-preview-summary {
@@ -687,6 +803,7 @@ AIChangePreview.addPreviewStyles = function() {
 
         .ai-preview-accept-all:hover {
             background: #059669;
+            transform: translateY(-1px);
         }
 
         .ai-preview-reject-all {
@@ -696,6 +813,7 @@ AIChangePreview.addPreviewStyles = function() {
 
         .ai-preview-reject-all:hover {
             background: #dc2626;
+            transform: translateY(-1px);
         }
     `;
 

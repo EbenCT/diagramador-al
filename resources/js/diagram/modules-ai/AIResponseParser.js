@@ -337,24 +337,57 @@ export class AIResponseParser {
         });
     }
 
-    calculateNewClassPosition() {
-        const elements = this.editor.graph.getElements();
+calculateNewClassPosition() {
+    const elements = this.editor.graph.getElements();
 
-        if (elements.length === 0) {
-            return { x: 100, y: 100 };
-        }
-
-        // Encontrar posición libre al lado derecho
-        const rightmostElement = elements.reduce((max, element) => {
-            const pos = element.position();
-            return pos.x > max.x ? pos : max;
-        }, { x: 0, y: 0 });
-
-        return {
-            x: rightmostElement.x + 200,
-            y: rightmostElement.y
-        };
+    if (elements.length === 0) {
+        return { x: 150, y: 150 };
     }
+
+    const positions = elements.map(element => element.position());
+
+    // Calcular centro de gravedad de las clases existentes
+    const centerX = positions.reduce((sum, pos) => sum + pos.x, 0) / positions.length;
+    const centerY = positions.reduce((sum, pos) => sum + pos.y, 0) / positions.length;
+
+    // Encontrar área libre cerca del centro
+    const gridSize = 200; // Distancia entre clases
+    const maxAttempts = 20;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        // Buscar en espiral alrededor del centro
+        const angle = (attempt * 45) % 360; // 45 grados por intento
+        const distance = Math.ceil(attempt / 8) * gridSize; // Aumentar distancia cada 8 intentos
+
+        const testX = centerX + Math.cos(angle * Math.PI / 180) * distance;
+        const testY = centerY + Math.sin(angle * Math.PI / 180) * distance;
+
+        // Verificar si esta posición está libre (no hay clases muy cerca)
+        const isFree = elements.every(element => {
+            const pos = element.position();
+            const distance = Math.sqrt(Math.pow(pos.x - testX, 2) + Math.pow(pos.y - testY, 2));
+            return distance > 150; // Mínimo 150px de separación
+        });
+
+        if (isFree) {
+            return {
+                x: Math.max(50, testX), // No muy cerca del borde
+                y: Math.max(50, testY)
+            };
+        }
+    }
+
+    // Fallback: posición segura a la derecha
+    const rightmostElement = elements.reduce((max, element) => {
+        const pos = element.position();
+        return pos.x > max.x ? pos : max;
+    }, { x: 0, y: 0 });
+
+    return {
+        x: rightmostElement.x + 250,
+        y: rightmostElement.y
+    };
+}
 
     // ==================== UTILIDADES DE TEXTO ====================
 
