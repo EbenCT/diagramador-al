@@ -1,6 +1,5 @@
 // resources/js/diagram/modules-ai/AIBubbleRenderer.js
 // Renderiza burbujas de diálogo flotantes sobre el canvas con respuestas de IA
-// ✅ VERSIÓN MEJORADA - Sistema "ver más" optimizado
 
 export class AIBubbleRenderer {
     constructor(editor) {
@@ -236,7 +235,6 @@ makeBubbleDraggable(bubbleElement, bubbleId) {
     });
 }
 
-// ✅ FUNCIÓN MEJORADA PARA EXPANDIR/CONTRAER
 toggleBubbleText(bubbleId, fullMessage) {
     const bubble = this.activeBubbles.get(bubbleId);
     if (!bubble) return;
@@ -249,7 +247,6 @@ toggleBubbleText(bubbleId, fullMessage) {
 
     bubble.isExpanded = !bubble.isExpanded;
 
-    // ✅ ANIMACIÓN SUAVE DE TRANSICIÓN
     textElement.style.transition = 'all 0.3s ease';
 
     if (bubble.isExpanded) {

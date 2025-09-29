@@ -116,16 +116,16 @@ extractBubbles(text) {
 }
 
 extractProblems(text) {
-    // ✅ USAR el nuevo método estructurado para advertencias
+   
     return this.extractStructuredMessages(text, 'ADVERTENCIA');
 }
 
 extractSuggestions(text) {
-    // ✅ USAR el nuevo método estructurado para sugerencias
+
     return this.extractStructuredMessages(text, 'SUGERENCIA');
 }
 extractErrors(text) {
-    // ✅ USAR el nuevo método estructurado para errores
+
     return this.extractStructuredMessages(text, 'ERROR');
 }
     extractStructuredMessages(text, messageType) {
