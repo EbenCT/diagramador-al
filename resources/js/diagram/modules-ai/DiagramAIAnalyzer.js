@@ -422,7 +422,7 @@ async processAIResponse(response) {
 buildOptimizedPrompt(diagramData, userContext) {
     const diagramText = this.formatDiagramForAI(diagramData);
 
-    return `Eres un experto en DISEÑO CONCEPTUAL DE BASES DE DATOS relacionales. Analiza este diagrama UML como modelo conceptual de BD y sugiere mejoras enfocadas en ESTRUCTURA DE DATOS, RELACIONES y INTEGRIDAD.
+    return `Eres un experto en DISEÑO CONCEPTUAL DE BASES DE DATOS relacionales con UML 2.5. Analiza este diagrama UML como modelo conceptual de BD y sugiere mejoras enfocadas en ESTRUCTURA DE DATOS, RELACIONES y INTEGRIDAD.
 
 DIAGRAMA ACTUAL:
 ${diagramText}
@@ -511,7 +511,11 @@ NOTAS IMPORTANTES:
 - Si NO hay advertencias, omite la sección "ADVERTENCIAS:"
 - Si NO hay sugerencias, omite la sección "SUGERENCIAS:"
 - Si el modelo está completo, responde "COMANDOS: NINGUNO"
-- Máximo 1 elemento por cada sección (ERRORES, ADVERTENCIAS, SUGERENCIAS)
+RESTRICCIÓN CRÍTICA: RESPONDE CON MÁXIMO 4 BURBUJAS TOTAL (mejor si son menos)
+- Solo 1 ERROR (el más crítico)
+- Solo 1 ADVERTENCIA (la más importante)
+- Solo 1 SUGERENCIA (la más valiosa)
+- Solo el ANÁLISIS principal
 - Máximo 5 comandos priorizando RELACIONES y NUEVAS ENTIDADES`;
 }
 
