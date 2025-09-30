@@ -416,14 +416,16 @@ export class SimpleXMIExporter {
 
                 const nameAttr = rel.name ? `name="${this.escapeXML(rel.name)}"` : '';
 
-                // Multiplicidades
-                const sourceMult = rel.sourceMultiplicity ?
-                    `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.sourceMultiplicity)}"/>
-                 <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="${this.getMultiplicityUpper(rel.sourceMultiplicity)}"/>` : '';
-
-                const targetMult = rel.targetMultiplicity ?
+                // CORREGIDO: Multiplicidades intercambiadas
+                // end1 apunta a target, por lo tanto lleva la multiplicidad de target
+                const end1Mult = rel.targetMultiplicity ?
                     `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.targetMultiplicity)}"/>
                  <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="${this.getMultiplicityUpper(rel.targetMultiplicity)}"/>` : '';
+
+                // end2 apunta a source, por lo tanto lleva la multiplicidad de source
+                const end2Mult = rel.sourceMultiplicity ?
+                    `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.sourceMultiplicity)}"/>
+                 <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="${this.getMultiplicityUpper(rel.sourceMultiplicity)}"/>` : '';
 
                 return `
       <packagedElement xmi:type="uml:Association"
@@ -434,12 +436,12 @@ export class SimpleXMIExporter {
         <ownedEnd xmi:id="${relId}_end1"
                  name=""
                  type="class_${rel.targetId}"
-                 aggregation="${sourceAggregation}">${sourceMult}
+                 aggregation="${sourceAggregation}">${end1Mult}
         </ownedEnd>
         <ownedEnd xmi:id="${relId}_end2"
                  name=""
                  type="class_${rel.sourceId}"
-                 aggregation="${targetAggregation}">${targetMult}
+                 aggregation="${targetAggregation}">${end2Mult}
         </ownedEnd>
       </packagedElement>`;
             }).join('');
