@@ -50,13 +50,11 @@ export class SimpleXMIExporter {
         return classes;
     }
 
-    // MÉTODO MEJORADO: Busca datos en TODOS los lugares posibles
     extractRelationships() {
         const relationships = [];
         const links = this.editor.graph.getLinks();
         const elements = this.editor.graph.getElements();
 
-        // Crear mapa de elementos para búsqueda rápida
         const elementMap = new Map();
         elements.forEach(el => {
             const umlData = el.get('umlData');
@@ -70,32 +68,19 @@ export class SimpleXMIExporter {
             const target = link.getTargetElement();
 
             if (source && target) {
-                // BUSCAR DATOS EN TODOS LOS LUGARES POSIBLES
                 const umlData = link.get('umlData') || {};
                 const relationData = link.get('relationData') || {};
                 const linkData = link.get('linkData') || {};
                 const attrs = link.attributes || {};
                 const labels = link.get('labels') || [];
 
-                // Obtener nombres de clases
                 const sourceName = elementMap.get(source.id) || 'Unknown';
                 const targetName = elementMap.get(target.id) || 'Unknown';
 
-                console.log('🔍 Analizando link:', {
-                    id: link.id,
-                    umlData,
-                    relationData,
-                    linkData,
-                    attrs: attrs.type,
-                    labels: labels.length
-                });
-
-                // DETECTAR TIPO DE RELACIÓN DE FORMA INTELIGENTE
                 let relationType = this.detectRelationTypeIntelligent(
                     link, umlData, relationData, linkData, attrs, labels
                 );
 
-                // OBTENER MULTIPLICIDADES DE TODAS LAS FUENTES
                 const sourceMultiplicity = this.extractMultiplicityIntelligent(
                     umlData, relationData, linkData, labels, 0
                 );
@@ -104,7 +89,6 @@ export class SimpleXMIExporter {
                     umlData, relationData, linkData, labels, 1
                 );
 
-                // OBTENER NOMBRE DE LA RELACIÓN
                 const relationName = this.extractRelationNameIntelligent(
                     relationType, sourceName, targetName,
                     umlData, relationData, linkData, labels
@@ -122,39 +106,32 @@ export class SimpleXMIExporter {
                     targetMultiplicity: targetMultiplicity
                 });
 
-                console.log('✅ Relación detectada:', {
+                console.log('✅ Relación:', {
                     type: relationType,
                     from: sourceName,
                     to: targetName,
-                    name: relationName,
-                    multiplicity: `${sourceMultiplicity} → ${targetMultiplicity}`
+                    mult: `${sourceMultiplicity} → ${targetMultiplicity}`
                 });
             }
         });
 
-        console.log('🔗 Total relaciones extraídas:', relationships.length);
+        console.log('🔗 Total relaciones:', relationships.length);
         return relationships;
     }
 
-    // DETECCIÓN INTELIGENTE DE TIPO DE RELACIÓN
     detectRelationTypeIntelligent(link, umlData, relationData, linkData, attrs, labels) {
-        // Prioridad 1: relationData.type o relationData.relationshipType
         if (relationData.type && relationData.type !== 'standard.Link') {
             return this.normalizeRelationType(relationData.type);
         }
         if (relationData.relationshipType) {
             return this.normalizeRelationType(relationData.relationshipType);
         }
-
-        // Prioridad 2: umlData.relationshipType o umlData.type
         if (umlData.relationshipType) {
             return this.normalizeRelationType(umlData.relationshipType);
         }
         if (umlData.type && umlData.type !== 'standard.Link') {
             return this.normalizeRelationType(umlData.type);
         }
-
-        // Prioridad 3: linkData (cualquier propiedad que tenga tipo)
         if (linkData.relationshipType) {
             return this.normalizeRelationType(linkData.relationshipType);
         }
@@ -162,7 +139,6 @@ export class SimpleXMIExporter {
             return this.normalizeRelationType(linkData.type);
         }
 
-        // Prioridad 4: Atributos del link (tipo de JointJS)
         const jointType = attrs.type || link.get('type') || '';
         if (jointType.includes('Inheritance') || jointType.includes('Generalization')) {
             return 'inheritance';
@@ -174,26 +150,19 @@ export class SimpleXMIExporter {
             return 'aggregation';
         }
 
-        // Prioridad 5: Detectar por atributos visuales
         const linkAttrs = attrs.attrs || link.get('attrs') || {};
         const line = linkAttrs.line || linkAttrs['.connection'] || {};
 
-        // Composición: rombo negro
         if (line.sourceMarker?.fill === 'black' || line.targetMarker?.fill === 'black') {
             return 'composition';
         }
-
-        // Agregación: rombo blanco
         if (line.sourceMarker?.fill === 'white' || line.targetMarker?.fill === 'white') {
             return 'aggregation';
         }
-
-        // Herencia: triángulo vacío
         if (line.targetMarker?.type === 'path' && line.targetMarker?.fill === 'white') {
             return 'inheritance';
         }
 
-        // Prioridad 6: Buscar en labels
         const labelText = labels.map(l => {
             const text = l.attrs?.text?.text || '';
             return text.toLowerCase();
@@ -209,68 +178,48 @@ export class SimpleXMIExporter {
             return 'aggregation';
         }
 
-        // Por defecto: asociación
-        console.log('⚠️ No se detectó tipo específico, usando association');
         return 'association';
     }
 
-    // EXTRACCIÓN INTELIGENTE DE MULTIPLICIDAD
     extractMultiplicityIntelligent(umlData, relationData, linkData, labels, labelIndex) {
-        // Prioridad 1: Desde relationData
         if (labelIndex === 0 && relationData.sourceMultiplicity) {
             return this.normalizeMultiplicity(relationData.sourceMultiplicity);
         }
         if (labelIndex === 1 && relationData.targetMultiplicity) {
             return this.normalizeMultiplicity(relationData.targetMultiplicity);
         }
-
-        // Prioridad 2: Desde umlData
         if (labelIndex === 0 && umlData.sourceMultiplicity) {
             return this.normalizeMultiplicity(umlData.sourceMultiplicity);
         }
         if (labelIndex === 1 && umlData.targetMultiplicity) {
             return this.normalizeMultiplicity(umlData.targetMultiplicity);
         }
-
-        // Prioridad 3: Desde linkData
         if (labelIndex === 0 && linkData.sourceMultiplicity) {
             return this.normalizeMultiplicity(linkData.sourceMultiplicity);
         }
         if (labelIndex === 1 && linkData.targetMultiplicity) {
             return this.normalizeMultiplicity(linkData.targetMultiplicity);
         }
-
-        // Prioridad 4: Desde labels visibles
         if (labels && labels[labelIndex]) {
             const labelText = labels[labelIndex].attrs?.text?.text || '';
             if (labelText && this.isValidMultiplicity(labelText)) {
                 return this.normalizeMultiplicity(labelText);
             }
         }
-
-        // Sin multiplicidad
         return '';
     }
 
-    // EXTRACCIÓN INTELIGENTE DE NOMBRE DE RELACIÓN
     extractRelationNameIntelligent(relationType, sourceName, targetName,
                                    umlData, relationData, linkData, labels) {
-        // Herencia no necesita nombre
         if (relationType === 'inheritance') {
             return '';
         }
-
-        // Prioridad 1: Nombre explícito en relationData
         if (relationData.name && relationData.name.trim() !== '') {
             return relationData.name.trim();
         }
-
-        // Prioridad 2: Nombre en umlData
         if (umlData.name && umlData.name.trim() !== '') {
             return umlData.name.trim();
         }
-
-        // Prioridad 3: Nombre en linkData
         if (linkData.name && linkData.name.trim() !== '') {
             return linkData.name.trim();
         }
@@ -278,13 +227,10 @@ export class SimpleXMIExporter {
             return linkData.relationName.trim();
         }
 
-        // Prioridad 4: Buscar en labels (label del medio)
         for (const label of labels) {
             const text = label.attrs?.text?.text || '';
-            // Ignorar si es multiplicidad
             if (text && !this.isValidMultiplicity(text)) {
                 const cleanText = text.trim();
-                // Ignorar palabras genéricas
                 if (cleanText &&
                     !['association', 'aggregation', 'composition', 'inheritance'].includes(cleanText.toLowerCase())) {
                     return cleanText;
@@ -292,7 +238,6 @@ export class SimpleXMIExporter {
             }
         }
 
-        // Generar nombre descriptivo según tipo
         switch (relationType) {
             case 'composition':
                 return `${sourceName}_compone_${targetName}`;
@@ -305,7 +250,6 @@ export class SimpleXMIExporter {
         }
     }
 
-    // NORMALIZACIÓN DE TIPOS
     normalizeRelationType(type) {
         if (!type) return 'association';
 
@@ -315,15 +259,12 @@ export class SimpleXMIExporter {
             'generalization': 'inheritance',
             'herencia': 'inheritance',
             'extends': 'inheritance',
-
             'composition': 'composition',
             'composición': 'composition',
             'composite': 'composition',
-
             'aggregation': 'aggregation',
             'agregación': 'aggregation',
             'shared': 'aggregation',
-
             'association': 'association',
             'asociación': 'association',
             'asociacion': 'association'
@@ -332,7 +273,6 @@ export class SimpleXMIExporter {
         return typeMap[typeStr] || 'association';
     }
 
-    // NORMALIZACIÓN DE MULTIPLICIDAD
     normalizeMultiplicity(mult) {
         if (!mult) return '';
 
@@ -353,7 +293,6 @@ export class SimpleXMIExporter {
         return multiplicityMap[text] || mult.toString().trim();
     }
 
-    // VALIDAR SI ES MULTIPLICIDAD
     isValidMultiplicity(text) {
         if (!text) return false;
         const cleaned = text.toString().trim();
@@ -440,55 +379,95 @@ export class SimpleXMIExporter {
         }).join('');
     }
 
-    // GENERACIÓN DE XML SEGÚN TIPO DE RELACIÓN
+    // CORREGIDO: Generación de relaciones para Enterprise Architect 13.5
     generateRelationshipsXML(relationships) {
         return relationships.map(rel => {
             const relId = `rel_${rel.id}`;
 
             switch (rel.type) {
                 case 'inheritance':
-                    // Herencia: Generalization (SIN nombre)
+                    // HERENCIA: Usar formato específico de EA
                     return `
       <packagedElement xmi:type="uml:Generalization"
                        xmi:id="${relId}"
-                       general="class_${rel.targetId}"
-                       specific="class_${rel.sourceId}"/>`;
+                       specific="class_${rel.sourceId}"
+                       general="class_${rel.targetId}"/>`;
 
-                case 'association':
-                case 'aggregation':
                 case 'composition':
-                    // Determinar aggregation
-                    let aggregationType = 'none';
+                case 'aggregation':
+                case 'association':
+                    // CRÍTICO: Para composición/agregación, el aggregation va en el lado CONTENEDOR (target)
+                    let sourceAggregation = 'none';
+                    let targetAggregation = 'none';
+
                     if (rel.type === 'composition') {
-                        aggregationType = 'composite';
+                        // El rombo va en el SOURCE (el que contiene)
+                        sourceAggregation = 'composite';
                     } else if (rel.type === 'aggregation') {
-                        aggregationType = 'shared';
+                        // El rombo va en el SOURCE (el que agrega)
+                        sourceAggregation = 'shared';
                     }
 
-                    // Solo incluir nombre si existe y no está vacío
                     const nameAttr = rel.name ? `name="${this.escapeXML(rel.name)}"` : '';
+
+                    // CRÍTICO: Formato de multiplicidad para EA
+                    const sourceMult = rel.sourceMultiplicity ?
+                        `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.sourceMultiplicity)}"/>
+                 <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="${this.getMultiplicityUpper(rel.sourceMultiplicity)}"/>` : '';
+
+                    const targetMult = rel.targetMultiplicity ?
+                        `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.targetMultiplicity)}"/>
+                 <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="${this.getMultiplicityUpper(rel.targetMultiplicity)}"/>` : '';
 
                     return `
       <packagedElement xmi:type="uml:Association"
                        xmi:id="${relId}"
                        ${nameAttr}>
-        <memberEnd xmi:idref="${relId}_source"/>
-        <memberEnd xmi:idref="${relId}_target"/>
-        <ownedEnd xmi:id="${relId}_source"
+        <memberEnd xmi:idref="${relId}_end1"/>
+        <memberEnd xmi:idref="${relId}_end2"/>
+        <ownedEnd xmi:id="${relId}_end1"
+                 name=""
                  type="class_${rel.sourceId}"
-                 aggregation="${aggregationType}"
-                 ${rel.sourceMultiplicity ? `multiplicity="${this.escapeXML(rel.sourceMultiplicity)}"` : ''}/>
-        <ownedEnd xmi:id="${relId}_target"
+                 aggregation="${sourceAggregation}">${sourceMult}
+        </ownedEnd>
+        <ownedEnd xmi:id="${relId}_end2"
+                 name=""
                  type="class_${rel.targetId}"
-                 aggregation="none"
-                 ${rel.targetMultiplicity ? `multiplicity="${this.escapeXML(rel.targetMultiplicity)}"` : ''}/>
+                 aggregation="${targetAggregation}">${targetMult}
+        </ownedEnd>
       </packagedElement>`;
 
                 default:
-                    console.warn('⚠️ Tipo de relación desconocido:', rel.type);
                     return `<!-- Unknown relationship type: ${rel.type} -->`;
             }
         }).join('');
+    }
+
+    // NUEVO: Extraer valores lower y upper de multiplicidad para EA
+    getMultiplicityLower(mult) {
+        if (!mult) return '0';
+        const str = mult.toString().trim();
+
+        if (str === '*' || str === '0..*') return '0';
+        if (str === '1' || str === '1..*') return '1';
+        if (str === '0..1') return '0';
+
+        // Extraer número antes de ..
+        const match = str.match(/^(\d+)/);
+        return match ? match[1] : '0';
+    }
+
+    getMultiplicityUpper(mult) {
+        if (!mult) return '*';
+        const str = mult.toString().trim();
+
+        if (str === '*' || str === '0..*' || str === '1..*') return '*';
+        if (str === '1') return '1';
+        if (str === '0..1') return '1';
+
+        // Extraer número después de ..
+        const match = str.match(/\.\.(\d+|\*)/);
+        return match ? match[1] : str;
     }
 
     generateLayoutXML(classes) {
@@ -553,7 +532,6 @@ export class SimpleXMIExporter {
         console.log('📥 Descarga XMI iniciada:', filename);
     }
 
-    // Método estático para uso rápido
     static quickExportXMI(editor) {
         const exporter = new SimpleXMIExporter(editor);
         exporter.exportToXMI();
