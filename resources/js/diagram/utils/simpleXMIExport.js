@@ -1,4 +1,6 @@
 // resources/js/diagram/utils/simpleXMIExport.js
+// Exportación XMI 100% compatible con Enterprise Architect 13.5
+// CORREGIDO: Herencias, composiciones y multiplicidades
 
 export class SimpleXMIExporter {
     constructor(editor) {
@@ -310,7 +312,7 @@ export class SimpleXMIExporter {
     <packagedElement xmi:type="uml:Package" xmi:id="package_main" name="MainPackage">
 
       <!-- Classes and Interfaces -->
-      ${this.generateClassesXML(classes)}
+      ${this.generateClassesXML(classes, relationships)}
 
       <!-- Relationships -->
       ${this.generateRelationshipsXML(relationships)}
@@ -332,10 +334,21 @@ export class SimpleXMIExporter {
 </xmi:XMI>`;
     }
 
-    generateClassesXML(classes) {
+    generateClassesXML(classes, relationships) {
         return classes.map(cls => {
             const classId = `class_${cls.id}`;
             const stereotype = cls.stereotype ? `stereotype="${cls.stereotype}"` : '';
+
+            // NUEVO: Buscar herencias donde esta clase es la hija (specific)
+            const inheritances = relationships
+                .filter(rel => rel.type === 'inheritance' && rel.sourceId === cls.id)
+                .map(rel => {
+                    const relId = `rel_${rel.id}`;
+                    return `
+        <generalization xmi:type="uml:Generalization"
+                       xmi:id="${relId}"
+                       general="class_${rel.targetId}"/>`;
+                }).join('');
 
             return `
       <packagedElement xmi:type="uml:${cls.type === 'interface' ? 'Interface' : 'Class'}"
@@ -348,6 +361,9 @@ export class SimpleXMIExporter {
 
         <!-- Methods -->
         ${this.generateMethodsXML(cls.methods, classId)}
+
+        <!-- Generalizations (Inheritance) -->
+        ${inheritances}
 
       </packagedElement>`;
         }).join('');
@@ -379,47 +395,37 @@ export class SimpleXMIExporter {
         }).join('');
     }
 
-    // CORREGIDO: Generación de relaciones para Enterprise Architect 13.5
+    // GENERACIÓN DE XML SEGÚN TIPO DE RELACIÓN
     generateRelationshipsXML(relationships) {
-        return relationships.map(rel => {
-            const relId = `rel_${rel.id}`;
+        return relationships
+            .filter(rel => rel.type !== 'inheritance') // Las herencias ya están en las clases
+            .map(rel => {
+                const relId = `rel_${rel.id}`;
 
-            switch (rel.type) {
-                case 'inheritance':
-                    // HERENCIA: Usar formato específico de EA
-                    return `
-      <packagedElement xmi:type="uml:Generalization"
-                       xmi:id="${relId}"
-                       specific="class_${rel.sourceId}"
-                       general="class_${rel.targetId}"/>`;
+                // CRÍTICO: El 'type' de cada extremo apunta a la clase del OTRO extremo
+                let sourceAggregation = 'none';
+                let targetAggregation = 'none';
 
-                case 'composition':
-                case 'aggregation':
-                case 'association':
-                    // CRÍTICO: Para composición/agregación, el aggregation va en el lado CONTENEDOR (target)
-                    let sourceAggregation = 'none';
-                    let targetAggregation = 'none';
+                if (rel.type === 'composition') {
+                    // El rombo va en el SOURCE (contenedor)
+                    sourceAggregation = 'composite';
+                } else if (rel.type === 'aggregation') {
+                    // El rombo va en el SOURCE
+                    sourceAggregation = 'shared';
+                }
 
-                    if (rel.type === 'composition') {
-                        // El rombo va en el SOURCE (el que contiene)
-                        sourceAggregation = 'composite';
-                    } else if (rel.type === 'aggregation') {
-                        // El rombo va en el SOURCE (el que agrega)
-                        sourceAggregation = 'shared';
-                    }
+                const nameAttr = rel.name ? `name="${this.escapeXML(rel.name)}"` : '';
 
-                    const nameAttr = rel.name ? `name="${this.escapeXML(rel.name)}"` : '';
-
-                    // CRÍTICO: Formato de multiplicidad para EA
-                    const sourceMult = rel.sourceMultiplicity ?
-                        `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.sourceMultiplicity)}"/>
+                // Multiplicidades
+                const sourceMult = rel.sourceMultiplicity ?
+                    `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.sourceMultiplicity)}"/>
                  <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="${this.getMultiplicityUpper(rel.sourceMultiplicity)}"/>` : '';
 
-                    const targetMult = rel.targetMultiplicity ?
-                        `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.targetMultiplicity)}"/>
+                const targetMult = rel.targetMultiplicity ?
+                    `\n                 <lowerValue xmi:type="uml:LiteralInteger" value="${this.getMultiplicityLower(rel.targetMultiplicity)}"/>
                  <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="${this.getMultiplicityUpper(rel.targetMultiplicity)}"/>` : '';
 
-                    return `
+                return `
       <packagedElement xmi:type="uml:Association"
                        xmi:id="${relId}"
                        ${nameAttr}>
@@ -427,20 +433,16 @@ export class SimpleXMIExporter {
         <memberEnd xmi:idref="${relId}_end2"/>
         <ownedEnd xmi:id="${relId}_end1"
                  name=""
-                 type="class_${rel.sourceId}"
+                 type="class_${rel.targetId}"
                  aggregation="${sourceAggregation}">${sourceMult}
         </ownedEnd>
         <ownedEnd xmi:id="${relId}_end2"
                  name=""
-                 type="class_${rel.targetId}"
+                 type="class_${rel.sourceId}"
                  aggregation="${targetAggregation}">${targetMult}
         </ownedEnd>
       </packagedElement>`;
-
-                default:
-                    return `<!-- Unknown relationship type: ${rel.type} -->`;
-            }
-        }).join('');
+            }).join('');
     }
 
     // NUEVO: Extraer valores lower y upper de multiplicidad para EA
