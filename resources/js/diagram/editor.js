@@ -15,6 +15,7 @@ import { SimpleSQLGenerator } from './utils/simpleSQLGenerator.js';
 import { SimpleJavaGenerator } from './utils/simpleJavaGenerator.js';
 import { SimplePostmanGenerator } from './utils/simplePostmanGenerator.js';
 import { DiagramAIAnalyzer } from './modules-ai/DiagramAIAnalyzer.js';
+import { DiagramAIEditor } from './modules-ai/DiagramAIEditor.js';
 // Configurar JointJS correctamente
 joint.config.useCSSSelectors = false;
 
@@ -59,6 +60,7 @@ class UMLDiagramEditor {
     init() {
         this.createPaper();
         this.aiAnalyzer = new DiagramAIAnalyzer(this);
+        this.aiEditor = new DiagramAIEditor(this);
         this.setupEventListeners();
         this.zoomManager.setupZoomButtons();
         this.zoomManager.setupPanNavigation();

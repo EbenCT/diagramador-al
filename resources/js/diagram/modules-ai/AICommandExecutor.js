@@ -630,4 +630,539 @@ export class AICommandExecutor {
 
         return stats;
     }
+
+    // ==================== NUEVOS MÉTODOS PARA EL EDITOR IA ====================
+
+    async executeCommand(command) {
+        console.log(`🔧 Ejecutando comando: ${command.action}`);
+
+        switch (command.action) {
+            case 'CREATE_CLASS':
+                return await this.executeCreateClassCommand(command);
+            case 'DELETE_CLASS':
+                return await this.executeDeleteClass(command);
+            case 'RENAME_CLASS':
+                return await this.executeRenameClass(command);
+            case 'MOVE_CLASS':
+                return await this.executeMoveClass(command);
+            case 'ADD_ATTRIBUTE':
+                return await this.executeAddAttributeCommand(command);
+            case 'EDIT_ATTRIBUTE':
+                return await this.executeEditAttribute(command);
+            case 'DELETE_ATTRIBUTE':
+                return await this.executeDeleteAttribute(command);
+            case 'CREATE_RELATION':
+                return await this.executeCreateRelationCommand(command);
+            case 'EDIT_RELATION':
+                return await this.executeEditRelation(command);
+            case 'DELETE_RELATION':
+                return await this.executeDeleteRelation(command);
+            case 'EDIT_MULTIPLICITY':
+                return await this.executeEditMultiplicity(command);
+            case 'SET_RELATION_NAME':
+                return await this.executeSetRelationName(command);
+            default:
+                throw new Error(`Comando no soportado: ${command.action}`);
+        }
+    }
+
+    // ==================== COMANDOS DE CLASES ====================
+
+    async executeCreateClassCommand(command) {
+        try {
+            if (this.findElementByClassName(command.className)) {
+                throw new Error(`Ya existe una clase llamada "${command.className}"`);
+            }
+
+            const position = command.position || { x: 100, y: 100 };
+            const attributes = command.attributes || [];
+            const methods = command.methods || [];
+
+            const element = this.editor.classManager.elementFactory.createClassElement(
+                command.className,
+                attributes,
+                methods,
+                position.x,
+                position.y,
+                'class',
+                this.editor.graph
+            );
+
+            this.animateElementEntry(element);
+            console.log(`✅ Clase "${command.className}" creada`);
+            return { success: true, elementId: element.id };
+
+        } catch (error) {
+            console.error('❌ Error creando clase:', error);
+            throw error;
+        }
+    }
+
+    async executeDeleteClass(command) {
+        try {
+            const element = this.findElementByClassName(command.className);
+            if (!element) {
+                throw new Error(`No se encontró la clase "${command.className}"`);
+            }
+
+            // Eliminar relaciones asociadas
+            const links = this.editor.graph.getLinks();
+            links.forEach(link => {
+                if (link.getSourceElement()?.id === element.id ||
+                    link.getTargetElement()?.id === element.id) {
+                    link.remove();
+                }
+            });
+
+            element.remove();
+            console.log(`✅ Clase "${command.className}" eliminada`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error eliminando clase:', error);
+            throw error;
+        }
+    }
+
+    async executeRenameClass(command) {
+        try {
+            const element = this.findElementByClassName(command.oldName);
+            if (!element) {
+                throw new Error(`No se encontró la clase "${command.oldName}"`);
+            }
+
+            if (this.findElementByClassName(command.newName)) {
+                throw new Error(`Ya existe una clase llamada "${command.newName}"`);
+            }
+
+            const umlData = element.get('umlData') || {};
+            this.editor.classManager.elementFactory.updateClassElement(
+                element,
+                command.newName,
+                umlData.attributes || [],
+                umlData.methods || [],
+                umlData.type || 'class',
+                umlData.uml25
+            );
+
+            this.animateElementUpdate(element);
+            console.log(`✅ Clase renombrada de "${command.oldName}" a "${command.newName}"`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error renombrando clase:', error);
+            throw error;
+        }
+    }
+
+    async executeMoveClass(command) {
+        try {
+            const element = this.findElementByClassName(command.className);
+            if (!element) {
+                throw new Error(`No se encontró la clase "${command.className}"`);
+            }
+
+            element.position(command.position.x, command.position.y);
+            this.animateElementUpdate(element);
+            console.log(`✅ Clase "${command.className}" movida a (${command.position.x}, ${command.position.y})`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error moviendo clase:', error);
+            throw error;
+        }
+    }
+
+    // ==================== COMANDOS DE ATRIBUTOS ====================
+
+    async executeAddAttributeCommand(command) {
+        try {
+            const element = this.findElementByClassName(command.className);
+            if (!element) {
+                throw new Error(`No se encontró la clase "${command.className}"`);
+            }
+
+            const umlData = element.get('umlData') || {};
+            const currentAttributes = umlData.attributes || [];
+
+            // Formatear atributo
+            const attribute = this.formatAttribute(command.attribute);
+
+            // Verificar que no exista
+            if (currentAttributes.some(attr => attr.includes(attribute.name))) {
+                throw new Error(`El atributo "${attribute.name}" ya existe`);
+            }
+
+            const newAttributes = [...currentAttributes, attribute.formatted];
+
+            this.editor.classManager.elementFactory.updateClassElement(
+                element,
+                umlData.className,
+                newAttributes,
+                umlData.methods || [],
+                umlData.type || 'class',
+                umlData.uml25
+            );
+
+            this.animateElementUpdate(element);
+            console.log(`✅ Atributo "${attribute.formatted}" agregado a "${command.className}"`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error agregando atributo:', error);
+            throw error;
+        }
+    }
+
+    async executeEditAttribute(command) {
+        try {
+            const element = this.findElementByClassName(command.className);
+            if (!element) {
+                throw new Error(`No se encontró la clase "${command.className}"`);
+            }
+
+            const umlData = element.get('umlData') || {};
+            const currentAttributes = umlData.attributes || [];
+
+            // Encontrar y reemplazar atributo
+            const attributeIndex = currentAttributes.findIndex(attr =>
+                attr.includes(command.oldAttribute.name)
+            );
+
+            if (attributeIndex === -1) {
+                throw new Error(`No se encontró el atributo "${command.oldAttribute.name}"`);
+            }
+
+            const newAttribute = this.formatAttribute(command.newAttribute);
+            const newAttributes = [...currentAttributes];
+            newAttributes[attributeIndex] = newAttribute.formatted;
+
+            this.editor.classManager.elementFactory.updateClassElement(
+                element,
+                umlData.className,
+                newAttributes,
+                umlData.methods || [],
+                umlData.type || 'class',
+                umlData.uml25
+            );
+
+            this.animateElementUpdate(element);
+            console.log(`✅ Atributo editado en "${command.className}"`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error editando atributo:', error);
+            throw error;
+        }
+    }
+
+    async executeDeleteAttribute(command) {
+        try {
+            const element = this.findElementByClassName(command.className);
+            if (!element) {
+                throw new Error(`No se encontró la clase "${command.className}"`);
+            }
+
+            const umlData = element.get('umlData') || {};
+            const currentAttributes = umlData.attributes || [];
+
+            const newAttributes = currentAttributes.filter(attr =>
+                !attr.includes(command.attributeName)
+            );
+
+            this.editor.classManager.elementFactory.updateClassElement(
+                element,
+                umlData.className,
+                newAttributes,
+                umlData.methods || [],
+                umlData.type || 'class',
+                umlData.uml25
+            );
+
+            this.animateElementUpdate(element);
+            console.log(`✅ Atributo "${command.attributeName}" eliminado de "${command.className}"`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error eliminando atributo:', error);
+            throw error;
+        }
+    }
+
+    // ==================== COMANDOS DE RELACIONES ====================
+
+    async executeCreateRelationCommand(command) {
+        try {
+            const sourceElement = this.findElementByClassName(command.sourceClass);
+            const targetElement = this.findElementByClassName(command.targetClass);
+
+            if (!sourceElement || !targetElement) {
+                throw new Error(`No se encontraron las clases "${command.sourceClass}" o "${command.targetClass}"`);
+            }
+
+            // Crear relación con multiplicidad
+            const relationship = this.createRelationshipWithMultiplicity(
+                sourceElement,
+                targetElement,
+                command.relationType || 'association',
+                command.sourceMultiplicity || '1',
+                command.targetMultiplicity || '1',
+                command.relationName || ''
+            );
+
+            this.animateRelationEntry(relationship);
+            console.log(`✅ Relación creada entre "${command.sourceClass}" y "${command.targetClass}"`);
+            return { success: true, relationId: relationship.id };
+
+        } catch (error) {
+            console.error('❌ Error creando relación:', error);
+            throw error;
+        }
+    }
+
+    async executeEditRelation(command) {
+        try {
+            const relation = this.findRelation(command.sourceClass, command.targetClass);
+            if (!relation) {
+                throw new Error(`No se encontró relación entre "${command.sourceClass}" y "${command.targetClass}"`);
+            }
+
+            const modifications = command.modifications || {};
+
+            // Actualizar multiplicidad
+            if (modifications.sourceMultiplicity) {
+                this.setRelationMultiplicity(relation, 'source', modifications.sourceMultiplicity);
+            }
+            if (modifications.targetMultiplicity) {
+                this.setRelationMultiplicity(relation, 'target', modifications.targetMultiplicity);
+            }
+
+            // Actualizar nombre
+            if (modifications.relationName !== undefined) {
+                this.setRelationNameDirect(relation, modifications.relationName);
+            }
+
+            // Actualizar tipo
+            if (modifications.relationType) {
+                this.configureRelationshipType(relation, modifications.relationType);
+            }
+
+            // Actualizar datos almacenados
+            const linkData = relation.get('linkData') || {};
+            relation.set('linkData', {
+                ...linkData,
+                ...modifications
+            });
+
+            console.log(`✅ Relación editada entre "${command.sourceClass}" y "${command.targetClass}"`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error editando relación:', error);
+            throw error;
+        }
+    }
+
+    async executeDeleteRelation(command) {
+        try {
+            const relation = this.findRelation(command.sourceClass, command.targetClass);
+            if (!relation) {
+                throw new Error(`No se encontró relación entre "${command.sourceClass}" y "${command.targetClass}"`);
+            }
+
+            relation.remove();
+            console.log(`✅ Relación eliminada entre "${command.sourceClass}" y "${command.targetClass}"`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error eliminando relación:', error);
+            throw error;
+        }
+    }
+
+    async executeEditMultiplicity(command) {
+        try {
+            const relation = this.findRelation(command.sourceClass, command.targetClass);
+            if (!relation) {
+                throw new Error(`No se encontró relación entre "${command.sourceClass}" y "${command.targetClass}"`);
+            }
+
+            this.setRelationMultiplicity(relation, 'source', command.sourceMultiplicity);
+            this.setRelationMultiplicity(relation, 'target', command.targetMultiplicity);
+
+            console.log(`✅ Multiplicidad actualizada: ${command.sourceMultiplicity} → ${command.targetMultiplicity}`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error editando multiplicidad:', error);
+            throw error;
+        }
+    }
+
+    async executeSetRelationName(command) {
+        try {
+            const relation = this.findRelation(command.sourceClass, command.targetClass);
+            if (!relation) {
+                throw new Error(`No se encontró relación entre "${command.sourceClass}" y "${command.targetClass}"`);
+            }
+
+            this.setRelationNameDirect(relation, command.relationName);
+            console.log(`✅ Nombre de relación establecido: "${command.relationName}"`);
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Error estableciendo nombre de relación:', error);
+            throw error;
+        }
+    }
+
+    // ==================== MÉTODOS AUXILIARES NUEVOS ====================
+
+    createRelationshipWithMultiplicity(sourceElement, targetElement, type, sourceMultiplicity, targetMultiplicity, relationName) {
+        const link = new joint.shapes.standard.Link({
+            source: { id: sourceElement.id },
+            target: { id: targetElement.id }
+        });
+
+        // Configurar tipo
+        this.configureRelationshipType(link, type);
+
+        // Configurar multiplicidad
+        this.setRelationMultiplicity(link, 'source', sourceMultiplicity);
+        this.setRelationMultiplicity(link, 'target', targetMultiplicity);
+
+        // Configurar nombre si se proporciona
+        if (relationName) {
+            this.setRelationNameDirect(link, relationName);
+        }
+
+        // Agregar al graph
+        this.editor.graph.addCell(link);
+
+        // Almacenar datos
+        link.set('linkData', {
+            type: type,
+            sourceMultiplicity: sourceMultiplicity,
+            targetMultiplicity: targetMultiplicity,
+            name: relationName
+        });
+
+        return link;
+    }
+
+    setRelationMultiplicity(relation, side, multiplicity) {
+        const position = side === 'source' ? 0.2 : 0.8;
+        const labelIndex = side === 'source' ? 0 : 1;
+
+        // Remover label existente si existe
+        const labels = relation.get('labels') || [];
+        const filteredLabels = labels.filter((label, index) => index !== labelIndex);
+
+        // Agregar nueva label
+        if (multiplicity && multiplicity !== '') {
+            filteredLabels.splice(labelIndex, 0, {
+                position: position,
+                attrs: {
+                    text: {
+                        text: multiplicity,
+                        fontSize: 12,
+                        fontFamily: 'Arial',
+                        fill: '#333333'
+                    }
+                }
+            });
+        }
+
+        relation.set('labels', filteredLabels);
+
+        // Actualizar datos almacenados
+        const linkData = relation.get('linkData') || {};
+        linkData[`${side}Multiplicity`] = multiplicity;
+        relation.set('linkData', linkData);
+    }
+
+    setRelationNameDirect(relation, name) {
+        if (name && name !== '') {
+            relation.appendLabel({
+                position: 0.5,
+                attrs: {
+                    text: {
+                        text: name,
+                        fontSize: 12,
+                        fontFamily: 'Arial',
+                        fill: '#1e40af',
+                        fontWeight: 'bold'
+                    }
+                }
+            });
+        }
+
+        // Actualizar datos almacenados
+        const linkData = relation.get('linkData') || {};
+        linkData.name = name;
+        relation.set('linkData', linkData);
+    }
+
+    findRelation(sourceClassName, targetClassName) {
+        const sourceElement = this.findElementByClassName(sourceClassName);
+        const targetElement = this.findElementByClassName(targetClassName);
+
+        if (!sourceElement || !targetElement) return null;
+
+        const links = this.editor.graph.getLinks();
+        return links.find(link => {
+            const source = link.getSourceElement();
+            const target = link.getTargetElement();
+            return (source?.id === sourceElement.id && target?.id === targetElement.id) ||
+                   (source?.id === targetElement.id && target?.id === sourceElement.id);
+        });
+    }
+
+    formatAttribute(attribute) {
+        if (typeof attribute === 'string') {
+            return {
+                name: attribute,
+                formatted: `- ${attribute}: String`
+            };
+        }
+
+        const visibility = this.getVisibilitySymbol(attribute.visibility || 'private');
+        const name = attribute.name || 'newAttribute';
+        const type = attribute.type || 'String';
+
+        return {
+            name: name,
+            formatted: `${visibility} ${name}: ${type}`
+        };
+    }
+
+    getVisibilitySymbol(visibility) {
+        const symbols = {
+            'public': '+',
+            'private': '-',
+            'protected': '#',
+            'package': '~'
+        };
+        return symbols[visibility] || '-';
+    }
+
+    parseMultiplicity(multiplicityString) {
+        if (!multiplicityString) return { min: 1, max: 1 };
+
+        if (multiplicityString === '*' || multiplicityString === '0..*') {
+            return { min: 0, max: '*' };
+        }
+
+        if (multiplicityString === '1..*') {
+            return { min: 1, max: '*' };
+        }
+
+        if (multiplicityString.includes('..')) {
+            const parts = multiplicityString.split('..');
+            return { min: parseInt(parts[0]) || 0, max: parts[1] === '*' ? '*' : parseInt(parts[1]) };
+        }
+
+        const num = parseInt(multiplicityString);
+        return { min: num, max: num };
+    }
 }
