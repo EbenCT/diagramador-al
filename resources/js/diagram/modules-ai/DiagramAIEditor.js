@@ -1,11 +1,14 @@
+// resources/js/diagram/modules-ai/DiagramAIEditor.js
 import { AICommandExecutor } from './AICommandExecutor.js';
-import { AIResponseParser } from './AIResponseParser.js';
+import { EditorAIResponseParser } from './EditorAIResponseParser.js';
+import { EditorAIVisualEnhancer } from './EditorAIVisualEnhancer.js';
 
 export class DiagramAIEditor {
     constructor(diagramEditor) {
         this.diagramEditor = diagramEditor;
         this.commandExecutor = new AICommandExecutor(diagramEditor);
-        this.responseParser = new AIResponseParser();
+        this.responseParser = new EditorAIResponseParser();
+        this.visualEnhancer = new EditorAIVisualEnhancer(diagramEditor);
 
         // Estados del editor
         this.currentState = 'ready';
@@ -18,8 +21,8 @@ export class DiagramAIEditor {
 
         // Configuración de Groq - IGUAL QUE EL ANALIZADOR
         this.groqApiKey = window.AI_CONFIG?.GROQ_API_KEY ||
-                     window.GROQ_API_KEY ||
-                     null;
+                         window.GROQ_API_KEY ||
+                         null;
 
         this.groqModel = 'llama-3.1-8b-instant';
 
@@ -251,7 +254,8 @@ export class DiagramAIEditor {
         };
     }
 
-    // Public Methods
+    // ==================== CONTROL DEL EDITOR ====================
+
     openEditor() {
         this.editorPanel?.classList.add('ai-editor-mini-panel-visible');
         this.currentState = 'ready';
@@ -263,6 +267,7 @@ export class DiagramAIEditor {
         this.resetToForm();
         this.pendingCommands = null;
         this.currentState = 'ready';
+        this.visualEnhancer.clearPreviews();
     }
 
     resetToForm() {
@@ -288,16 +293,6 @@ export class DiagramAIEditor {
         // Limpiar comandos pendientes
         this.pendingCommands = null;
         this.currentState = 'ready';
-    }
-
-    showFormState() {
-        const formState = document.getElementById('ai-editor-form-state');
-        const loadingState = document.getElementById('ai-editor-loading-state');
-        const resultState = document.getElementById('ai-editor-result-state');
-
-        if (formState) formState.style.display = 'block';
-        if (loadingState) loadingState.style.display = 'none';
-        if (resultState) resultState.style.display = 'none';
     }
 
     showLoadingState() {
@@ -334,25 +329,7 @@ export class DiagramAIEditor {
         }, 100);
     }
 
-    startVoiceInput() {
-        if (!this.voiceHandler) return;
-
-        try {
-            this.voiceHandler.start();
-        } catch (error) {
-            console.error('Error starting voice recognition:', error);
-        }
-    }
-
-    stopVoiceInput() {
-        if (!this.voiceHandler) return;
-
-        try {
-            this.voiceHandler.stop();
-        } catch (error) {
-            console.error('Error stopping voice recognition:', error);
-        }
-    }
+    // ==================== PROCESAMIENTO DE COMANDOS ====================
 
     processTextInput() {
         const textInput = document.getElementById('ai-editor-text-input');
@@ -376,291 +353,29 @@ export class DiagramAIEditor {
 
             console.log('🔍 DEBUG - Respuesta cruda de Groq:', response);
 
-            // USAR PARSER ESPECÍFICO PARA EDITOR (no el del analizador)
-            const commands = this.parseEditorResponse(response);
+            // USAR PARSER ESPECÍFICO PARA EDITOR
+            const commands = this.responseParser.parseResponse(response);
 
             console.log('🔍 DEBUG - Comandos parseados:', commands);
             console.log('🔍 DEBUG - Número de comandos:', commands ? commands.length : 0);
 
             if (commands && commands.length > 0) {
                 this.pendingCommands = commands;
+
+                // ✨ MOSTRAR PREVIEW VISUAL MEJORADO
+                this.visualEnhancer.showPreview(commands);
+
                 this.showResultState();
             } else {
                 this.showError('No se pudieron generar comandos válidos para tu solicitud.');
-                this.showFormState();
+                this.resetToForm();
             }
 
         } catch (error) {
             console.error('Error processing command:', error);
             this.showError('Error procesando el comando: ' + error.message);
-            this.showFormState();
+            this.resetToForm();
         }
-    }
-
-    // NUEVO MÉTODO: Parser específico para respuestas del editor
-    parseEditorResponse(response) {
-        console.log('🔍 Parser Editor - Respuesta recibida:', response);
-
-        if (!response || typeof response !== 'string') {
-            console.error('❌ Respuesta vacía o inválida');
-            return null;
-        }
-
-        try {
-            // Limpiar respuesta (remover markdown, espacios extra)
-            let cleanResponse = response.trim();
-
-            // Buscar JSON en la respuesta
-            const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                cleanResponse = jsonMatch[0];
-            }
-
-            // Parsear JSON
-            const parsed = JSON.parse(cleanResponse);
-            console.log('✅ JSON parseado:', parsed);
-
-            // Validar estructura esperada: {commands: [...]}
-            if (!parsed.commands || !Array.isArray(parsed.commands)) {
-                console.error('❌ Estructura inválida: se esperaba {commands: [...]}');
-                return this.tryAlternativeEditorParser(response);
-            }
-
-            // Validar y limpiar comandos
-            const validCommands = [];
-
-            for (const command of parsed.commands) {
-                const validatedCommand = this.validateEditorCommand(command);
-                if (validatedCommand) {
-                    validCommands.push(validatedCommand);
-                } else {
-                    console.warn('⚠️ Comando inválido ignorado:', command);
-                }
-            }
-
-            console.log(`✅ ${validCommands.length} comandos válidos parseados`);
-            return validCommands;
-
-        } catch (error) {
-            console.error('❌ Error parseando JSON:', error);
-            console.error('Respuesta original:', response);
-
-            // Intento de parseo alternativo
-            return this.tryAlternativeEditorParser(response);
-        }
-    }
-
-    // Validador específico para comandos del editor - VERSIÓN COMPLETA
-    validateEditorCommand(command) {
-        if (!command || typeof command !== 'object') {
-            return null;
-        }
-
-        const action = command.action;
-        const validActions = [
-            'CREATE_CLASS', 'DELETE_CLASS', 'RENAME_CLASS', 'MOVE_CLASS',
-            'ADD_ATTRIBUTE', 'EDIT_ATTRIBUTE', 'DELETE_ATTRIBUTE',
-            'CREATE_RELATION', 'EDIT_RELATION', 'DELETE_RELATION',
-            'EDIT_MULTIPLICITY', 'SET_RELATION_NAME'
-        ];
-
-        if (!validActions.includes(action)) {
-            console.warn(`❌ Acción no válida: ${action}`);
-            return null;
-        }
-
-        // Validaciones específicas por tipo de comando
-        switch (action) {
-            case 'CREATE_CLASS':
-                // Soportar múltiples formatos de respuesta
-                const className = command.className || command.parametros;
-                if (!className || typeof className !== 'string') {
-                    console.error('❌ CREATE_CLASS: falta className/parametros');
-                    console.error('Comando recibido:', command);
-                    return null;
-                }
-                console.log(`✅ CREATE_CLASS validado: ${className}`);
-                return {
-                    action: 'CREATE_CLASS',
-                    className: className.trim(),
-                    position: command.position || { x: 100, y: 100 },
-                    attributes: command.attributes || [],
-                    methods: command.methods || []
-                };
-
-            case 'DELETE_CLASS':
-                const deleteClassName = command.className || command.parametros;
-                if (!deleteClassName) {
-                    console.error('❌ DELETE_CLASS: falta className');
-                    return null;
-                }
-                console.log(`✅ DELETE_CLASS validado: ${deleteClassName}`);
-                return {
-                    action: 'DELETE_CLASS',
-                    className: deleteClassName.trim()
-                };
-
-            case 'RENAME_CLASS':
-                const oldName = command.oldName || command.parametros?.oldName;
-                const newName = command.newName || command.parametros?.newName;
-                if (!oldName || !newName) {
-                    console.error('❌ RENAME_CLASS: falta oldName o newName');
-                    return null;
-                }
-                console.log(`✅ RENAME_CLASS validado: ${oldName} -> ${newName}`);
-                return {
-                    action: 'RENAME_CLASS',
-                    oldName: oldName.trim(),
-                    newName: newName.trim()
-                };
-
-            case 'ADD_ATTRIBUTE':
-                const attrClassName = command.className || command.parametros?.className;
-                const attribute = command.attribute || command.parametros?.attribute;
-                if (!attrClassName || !attribute) {
-                    console.error('❌ ADD_ATTRIBUTE: falta className o attribute');
-                    return null;
-                }
-                console.log(`✅ ADD_ATTRIBUTE validado: ${JSON.stringify(attribute)} -> ${attrClassName}`);
-                return {
-                    action: 'ADD_ATTRIBUTE',
-                    className: attrClassName.trim(),
-                    attribute: this.normalizeEditorAttribute(attribute)
-                };
-
-            case 'DELETE_ATTRIBUTE':
-                const delAttrClassName = command.className || command.parametros?.className;
-                const attributeName = command.attributeName || command.parametros?.attributeName;
-                if (!delAttrClassName || !attributeName) {
-                    console.error('❌ DELETE_ATTRIBUTE: falta className o attributeName');
-                    return null;
-                }
-                console.log(`✅ DELETE_ATTRIBUTE validado: ${attributeName} de ${delAttrClassName}`);
-                return {
-                    action: 'DELETE_ATTRIBUTE',
-                    className: delAttrClassName.trim(),
-                    attributeName: attributeName.trim()
-                };
-
-            case 'CREATE_RELATION':
-                const sourceClass = command.sourceClass || command.parametros?.sourceClass;
-                const targetClass = command.targetClass || command.parametros?.targetClass;
-                if (!sourceClass || !targetClass) {
-                    console.error('❌ CREATE_RELATION: falta sourceClass o targetClass');
-                    return null;
-                }
-                console.log(`✅ CREATE_RELATION validado: ${sourceClass} -> ${targetClass}`);
-                return {
-                    action: 'CREATE_RELATION',
-                    sourceClass: sourceClass.trim(),
-                    targetClass: targetClass.trim(),
-                    relationType: command.relationType || 'association',
-                    sourceMultiplicity: command.sourceMultiplicity || '1',
-                    targetMultiplicity: command.targetMultiplicity || '1',
-                    relationName: command.relationName || ''
-                };
-
-            case 'DELETE_RELATION':
-                const delSourceClass = command.sourceClass || command.parametros?.sourceClass;
-                const delTargetClass = command.targetClass || command.parametros?.targetClass;
-                if (!delSourceClass || !delTargetClass) {
-                    console.error('❌ DELETE_RELATION: falta sourceClass o targetClass');
-                    return null;
-                }
-                console.log(`✅ DELETE_RELATION validado: ${delSourceClass} -> ${delTargetClass}`);
-                return {
-                    action: 'DELETE_RELATION',
-                    sourceClass: delSourceClass.trim(),
-                    targetClass: delTargetClass.trim()
-                };
-
-            case 'EDIT_MULTIPLICITY':
-                const multSourceClass = command.sourceClass || command.parametros?.sourceClass;
-                const multTargetClass = command.targetClass || command.parametros?.targetClass;
-                if (!multSourceClass || !multTargetClass) {
-                    console.error('❌ EDIT_MULTIPLICITY: falta sourceClass o targetClass');
-                    return null;
-                }
-                console.log(`✅ EDIT_MULTIPLICITY validado: ${multSourceClass} -> ${multTargetClass}`);
-                return {
-                    action: 'EDIT_MULTIPLICITY',
-                    sourceClass: multSourceClass.trim(),
-                    targetClass: multTargetClass.trim(),
-                    sourceMultiplicity: command.sourceMultiplicity || '1',
-                    targetMultiplicity: command.targetMultiplicity || '1'
-                };
-
-            default:
-                console.log(`✅ Comando ${action} validado (básico)`);
-                return command;
-        }
-    }
-
-    // Parser alternativo para el editor (cuando falla el JSON)
-    tryAlternativeEditorParser(response) {
-        console.log('🔄 Intento parser alternativo para editor...');
-
-        const commands = [];
-
-        // Detectar "crear clase" en texto libre
-        const createClassMatch = response.match(/crear?\s+(?:una\s+)?clase\s+(\w+)/i);
-        if (createClassMatch) {
-            commands.push({
-                action: 'CREATE_CLASS',
-                className: createClassMatch[1],
-                position: { x: 100, y: 100 },
-                attributes: [],
-                methods: []
-            });
-        }
-
-        // Detectar "eliminar clase"
-        const deleteClassMatch = response.match(/eliminar?\s+(?:la\s+)?clase\s+(\w+)/i);
-        if (deleteClassMatch) {
-            commands.push({
-                action: 'DELETE_CLASS',
-                className: deleteClassMatch[1]
-            });
-        }
-
-        // Detectar "agregar atributo"
-        const addAttrMatch = response.match(/agregar?\s+atributo\s+(\w+)(?:\s+a\s+(\w+))?/i);
-        if (addAttrMatch) {
-            commands.push({
-                action: 'ADD_ATTRIBUTE',
-                className: addAttrMatch[2] || 'Usuario',
-                attribute: {
-                    name: addAttrMatch[1],
-                    type: 'String',
-                    visibility: 'private'
-                }
-            });
-        }
-
-        if (commands.length > 0) {
-            console.log('✅ Parser alternativo encontró comandos:', commands);
-            return commands;
-        }
-
-        console.error('❌ No se pudieron extraer comandos de la respuesta');
-        return null;
-    }
-
-    // Normalizar atributos para el editor
-    normalizeEditorAttribute(attribute) {
-        if (typeof attribute === 'string') {
-            return {
-                name: attribute,
-                type: 'String',
-                visibility: 'private'
-            };
-        }
-
-        return {
-            name: attribute.name || 'newAttribute',
-            type: attribute.type || 'String',
-            visibility: attribute.visibility || 'private'
-        };
     }
 
     async sendToGroq(command, diagramContext) {
@@ -877,30 +592,98 @@ Analiza el comando y devuelve SOLO el JSON correspondiente, sin explicaciones.
         return JSON.stringify(context, null, 2);
     }
 
-    async applyChanges() {
-        if (!this.pendingCommands) return;
 
-        try {
-            this.currentState = 'executing';
+async applyChanges() {
+    if (!this.pendingCommands) return;
 
-            // Ejecutar comandos usando el AICommandExecutor existente
-            for (const command of this.pendingCommands) {
-                await this.commandExecutor.executeCommand(command);
+    try {
+        this.currentState = 'executing';
+
+        // Limpiar previews
+        this.visualEnhancer.clearPreviews();
+
+        // Ejecutar comandos usando el AICommandExecutor existente
+        for (const command of this.pendingCommands) {
+            console.log(`🔄 Ejecutando comando: ${command.action}`);
+
+            const result = await this.commandExecutor.executeCommand(command);
+
+            console.log(`✅ Resultado del comando:`, result);
+
+            // ✨ MEJORAR VISUAL INMEDIATAMENTE DESPUÉS DE CREAR
+            if (result.success && command.action === 'CREATE_CLASS') {
+                // DAR TIEMPO PARA QUE SE RENDERICE
+                setTimeout(() => {
+                    const newElement = this.findElementByClassName(command.className);
+                    if (newElement) {
+                        console.log(`🎨 Aplicando mejoras visuales a: ${command.className}`);
+                        this.visualEnhancer.enhanceNewClass(newElement, false);
+                    } else {
+                        console.warn(`⚠️ No se encontró elemento creado: ${command.className}`);
+                    }
+                }, 100);
             }
-
-            this.showSuccess('Cambios aplicados exitosamente');
-            this.resetToForm();
-
-        } catch (error) {
-            console.error('Error applying changes:', error);
-            this.showError('Error aplicando los cambios: ' + error.message);
         }
+
+        this.showSuccess('Cambios aplicados exitosamente');
+        this.resetToForm();
+
+    } catch (error) {
+        console.error('Error applying changes:', error);
+        this.showError('Error aplicando los cambios: ' + error.message);
     }
+}
 
     cancelPreview() {
         this.pendingCommands = null;
         this.currentState = 'ready';
+        this.visualEnhancer.clearPreviews();
         this.resetToForm();
+    }
+
+    // ==================== UTILIDADES ====================
+
+// En DiagramAIEditor.js - Debug temporal
+findElementByClassName(className) {
+    const elements = this.diagramEditor.graph.getElements();
+    console.log(`🔍 Buscando clase: ${className}`);
+    console.log(`📊 Elementos en el grafo:`, elements.length);
+
+    const found = elements.find(element => {
+        const umlData = element.get('umlData');
+        const matches = umlData?.className === className;
+        if (matches) {
+            console.log(`✅ Encontrado: ${className}`, element);
+        }
+        return matches;
+    });
+
+    if (!found) {
+        console.warn(`❌ No se encontró clase: ${className}`);
+        console.log('Clases disponibles:', elements.map(el => el.get('umlData')?.className));
+    }
+
+    return found;
+}
+
+    startVoiceInput() {
+        if (!this.voiceHandler) return;
+
+        try {
+            this.voiceHandler.start();
+        } catch (error) {
+            console.error('Error starting voice recognition:', error);
+        }
+    }
+
+    stopVoiceInput() {
+        if (!this.voiceHandler) return;
+
+        try {
+            this.voiceHandler.stop();
+        } catch (error) {
+            console.error('Error stopping voice recognition:', error);
+        }
     }
 
     updateVoiceStatus(status, state) {
