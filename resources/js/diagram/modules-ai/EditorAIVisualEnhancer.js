@@ -18,95 +18,97 @@ export class EditorAIVisualEnhancer {
             return;
         }
 
-        console.log(`✨ Mejorando visual de clase: ${element.get('umlData')?.className}`);
+        console.log(`✨ Aplicando mejoras MÍNIMAS a clase: ${element.get('umlData')?.className}`);
 
-        // APLICAR ESTILOS INMEDIATAMENTE (como hace el analizador)
-        if (isPreview) {
-            this.applyPreviewStyles(element);
-        } else {
-            this.applyNewClassStyles(element);
-        }
+        // ESPERAR UN TICK PARA ASEGURAR QUE EL ELEMENTO ESTÉ COMPLETAMENTE RENDERIZADO
+        setTimeout(() => {
+            // APLICAR SOLO ESTILOS MÍNIMOS
+            if (isPreview) {
+                this.applyPreviewStyles(element);
+            } else {
+                // SOLO aplicar sombra sutil - NO cambiar colores ni estructura
+                this.applyNewClassStyles(element);
+            }
 
-        // FORZAR ACTUALIZACIÓN VISUAL
-        element.trigger('change:attrs');
+            // NO forzar cambios - dejar que el elemento mantenga su estado natural
+            // element.trigger('change:attrs'); // COMENTADO
 
-        // Agregar animación de entrada
-        this.animateElementEntry(element);
+            // Agregar animación muy sutil de entrada
+            this.animateElementEntry(element);
 
-        // Marcar como mejorado
-        this.enhancedElements.add(element.id);
+            // Marcar como mejorado
+            this.enhancedElements.add(element.id);
+        }, 50); // Delay más largo para asegurar renderizado completo
     }
 
     applyNewClassStyles(element) {
-        console.log('🎨 Aplicando estilos mejorados...');
+        console.log('🎨 NO aplicando estilos - manteniendo aspecto original de DiagramElementFactory');
 
-        // ESTILOS SIMILARES A LOS DEL ANALIZADOR
+        // NO MODIFICAR ESTILOS - DEJAR QUE DiagramElementFactory MANEJE TODO
+        // El elemento ya tiene los estilos correctos y consistentes
+
+        // Solo aplicar una sombra muy sutil para indicar que fue creado por IA
+        const currentAttrs = element.attr();
         element.attr({
             body: {
-                fill: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                stroke: '#0ea5e9',
-                strokeWidth: 3,
-                rx: 12,
-                ry: 12,
+                ...currentAttrs.body,
                 filter: {
                     name: 'dropShadow',
                     args: {
-                        dx: 0,
-                        dy: 4,
-                        blur: 12,
-                        color: 'rgba(14, 165, 233, 0.4)'
+                        dx: 1,
+                        dy: 1,
+                        blur: 3,
+                        color: 'rgba(59, 130, 246, 0.15)' // Sombra azul muy sutil
                     }
                 }
-            },
-            header: {
-                fill: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
-                stroke: '#0284c7',
-                rx: 12,
-                ry: 12
-            },
-            headerText: {
-                fill: 'white',
-                fontWeight: '700',
-                fontSize: '14px'
-            },
-            '.uml-class-attrs-text': {
-                fontSize: '12px',
-                fill: '#1e293b'
-            },
-            '.uml-class-methods-text': {
-                fontSize: '12px',
-                fill: '#1e293b'
             }
         });
 
-        // FORZAR REDIBUJADO
-        element.trigger('change:attrs');
-
-        console.log('✅ Estilos aplicados correctamente');
+        console.log('✅ Elemento mantiene estilos originales con sombra sutil de IA');
     }
 
     applyPreviewStyles(element) {
-        // Estilo para preview de clases
+        // Obtener atributos actuales para mantener estructura
+        const currentAttrs = element.attr();
+
+        // PREVIEW MÁS SUTIL - MANTENIENDO ESTRUCTURA BASE
         element.attr({
             body: {
-                fill: 'rgba(139, 92, 246, 0.1)',
+                ...currentAttrs.body, // Mantener todos los estilos base
+                fill: 'rgba(139, 92, 246, 0.08)', // Muy sutil
                 stroke: '#8b5cf6',
                 strokeWidth: 2,
                 strokeDasharray: '8,4',
-                opacity: 0.8,
-                rx: 8,
-                ry: 8
+                opacity: 0.9
             },
-            header: {
-                fill: 'rgba(139, 92, 246, 0.2)',
+            // MANTENER LÍNEAS DIVISORIAS EN PREVIEW
+            divider1: {
+                ...currentAttrs.divider1,
                 stroke: '#8b5cf6',
-                strokeDasharray: '8,4'
+                strokeDasharray: '6,3',
+                opacity: 0.7
             },
-            headerText: {
-                fill: '#6b21a8',
-                fontStyle: 'italic'
+            divider2: {
+                ...currentAttrs.divider2,
+                stroke: '#8b5cf6',
+                strokeDasharray: '6,3',
+                opacity: 0.7
+            },
+            classText: {
+                ...currentAttrs.classText,
+                opacity: 0.8 // Solo reducir opacidad, mantener colores originales
             }
         });
+
+        // LÍNEA DIVISORIA 3 SI EXISTE
+        if (currentAttrs.divider3) {
+            element.attr('divider3', {
+                ...currentAttrs.divider3,
+                stroke: '#8b5cf6',
+                strokeDasharray: '6,3',
+                opacity: 0.7
+            });
+        }
     }
 
     normalizeClassStyles(element) {
@@ -137,28 +139,15 @@ export class EditorAIVisualEnhancer {
     animateElementEntry(element) {
         if (!element) return;
 
-        // Animación de entrada con rebote
-        element.attr('body/transform', 'scale(0.8)');
-        element.attr('body/opacity', 0.5);
+        // ANIMACIÓN MUY SUTIL - Solo fade in sin escala
+        element.attr('body/opacity', 0.3);
 
         setTimeout(() => {
-            element.transition('attrs/body/transform', 'scale(1.05)', {
-                duration: 200,
-                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
-            });
             element.transition('attrs/body/opacity', 1, {
-                duration: 200,
-                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
+                duration: 400,
+                timingFunction: (t) => 1 - Math.pow(1 - t, 2) // easeOut suave
             });
-
-            // Segundo rebote
-            setTimeout(() => {
-                element.transition('attrs/body/transform', 'scale(1)', {
-                    duration: 150,
-                    timingFunction: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t // easeInOut
-                });
-            }, 200);
-        }, 50);
+        }, 100);
     }
 
     animateElementUpdate(element) {
