@@ -1,6 +1,8 @@
 // resources/js/diagram/modules-ai/AICommandExecutor.js
 // Ejecuta los comandos y modificaciones propuestos por la IA en el diagrama real
 
+import * as joint from 'jointjs';
+
 export class AICommandExecutor {
     constructor(editor) {
         this.editor = editor;

@@ -1,6 +1,8 @@
 // resources/js/diagram/modules-ai/EditorAIVisualEnhancer.js
 // Mejora visual de elementos creados por IA y efectos de preview
 
+import * as joint from 'jointjs';
+
 export class EditorAIVisualEnhancer {
     constructor(editor) {
         this.editor = editor;
