@@ -191,7 +191,7 @@ export class EditorAIResponseParser {
             action: 'CREATE_RELATION',
             sourceClass: sourceClass.trim(),
             targetClass: targetClass.trim(),
-            relationType: command.relationType || 'association',
+            relationType: this.normalizeRelationType(command.relationType) || 'association',
             sourceMultiplicity: command.sourceMultiplicity || '1',
             targetMultiplicity: command.targetMultiplicity || '1',
             relationName: command.relationName || ''
@@ -273,6 +273,45 @@ export class EditorAIResponseParser {
             });
         }
 
+        // Detectar relaciones con diferentes tipos
+        const relationPatterns = [
+            // Herencia
+            { pattern: /crear?\s+(?:una\s+)?herencia\s+entre\s+(\w+)\s+y\s+(\w+)/i, type: 'inheritance' },
+            { pattern: /(\w+)\s+hereda\s+de\s+(\w+)/i, type: 'inheritance' },
+            { pattern: /(\w+)\s+es\s+un\s+(\w+)/i, type: 'inheritance' },
+
+            // Composición
+            { pattern: /crear?\s+(?:una\s+)?composici[óo]n\s+entre\s+(\w+)\s+y\s+(\w+)/i, type: 'composition' },
+            { pattern: /(\w+)\s+se\s+compone\s+de\s+(\w+)/i, type: 'composition' },
+            { pattern: /(\w+)\s+contiene\s+(\w+)/i, type: 'composition' },
+
+            // Agregación
+            { pattern: /crear?\s+(?:una\s+)?agregaci[óo]n\s+entre\s+(\w+)\s+y\s+(\w+)/i, type: 'aggregation' },
+            { pattern: /(\w+)\s+tiene\s+(?:un\s+|una\s+)?(\w+)/i, type: 'aggregation' },
+            { pattern: /(\w+)\s+incluye\s+(\w+)/i, type: 'aggregation' },
+
+            // Asociación
+            { pattern: /crear?\s+(?:una\s+)?asociaci[óo]n\s+entre\s+(\w+)\s+y\s+(\w+)/i, type: 'association' },
+            { pattern: /crear?\s+(?:una\s+)?relaci[óo]n\s+entre\s+(\w+)\s+y\s+(\w+)/i, type: 'association' },
+            { pattern: /(\w+)\s+se\s+relaciona\s+con\s+(\w+)/i, type: 'association' }
+        ];
+
+        for (const relationPattern of relationPatterns) {
+            const match = response.match(relationPattern.pattern);
+            if (match) {
+                commands.push({
+                    action: 'CREATE_RELATION',
+                    sourceClass: match[1],
+                    targetClass: match[2],
+                    relationType: relationPattern.type,
+                    sourceMultiplicity: '1',
+                    targetMultiplicity: '1',
+                    relationName: ''
+                });
+                break; // Solo tomar la primera coincidencia
+            }
+        }
+
         if (commands.length > 0) {
             console.log('✅ Parser alternativo encontró comandos:', commands);
             return commands;
@@ -297,6 +336,23 @@ export class EditorAIResponseParser {
             type: attribute.type || 'String',
             visibility: attribute.visibility || 'private'
         };
+    }
+
+    // Normalizar tipos de relación
+    normalizeRelationType(type) {
+        const typeMap = {
+            'asociación': 'association',
+            'asociacion': 'association',
+            'relación': 'association',
+            'relacion': 'association',
+            'herencia': 'inheritance',
+            'composición': 'composition',
+            'composicion': 'composition',
+            'agregación': 'aggregation',
+            'agregacion': 'aggregation'
+        };
+
+        return typeMap[type?.toLowerCase()] || type || 'association';
     }
 
     // Calcular posición inteligente para nuevas clases

@@ -533,9 +533,20 @@ IMPORTANTE: Responde ÚNICAMENTE con JSON válido usando estos formatos EXACTOS:
     ]
 }
 
-TIPOS DE RELACIÓN: "association", "composition", "aggregation", "inheritance"
+TIPOS DE RELACIÓN:
+- "association": Relación general (conoce/usa) - línea simple
+- "composition": Relación "parte de" fuerte (rombo negro) - las partes no existen sin el todo
+- "aggregation": Relación "tiene un" débil (rombo blanco) - las partes pueden existir independientemente
+- "inheritance": Relación "es un" (flecha triangular) - herencia de clase
+
 MULTIPLICIDADES: "1", "0..1", "0..*", "1..*", "1..5", "*"
 VISIBILIDADES: "public" (+), "private" (-), "protected" (#)
+
+EJEMPLOS DE RELACIONES:
+- "crear herencia entre Animal y Perro" -> relationType: "inheritance"
+- "crear composición entre Casa y Habitación" -> relationType: "composition"
+- "crear agregación entre Universidad y Estudiante" -> relationType: "aggregation"
+- "crear asociación entre Cliente y Pedido" -> relationType: "association"
 
 DIAGRAMA ACTUAL:
 ${diagramContext}

@@ -1021,6 +1021,32 @@ export class AICommandExecutor {
     // ==================== MÉTODOS AUXILIARES NUEVOS ====================
 
     createRelationshipWithMultiplicity(sourceElement, targetElement, type, sourceMultiplicity, targetMultiplicity, relationName) {
+        // Usar el RelationshipManager para crear la relación correctamente
+        if (this.editor.relationshipManager) {
+            const relationship = this.editor.relationshipManager.createRelationshipFromConfig(
+                type,
+                sourceElement,
+                targetElement,
+                {
+                    sourceMultiplicity: sourceMultiplicity || '',
+                    targetMultiplicity: targetMultiplicity || '',
+                    name: relationName || '',
+                    sourceAnchor: 'auto',
+                    targetAnchor: 'auto'
+                }
+            );
+
+            if (relationship) {
+                console.log(`✅ Relación ${type} creada usando RelationshipManager`);
+                return relationship;
+            } else {
+                console.warn(`⚠️ RelationshipManager no devolvió el objeto de relación para tipo: ${type}`);
+                // Continuar con el fallback
+            }
+        }
+
+        // Fallback: crear directamente si no hay RelationshipManager o si falló
+        console.log(`🔄 Usando método de creación directa para relación ${type}`);
         const link = new joint.shapes.standard.Link({
             source: { id: sourceElement.id },
             target: { id: targetElement.id }
@@ -1049,6 +1075,7 @@ export class AICommandExecutor {
             name: relationName
         });
 
+        console.log(`✅ Relación ${type} creada directamente (fallback)`);
         return link;
     }
 

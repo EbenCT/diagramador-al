@@ -458,6 +458,9 @@ export class DiagramRelationshipManager {
         this.editor.updateCanvasInfo();
 
         console.log('✅ Relación', relationshipType, 'creada con anti-superposición');
+
+        // Retornar el link creado para que pueda ser usado por otros métodos
+        return link;
     }
 
     // ==================== LABELS MEJORADAS ====================
