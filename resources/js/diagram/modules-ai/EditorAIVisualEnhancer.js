@@ -18,53 +18,31 @@ export class EditorAIVisualEnhancer {
             return;
         }
 
-        console.log(`✨ Aplicando mejoras MÍNIMAS a clase: ${element.get('umlData')?.className}`);
+        console.log(`🔒 ENHANCER COMPLETAMENTE DESHABILITADO para: ${element.get('umlData')?.className}`);
+        console.log(`📐 Elemento actual - Tamaño: ${element.size().width}x${element.size().height}`);
 
-        // ESPERAR UN TICK PARA ASEGURAR QUE EL ELEMENTO ESTÉ COMPLETAMENTE RENDERIZADO
-        setTimeout(() => {
-            // APLICAR SOLO ESTILOS MÍNIMOS
-            if (isPreview) {
-                this.applyPreviewStyles(element);
-            } else {
-                // SOLO aplicar sombra sutil - NO cambiar colores ni estructura
-                this.applyNewClassStyles(element);
-            }
+        // *** COMPLETAMENTE DESHABILITADO ***
+        // NO HACER NADA - DEJAR QUE EL ELEMENTO MANTENGA SUS DIMENSIONES ORIGINALES
 
-            // NO forzar cambios - dejar que el elemento mantenga su estado natural
-            // element.trigger('change:attrs'); // COMENTADO
+        if (isPreview) {
+            // Solo para preview aplicar estilos mínimos
+            this.applyPreviewStyles(element);
+        }
 
-            // Agregar animación muy sutil de entrada
-            this.animateElementEntry(element);
+        // Marcar como "mejorado" sin realmente modificar nada
+        this.enhancedElements.add(element.id);
 
-            // Marcar como mejorado
-            this.enhancedElements.add(element.id);
-        }, 50); // Delay más largo para asegurar renderizado completo
+        console.log('✅ Elemento mantenido INTACTO sin mejoras para preservar dimensiones');
     }
 
     applyNewClassStyles(element) {
-        console.log('🎨 NO aplicando estilos - manteniendo aspecto original de DiagramElementFactory');
+        console.log('🎨 DESHABILITADO - NO aplicando NINGÚN estilo para mantener dimensiones correctas');
 
-        // NO MODIFICAR ESTILOS - DEJAR QUE DiagramElementFactory MANEJE TODO
-        // El elemento ya tiene los estilos correctos y consistentes
+        // *** COMPLETAMENTE DESHABILITADO ***
+        // NO TOCAR NADA DEL ELEMENTO - DEJAR INTACTO
+        // El DiagramElementFactory ya lo creó perfecto
 
-        // Solo aplicar una sombra muy sutil para indicar que fue creado por IA
-        const currentAttrs = element.attr();
-        element.attr({
-            body: {
-                ...currentAttrs.body,
-                filter: {
-                    name: 'dropShadow',
-                    args: {
-                        dx: 1,
-                        dy: 1,
-                        blur: 3,
-                        color: 'rgba(59, 130, 246, 0.15)' // Sombra azul muy sutil
-                    }
-                }
-            }
-        });
-
-        console.log('✅ Elemento mantiene estilos originales con sombra sutil de IA');
+        console.log('✅ Elemento mantenido INTACTO sin modificaciones');
     }
 
     applyPreviewStyles(element) {
@@ -139,15 +117,10 @@ export class EditorAIVisualEnhancer {
     animateElementEntry(element) {
         if (!element) return;
 
-        // ANIMACIÓN MUY SUTIL - Solo fade in sin escala
-        element.attr('body/opacity', 0.3);
+        console.log('🎬 ANIMACIÓN DESHABILITADA - No tocar opacity ni nada');
 
-        setTimeout(() => {
-            element.transition('attrs/body/opacity', 1, {
-                duration: 400,
-                timingFunction: (t) => 1 - Math.pow(1 - t, 2) // easeOut suave
-            });
-        }, 100);
+        // *** COMPLETAMENTE DESHABILITADO ***
+        // NO ANIMAR NADA - PODRÍA ESTAR CAUSANDO PROBLEMAS DE DIMENSIONES
     }
 
     animateElementUpdate(element) {
