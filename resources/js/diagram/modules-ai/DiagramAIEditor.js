@@ -643,7 +643,7 @@ async applyChanges() {
 
     // ==================== UTILIDADES ====================
 
-// En DiagramAIEditor.js - Debug temporal
+// En DiagramAIEditor.js - Debug temporal - Case insensitive
 findElementByClassName(className) {
     const elements = this.diagramEditor.graph.getElements();
     console.log(`🔍 Buscando clase: ${className}`);
@@ -651,7 +651,7 @@ findElementByClassName(className) {
 
     const found = elements.find(element => {
         const umlData = element.get('umlData');
-        const matches = umlData?.className === className;
+        const matches = umlData?.className?.toLowerCase() === className?.toLowerCase();
         if (matches) {
             console.log(`✅ Encontrado: ${className}`, element);
         }

@@ -133,7 +133,7 @@ export class AICommandExecutor {
             const currentAttributes = umlData.attributes || [];
 
             // Verificar que el atributo no exista ya
-            if (currentAttributes.includes(change.attribute)) {
+            if (currentAttributes.some(attr => attr.toLowerCase() === change.attribute.toLowerCase())) {
                 return {
                     success: false,
                     error: `El atributo "${change.attribute}" ya existe`
@@ -187,7 +187,7 @@ export class AICommandExecutor {
             const currentMethods = umlData.methods || [];
 
             // Verificar que el método no exista ya
-            if (currentMethods.includes(change.method)) {
+            if (currentMethods.some(method => method.toLowerCase() === change.method.toLowerCase())) {
                 return {
                     success: false,
                     error: `El método "${change.method}" ya existe`
@@ -432,7 +432,7 @@ export class AICommandExecutor {
         const elements = this.editor.graph.getElements();
         return elements.find(element => {
             const umlData = element.get('umlData');
-            return umlData?.className === className;
+            return umlData?.className?.toLowerCase() === className?.toLowerCase();
         });
     }
 
@@ -789,7 +789,7 @@ export class AICommandExecutor {
             const attribute = this.formatAttribute(command.attribute);
 
             // Verificar que no exista
-            if (currentAttributes.some(attr => attr.includes(attribute.name))) {
+            if (currentAttributes.some(attr => attr.toLowerCase().includes(attribute.name.toLowerCase()))) {
                 throw new Error(`El atributo "${attribute.name}" ya existe`);
             }
 
@@ -826,7 +826,7 @@ export class AICommandExecutor {
 
             // Encontrar y reemplazar atributo
             const attributeIndex = currentAttributes.findIndex(attr =>
-                attr.includes(command.oldAttribute.name)
+                attr.toLowerCase().includes(command.oldAttribute.name.toLowerCase())
             );
 
             if (attributeIndex === -1) {
@@ -867,7 +867,7 @@ export class AICommandExecutor {
             const currentAttributes = umlData.attributes || [];
 
             const newAttributes = currentAttributes.filter(attr =>
-                !attr.includes(command.attributeName)
+                !attr.toLowerCase().includes(command.attributeName.toLowerCase())
             );
 
             this.editor.classManager.elementFactory.updateClassElement(

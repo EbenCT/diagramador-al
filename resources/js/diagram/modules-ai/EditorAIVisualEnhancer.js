@@ -346,7 +346,7 @@ export class EditorAIVisualEnhancer {
         const elements = this.editor.graph.getElements();
         return elements.find(element => {
             const umlData = element.get('umlData');
-            return umlData?.className === className;
+            return umlData?.className?.toLowerCase() === className?.toLowerCase();
         });
     }
 
