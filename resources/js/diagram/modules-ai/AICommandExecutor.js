@@ -458,11 +458,11 @@ export class AICommandExecutor {
         setTimeout(() => {
             element.transition('attrs/body/transform', 'scale(1)', {
                 duration: 300,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
             element.transition('attrs/body/opacity', 1, {
                 duration: 300,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
         }, 50);
     }
@@ -480,11 +480,11 @@ export class AICommandExecutor {
         setTimeout(() => {
             element.transition('attrs/body/stroke', originalStroke || '#1e40af', {
                 duration: 500,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
             element.transition('attrs/body/strokeWidth', originalStrokeWidth || 2, {
                 duration: 500,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
         }, 200);
     }
@@ -500,7 +500,7 @@ export class AICommandExecutor {
         setTimeout(() => {
             relation.transition('attrs/line/strokeWidth', originalStrokeWidth || 2, {
                 duration: 400,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
         }, 50);
     }

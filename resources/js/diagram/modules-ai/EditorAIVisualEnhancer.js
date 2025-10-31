@@ -113,17 +113,17 @@ export class EditorAIVisualEnhancer {
         // Volver a estilos normales gradualmente
         element.transition('attrs/body/fill', '#ffffff', {
             duration: 1000,
-            timingFunction: 'ease-out'
+            timingFunction: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t // easeInOut
         });
 
         element.transition('attrs/body/stroke', '#1e40af', {
             duration: 1000,
-            timingFunction: 'ease-out'
+            timingFunction: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t // easeInOut
         });
 
         element.transition('attrs/body/strokeWidth', 2, {
             duration: 1000,
-            timingFunction: 'ease-out'
+            timingFunction: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t // easeInOut
         });
 
         // Remover filtro gradualmente
@@ -144,18 +144,18 @@ export class EditorAIVisualEnhancer {
         setTimeout(() => {
             element.transition('attrs/body/transform', 'scale(1.05)', {
                 duration: 200,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
             element.transition('attrs/body/opacity', 1, {
                 duration: 200,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
 
             // Segundo rebote
             setTimeout(() => {
                 element.transition('attrs/body/transform', 'scale(1)', {
                     duration: 150,
-                    timingFunction: 'ease-in-out'
+                    timingFunction: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t // easeInOut
                 });
             }, 200);
         }, 50);
@@ -175,15 +175,15 @@ export class EditorAIVisualEnhancer {
         setTimeout(() => {
             element.transition('attrs/body/fill', originalFill || '#ffffff', {
                 duration: 600,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
             element.transition('attrs/body/stroke', originalStroke || '#1e40af', {
                 duration: 600,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
             element.transition('attrs/body/strokeWidth', 2, {
                 duration: 600,
-                timingFunction: 'ease-out'
+                timingFunction: (t) => 1 - Math.pow(1 - t, 3) // easeOut
             });
         }, 300);
     }
