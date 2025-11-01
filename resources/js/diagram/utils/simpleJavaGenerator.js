@@ -56,6 +56,67 @@ export class SimpleJavaGenerator {
         });
     }
 
+    detectAuthenticationEntities(classes) {
+        // Patrones de detección
+        const USER_PATTERNS = ['user', 'usuario', 'account', 'cuenta', 'cliente', 'client'];
+        const EMAIL_PATTERNS = ['email', 'correo', 'mail', 'e-mail'];
+        const PASSWORD_PATTERNS = ['password', 'contraseña', 'clave', 'pass', 'pwd'];
+
+        // Buscar entidad de usuario
+        const userEntity = classes.find(cls => {
+            const className = cls.name.toLowerCase();
+            return USER_PATTERNS.some(pattern => className.includes(pattern));
+        });
+
+        if (!userEntity) {
+            console.log('❌ No se encontró entidad de usuario');
+            return { needsAuth: false };
+        }
+
+        console.log('✅ Entidad de usuario encontrada:', userEntity.name);
+
+        // Verificar si tiene campos de email y password
+        const attributes = userEntity.attributes.map(attr => attr.toLowerCase());
+
+        const hasEmail = attributes.some(attr =>
+            EMAIL_PATTERNS.some(pattern => attr.includes(pattern))
+        );
+
+        const hasPassword = attributes.some(attr =>
+            PASSWORD_PATTERNS.some(pattern => attr.includes(pattern))
+        );
+
+        console.log('📧 Tiene email:', hasEmail);
+        console.log('🔒 Tiene password:', hasPassword);
+
+        if (hasEmail && hasPassword) {
+            console.log('🎉 Sistema de autenticación será generado automáticamente');
+            return {
+                needsAuth: true,
+                userEntity: userEntity,
+                emailField: this.findFieldName(userEntity.attributes, EMAIL_PATTERNS),
+                passwordField: this.findFieldName(userEntity.attributes, PASSWORD_PATTERNS)
+            };
+        }
+
+        console.log('⚠️ Faltan campos necesarios para autenticación');
+        return { needsAuth: false };
+    }
+
+    findFieldName(attributes, patterns) {
+        const foundAttr = attributes.find(attr => {
+            const attrLower = attr.toLowerCase();
+            return patterns.some(pattern => attrLower.includes(pattern));
+        });
+
+        if (foundAttr) {
+            const parsed = this.parseAttribute(foundAttr);
+            return parsed.name;
+        }
+
+        return null;
+    }
+
     extractClasses() {
         const classes = [];
         const elements = this.editor.graph.getElements();
@@ -121,6 +182,10 @@ extractRelationships() {
         const resourcesPath = 'src/main/resources';
         const testPath = `src/test/java/${this.packageName.replace(/\./g, '/')}`;
 
+        // Detectar si necesita sistema de autenticación
+        const authInfo = this.detectAuthenticationEntities(classes);
+        console.log('🔐 Detección de autenticación:', authInfo);
+
         // Categorizar clases por estereotipo
         const entitiesClasses = classes.filter(c => c.stereotype === 'entity');
         const serviceClasses = classes.filter(c => c.stereotype === 'service');
@@ -176,8 +241,37 @@ extractRelationships() {
             zip.file(`${srcPath}/util/${cls.name}.java`, utilityCode);
         });
 
+        // Generar sistema de autenticación si es necesario
+        if (authInfo.needsAuth) {
+            console.log('🔐 Generando sistema de autenticación completo...');
+
+            // Configuración de seguridad
+            zip.file(`${srcPath}/config/SecurityConfig.java`, this.generateSecurityConfig());
+            zip.file(`${srcPath}/config/JwtUtil.java`, this.generateJwtUtil());
+
+            // Servicios de autenticación
+            zip.file(`${srcPath}/auth/service/UserDetailsServiceImpl.java`, this.generateUserDetailsService(authInfo.userEntity, authInfo));
+            zip.file(`${srcPath}/auth/service/AuthService.java`, this.generateAuthService(authInfo.userEntity, authInfo));
+
+            // Controlador de autenticación
+            zip.file(`${srcPath}/auth/controller/AuthController.java`, this.generateAuthController(authInfo.userEntity));
+
+            // DTOs de autenticación
+            zip.file(`${srcPath}/auth/dto/LoginRequestDTO.java`, this.generateLoginRequestDTO());
+            zip.file(`${srcPath}/auth/dto/RegisterRequestDTO.java`, this.generateRegisterRequestDTO(authInfo.userEntity, authInfo));
+            zip.file(`${srcPath}/auth/dto/AuthResponseDTO.java`, this.generateAuthResponseDTO());
+
+            // Filtro JWT
+            zip.file(`${srcPath}/auth/filter/JwtAuthenticationFilter.java`, this.generateJwtAuthenticationFilter());
+
+            // Excepciones personalizadas
+            zip.file(`${srcPath}/exception/GlobalExceptionHandler.java`, this.generateGlobalExceptionHandler());
+            zip.file(`${srcPath}/exception/EntityNotFoundException.java`, this.generateEntityNotFoundException());
+            zip.file(`${srcPath}/exception/AuthenticationException.java`, this.generateAuthenticationException());
+        }
+
         // Generar archivos de configuración
-        zip.file('pom.xml', this.generatePomXml());
+        zip.file('pom.xml', this.generatePomXml(authInfo.needsAuth));
         zip.file(`${resourcesPath}/application.properties`, this.generateApplicationProperties());
         zip.file(`${resourcesPath}/application-dev.properties`, this.generateDevProperties());
         zip.file(`${resourcesPath}/application-prod.properties`, this.generateProdProperties());
@@ -214,6 +308,7 @@ import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.HashSet;
 
 /**
  * Entidad JPA para ${className}
@@ -277,62 +372,199 @@ ${this.generateEntityRelationships(className, entityRelationships)}
     }
 
 generateEntityRelationships(className, relationships) {
-    return relationships.map(rel => {
-        if (rel.sourceClass === className) {
-            console.log('Procesando relación:', {
-                sourceClass: rel.sourceClass,
-                targetClass: rel.targetClass,
-                type: rel.type
-            });
+    const allRelationships = [];
+
+    relationships.forEach(rel => {
+        console.log('🔗 Procesando relación para clase:', className, rel);
+
+        // Determine relationship direction and field names
+        const isSource = (rel.sourceClass === className);
+        const isTarget = (rel.targetClass === className);
+
+        if (isSource) {
+            // Esta clase es la fuente de la relación
             const targetClass = rel.targetClass;
             const fieldName = this.decapitalizeFirst(targetClass);
 
-            switch (rel.type) {
-                case 'inheritance':
-                    // HERENCIA: Siempre FK de hija hacia padre (sin evaluar multiplicidad)
-                    return `
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
-    private ${targetClass} ${fieldName};`;
+            // Para determinar mappedBy, necesitamos el nombre del campo en el target que apunta de vuelta
+            // Si es 1-to-many, el lado many (target) debe tener un campo que referencie al uno (source)
+            let mappedByFieldName = null;
+            if (rel.sourceMultiplicity === '1' && rel.targetMultiplicity === '*') {
+                // OneToMany: el lado target (many) tendrá un campo que referencia al source (one)
+                mappedByFieldName = this.decapitalizeFirst(className);
+            }
 
-                case 'association':
-                    // CAMBIO CLAVE: Evaluar sourceMultiplicity en lugar de targetMultiplicity
-                    if (rel.sourceMultiplicity.includes('*') || rel.sourceMultiplicity.includes('n')) {
-                        // Source es "*" -> @ManyToOne + FK en esta tabla
-                        return `
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
-    private ${targetClass} ${fieldName};`;
-                    } else {
-                        // Source es "1" -> @OneToMany + FK en la tabla target
-                        return `
-    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JoinColumn(name = "${this.camelToSnakeCase(className)}_id")
-    private Set<${targetClass}> ${fieldName}s;`;
-                    }
-
-                case 'composition':
-                    return `
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @JoinColumn(name = "${this.camelToSnakeCase(className)}_id")
-    private Set<${targetClass}> ${fieldName}s;`;
-
-                case 'aggregation':
-                    return `
-    @OneToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
-    @JoinColumn(name = "${this.camelToSnakeCase(className)}_id")
-    private Set<${targetClass}> ${fieldName}s;`;
-
-                default:
-                    return `// Relación ${rel.type} con ${targetClass}`;
+            const relationship = this.generateRelationshipSide(rel, 'source', className, targetClass, fieldName, mappedByFieldName);
+            if (relationship) {
+                console.log('✅ Lado SOURCE generado para', className, '->', targetClass);
+                allRelationships.push(relationship);
             }
         }
-        return '';
-    }).filter(rel => rel).join('\n');
+
+        if (isTarget) {
+            // Esta clase es el destino de la relación
+            const sourceClass = rel.sourceClass;
+            const fieldName = this.decapitalizeFirst(sourceClass);
+
+            // El lado target nunca usa mappedBy en relaciones OneToMany (es el lado que posee la FK)
+            const relationship = this.generateRelationshipSide(rel, 'target', className, sourceClass, fieldName, null);
+            if (relationship) {
+                console.log('✅ Lado TARGET generado para', sourceClass, '->', className);
+                allRelationships.push(relationship);
+            }
+        }
+    });
+
+    return allRelationships.join('\n');
+}generateRelationshipSide(rel, side, currentClass, otherClass, fieldName, mappedByFieldName = null) {
+    console.log('🔧 Generando lado de relación:', {
+        side: side,
+        currentClass: currentClass,
+        otherClass: otherClass,
+        fieldName: fieldName,
+        mappedByFieldName: mappedByFieldName,
+        type: rel.type,
+        sourceMultiplicity: rel.sourceMultiplicity,
+        targetMultiplicity: rel.targetMultiplicity
+    });
+
+    switch (rel.type) {
+        case 'inheritance':
+            // HERENCIA: Solo el hijo tiene referencia al padre
+            if (side === 'source') {
+                return `
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
+    private ${otherClass} ${fieldName};`;
+            }
+            return null; // El padre no tiene referencia directa
+
+        case 'association':
+            return this.generateAssociationSide(rel, side, currentClass, otherClass, fieldName, mappedByFieldName);
+
+        case 'composition':
+            // COMPOSICIÓN: Padre->Hijos (OneToMany), Hijo->Padre (ManyToOne)
+            if (side === 'source') {
+                // El padre tiene una colección de hijos
+                // mappedBy debe apuntar al campo que existe en la clase hija que referencia al padre
+                if (!mappedByFieldName) {
+                    console.warn('⚠️ mappedByFieldName es null para composición source');
+                    return null;
+                }
+                return `
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, mappedBy = "${mappedByFieldName}")
+    private Set<${otherClass}> ${fieldName}s = new HashSet<>();`;
+            } else {
+                // El hijo tiene referencia al padre (este ES el campo referenciado por mappedBy)
+                return `
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id", nullable = false)
+    private ${otherClass} ${fieldName};`;
+            }
+
+        case 'aggregation':
+            // AGREGACIÓN: Similar a composición pero sin orphanRemoval
+            if (side === 'source') {
+                // El padre tiene una colección de hijos
+                // mappedBy debe apuntar al campo que existe en la clase hija que referencia al padre
+                if (!mappedByFieldName) {
+                    console.warn('⚠️ mappedByFieldName es null para agregación source');
+                    return null;
+                }
+                return `
+    @OneToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY, mappedBy = "${mappedByFieldName}")
+    private Set<${otherClass}> ${fieldName}s = new HashSet<>();`;
+            } else {
+                // El hijo tiene referencia al padre (este ES el campo referenciado por mappedBy)
+                return `
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
+    private ${otherClass} ${fieldName};`;
+            }
+
+        default:
+            return `// Relación ${rel.type} con ${otherClass}`;
+    }
+}
+
+generateAssociationSide(rel, side, currentClass, otherClass, fieldName, mappedByFieldName = null) {
+    const sourceMultiplicity = rel.sourceMultiplicity || '1';
+    const targetMultiplicity = rel.targetMultiplicity || '1';
+
+    // Determinar el tipo de relación basado en multiplicidades
+    const isSourceMany = this.isMany(sourceMultiplicity);
+    const isTargetMany = this.isMany(targetMultiplicity);
+
+    console.log('🔗 Generando asociación:', {
+        side,
+        currentClass,
+        otherClass,
+        fieldName,
+        mappedByFieldName,
+        sourceMultiplicity,
+        targetMultiplicity,
+        isSourceMany,
+        isTargetMany
+    });
+
+    if (side === 'source') {
+        if (isTargetMany) {
+            // 1 -> * : OneToMany
+            if (!mappedByFieldName) {
+                console.warn('⚠️ mappedByFieldName es null para asociación OneToMany source');
+                return null;
+            }
+            return `
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, mappedBy = "${mappedByFieldName}")
+    private Set<${otherClass}> ${fieldName}s = new HashSet<>();`;
+        } else {
+            // 1 -> 1 : OneToOne - este lado posee la relación
+            return `
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
+    private ${otherClass} ${fieldName};`;
+        }
+    } else { // side === 'target'
+        if (isSourceMany) {
+            // * -> 1 : ManyToOne - este lado tiene la foreign key
+            return `
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
+    private ${otherClass} ${fieldName};`;
+        } else {
+            // 1 -> 1 : OneToOne (lado inverso) - NO usa mappedBy en target
+            return `
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "${this.camelToSnakeCase(fieldName)}_id")
+    private ${otherClass} ${fieldName};`;
+        }
+    }
+}
+
+isMany(multiplicity) {
+    return multiplicity.includes('*') ||
+           multiplicity.includes('n') ||
+           multiplicity.includes('..') ||
+           multiplicity === '0..*' ||
+           multiplicity === '1..*';
 }
 
 generateRepository(cls) {
     const className = cls.name;
+
+    // Determinar si es una entidad de usuario para agregar métodos específicos
+    const isUserEntity = ['user', 'usuario', 'account', 'cuenta'].some(pattern =>
+        className.toLowerCase().includes(pattern)
+    );
+
+    const userSpecificMethods = isUserEntity ? `
+    // Métodos específicos para entidad de usuario
+    Optional<${className}> findByEmail(String email);
+
+    @Query("SELECT u FROM ${className} u WHERE u.email = :email")
+    Optional<${className}> findByEmailIgnoreCase(@Param("email") String email);
+
+    boolean existsByEmail(String email);` : '';
 
     return `package ${this.packageName}.domain.repository;
 
@@ -351,7 +583,7 @@ import java.util.Optional;
 @Repository
 public interface ${className}Repository extends JpaRepository<${className}, Long> {
 
-    // Métodos de consulta básicos (SIN soft delete)
+    // Métodos de consulta básicos
 
     List<${className}> findByOrderByCreatedAtDesc();
 
@@ -363,6 +595,7 @@ public interface ${className}Repository extends JpaRepository<${className}, Long
     // Buscar por ID con validación
     @Query("SELECT e FROM ${className} e WHERE e.id = :id")
     Optional<${className}> findByIdSafe(@Param("id") Long id);
+${userSpecificMethods}
 
     // TODO: Agregar métodos de consulta específicos según necesidades del negocio
     // Ejemplo:
@@ -379,6 +612,7 @@ import ${this.packageName}.domain.model.${className};
 import ${this.packageName}.domain.repository.${className}Repository;
 import ${this.packageName}.web.dto.${className}RequestDTO;
 import ${this.packageName}.web.dto.${className}ResponseDTO;
+import ${this.packageName}.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -424,7 +658,7 @@ public class ${className}Service {
         log.debug("Buscando ${className} con ID: {}", id);
 
         ${className} entity = ${this.decapitalizeFirst(className)}Repository.findById(id)
-            .orElseThrow(() -> new RuntimeException("${className} no encontrado con ID: " + id));
+            .orElseThrow(() -> EntityNotFoundException.notFound("${className}", id));
 
         return mapEntityToResponse(entity);
     }
@@ -449,7 +683,7 @@ public class ${className}Service {
         log.info("Actualizando ${className} con ID: {}", id);
 
         ${className} entity = ${this.decapitalizeFirst(className)}Repository.findById(id)
-            .orElseThrow(() -> new RuntimeException("${className} no encontrado con ID: " + id));
+            .orElseThrow(() -> EntityNotFoundException.notFound("${className}", id));
 
         mapRequestToEntity(requestDTO, entity);
         ${className} updatedEntity = ${this.decapitalizeFirst(className)}Repository.save(entity);
@@ -465,7 +699,7 @@ public class ${className}Service {
         log.info("Eliminando ${className} con ID: {}", id);
 
         ${className} entity = ${this.decapitalizeFirst(className)}Repository.findById(id)
-            .orElseThrow(() -> new RuntimeException("${className} no encontrado con ID: " + id));
+            .orElseThrow(() -> EntityNotFoundException.notFound("${className}", id));
 
         // Implementar soft delete si es necesario
         ${this.decapitalizeFirst(className)}Repository.delete(entity);
@@ -501,10 +735,23 @@ public class ${className}Service {
             const attrData = this.parseAttribute(attr);
             const fieldName = attrData.name;
             const capitalizedField = this.capitalizeFirst(fieldName);
+            const javaType = this.mapUMLTypeToJava(attrData.type);
 
-            return `        if (requestDTO.get${capitalizedField}() != null) {
-            entity.set${capitalizedField}(requestDTO.get${capitalizedField}());
-        }`;
+            // Generar validación y mapeo específico según el tipo
+            let mapping = `        if (requestDTO.get${capitalizedField}() != null) {\n`;
+
+            if (javaType === 'String') {
+                mapping += `            entity.set${capitalizedField}(requestDTO.get${capitalizedField}().trim());\n`;
+            } else if (javaType === 'LocalDateTime') {
+                mapping += `            entity.set${capitalizedField}(requestDTO.get${capitalizedField}());\n`;
+            } else if (javaType === 'BigDecimal') {
+                mapping += `            entity.set${capitalizedField}(requestDTO.get${capitalizedField}());\n`;
+            } else {
+                mapping += `            entity.set${capitalizedField}(requestDTO.get${capitalizedField}());\n`;
+            }
+
+            mapping += `        }`;
+            return mapping;
         }).join('\n');
     }
 
@@ -513,8 +760,16 @@ public class ${className}Service {
             const attrData = this.parseAttribute(attr);
             const fieldName = attrData.name;
             const capitalizedField = this.capitalizeFirst(fieldName);
+            const javaType = this.mapUMLTypeToJava(attrData.type);
 
-            return `        responseDTO.set${capitalizedField}(entity.get${capitalizedField}());`;
+            // Mapeo específico según el tipo
+            if (javaType === 'LocalDateTime') {
+                return `        responseDTO.set${capitalizedField}(entity.get${capitalizedField}());`;
+            } else if (javaType === 'BigDecimal') {
+                return `        responseDTO.set${capitalizedField}(entity.get${capitalizedField}());`;
+            } else {
+                return `        responseDTO.set${capitalizedField}(entity.get${capitalizedField}());`;
+            }
         }).join('\n');
     }
 
@@ -897,7 +1152,33 @@ ${this.generateUtilityMethods(cls.methods)}
 
     // ==================== GENERADORES DE ARCHIVOS DE CONFIGURACIÓN ====================
 
-    generatePomXml() {
+    generatePomXml(needsAuth = false) {
+        const authDependencies = needsAuth ? `
+        <!-- Spring Security -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- JWT Dependencies -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.11.5</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>` : '';
+
         return `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -940,7 +1221,7 @@ ${this.generateUtilityMethods(cls.methods)}
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
-
+${authDependencies}
         <!-- Database -->
         <dependency>
             <groupId>mysql</groupId>
@@ -1084,6 +1365,46 @@ public class ${className}Application {
     }
 
     generateReadme(classes) {
+        const authInfo = this.detectAuthenticationEntities(classes);
+        const authSection = authInfo.needsAuth ? `
+
+## 🔐 Autenticación
+
+Este proyecto incluye un **sistema de autenticación JWT completo** generado automáticamente porque se detectó una entidad **${authInfo.userEntity.name}** con campos de email y contraseña.
+
+### Endpoints de Autenticación
+
+- **POST** \`/api/auth/register\` - Registrar nuevo usuario
+- **POST** \`/api/auth/login\` - Iniciar sesión
+- **GET** \`/api/auth/validate\` - Validar token (requiere autenticación)
+
+### Ejemplo de Login
+
+\`\`\`bash
+curl -X POST http://localhost:8080/api/auth/login \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "usuario@email.com",
+    "password": "123456"
+  }'
+\`\`\`
+
+### Ejemplo de Uso con Token
+
+\`\`\`bash
+curl -X GET http://localhost:8080/api/usuario \\
+  -H "Authorization: Bearer tu_jwt_token_aqui"
+\`\`\`
+
+### Características de Seguridad
+
+- ✅ **JWT (JSON Web Tokens)** para autenticación stateless
+- ✅ **BCrypt** para cifrado de contraseñas
+- ✅ **Spring Security** configurado automáticamente
+- ✅ **CORS** habilitado para frontend
+- ✅ **Manejo de errores** personalizado
+- ✅ **Validaciones** de entrada en DTOs` : '';
+
         return `# ${this.projectName}
 
 Proyecto Spring Boot generado automáticamente desde diagrama UML.
@@ -1093,6 +1414,7 @@ Proyecto Spring Boot generado automáticamente desde diagrama UML.
 Este proyecto contiene ${classes.length} clases principales:
 
 ${classes.map(cls => `- **${cls.name}** (${cls.stereotype}): ${cls.responsibilities.join(', ') || 'Sin descripción'}`).join('\n')}
+${authSection}
 
 ## Estructura del Proyecto
 
@@ -1105,6 +1427,13 @@ src/main/java/${this.packageName.replace(/\./g, '/')}/
 ├── web/
 │   ├── controller/     # Controladores REST
 │   └── dto/           # DTOs Request/Response
+${authInfo.needsAuth ? `├── auth/
+│   ├── controller/     # AuthController
+│   ├── service/        # AuthService, UserDetailsService
+│   ├── dto/           # DTOs de autenticación
+│   └── filter/        # Filtros JWT
+├── config/            # SecurityConfig, JwtUtil
+├── exception/         # Manejo global de errores` : ''}
 └── util/              # Clases utilitarias
 \`\`\`
 
@@ -1247,7 +1576,727 @@ application-local.properties
 *.env`;
     }
 
-    // ==================== MÉTODOS UTILITARIOS ====================
+    // ==================== GENERADORES DE AUTENTICACIÓN ====================
+
+    generateSecurityConfig() {
+        return `package ${this.packageName}.config;
+
+import ${this.packageName}.auth.filter.JwtAuthenticationFilter;
+import ${this.packageName}.auth.service.UserDetailsServiceImpl;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+
+/**
+ * Configuración de Spring Security
+ * Generada automáticamente desde diagrama UML
+ */
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final UserDetailsServiceImpl userDetailsService;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/public/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+}`;
+    }
+
+    generateJwtUtil() {
+        return `package ${this.packageName}.config;
+
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+
+import java.security.Key;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+/**
+ * Utilidad para manejo de tokens JWT
+ * Generada automáticamente desde diagrama UML
+ */
+@Component
+@Slf4j
+public class JwtUtil {
+
+    @Value("\${jwt.secret:mySecretKey}")
+    private String secret;
+
+    @Value("\${jwt.expiration:86400000}") // 24 horas
+    private int jwtExpiration;
+
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    public Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getSignKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    private Boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    public String generateToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        return createToken(claims, userDetails.getUsername());
+    }
+
+    private String createToken(Map<String, Object> claims, String subject) {
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(getSignKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public Boolean validateToken(String token, UserDetails userDetails) {
+        try {
+            final String username = extractUsername(token);
+            return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        } catch (Exception e) {
+            log.error("Error validando token JWT: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private Key getSignKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+}`;
+    }
+
+    generateUserDetailsService(userEntity, authInfo) {
+        const emailField = authInfo.emailField || 'email';
+        const passwordField = authInfo.passwordField || 'password';
+
+        return `package ${this.packageName}.auth.service;
+
+import ${this.packageName}.domain.model.${userEntity.name};
+import ${this.packageName}.domain.repository.${userEntity.name}Repository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+
+/**
+ * Implementación de UserDetailsService para ${userEntity.name}
+ * Generada automáticamente desde diagrama UML
+ */
+@Service
+@RequiredArgsConstructor
+public class UserDetailsServiceImpl implements UserDetailsService {
+
+    private final ${userEntity.name}Repository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        ${userEntity.name} user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));
+
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(user.get${this.capitalizeFirst(emailField)}())
+                .password(user.get${this.capitalizeFirst(passwordField)}())
+                .authorities(new ArrayList<>()) // TODO: Implementar roles si es necesario
+                .build();
+    }
+}`;
+    }
+
+    generateAuthService(userEntity, authInfo) {
+        // Usar los nombres de campos detectados para la entidad
+        const emailField = authInfo.emailField || 'email';
+        const passwordField = authInfo.passwordField || 'password';
+
+        // Los DTOs siempre usan 'email' y 'password' estandarizados
+        const emailSetter = `set${this.capitalizeFirst(emailField)}`;
+        const passwordSetter = `set${this.capitalizeFirst(passwordField)}`;
+
+        return `package ${this.packageName}.auth.service;
+
+import ${this.packageName}.auth.dto.AuthResponseDTO;
+import ${this.packageName}.auth.dto.LoginRequestDTO;
+import ${this.packageName}.auth.dto.RegisterRequestDTO;
+import ${this.packageName}.config.JwtUtil;
+import ${this.packageName}.domain.model.${userEntity.name};
+import ${this.packageName}.domain.repository.${userEntity.name}Repository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Servicio de autenticación
+ * Generado automáticamente desde diagrama UML
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
+public class AuthService {
+
+    private final ${userEntity.name}Repository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final UserDetailsServiceImpl userDetailsService;
+    private final JwtUtil jwtUtil;
+
+    public AuthResponseDTO login(LoginRequestDTO request) {
+        log.info("Intento de login para: {}", request.getEmail());
+
+        // Autenticar usuario
+        authenticationManager.authenticate(
+            new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+
+        // Cargar detalles del usuario
+        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
+
+        // Generar token
+        String token = jwtUtil.generateToken(userDetails);
+
+        // Obtener información del usuario
+        ${userEntity.name} user = userRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        log.info("Login exitoso para: {}", request.getEmail());
+
+        return AuthResponseDTO.builder()
+            .token(token)
+            .email(user.get${this.capitalizeFirst(emailField)}())
+            .message("Login exitoso")
+            .build();
+    }
+
+    public AuthResponseDTO register(RegisterRequestDTO request) {
+        log.info("Registro de nuevo usuario: {}", request.getEmail());
+
+        // Verificar si el usuario ya existe
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new RuntimeException("El email ya está registrado");
+        }
+
+        // Crear nuevo usuario
+        ${userEntity.name} user = new ${userEntity.name}();
+        user.${emailSetter}(request.getEmail());
+        user.${passwordSetter}(passwordEncoder.encode(request.getPassword()));
+
+        // TODO: Mapear otros campos del RegisterRequestDTO
+
+        ${userEntity.name} savedUser = userRepository.save(user);
+
+        // Generar token
+        UserDetails userDetails = userDetailsService.loadUserByUsername(savedUser.get${this.capitalizeFirst(emailField)}());
+        String token = jwtUtil.generateToken(userDetails);
+
+        log.info("Usuario registrado exitosamente: {}", request.getEmail());
+
+        return AuthResponseDTO.builder()
+            .token(token)
+            .email(savedUser.get${this.capitalizeFirst(emailField)}())
+            .message("Usuario registrado exitosamente")
+            .build();
+    }
+}`;
+    }    // ==================== MÉTODOS UTILITARIOS ====================
+
+    generateAuthController(userEntity) {
+        return `package ${this.packageName}.auth.controller;
+
+import ${this.packageName}.auth.dto.AuthResponseDTO;
+import ${this.packageName}.auth.dto.LoginRequestDTO;
+import ${this.packageName}.auth.dto.RegisterRequestDTO;
+import ${this.packageName}.auth.service.AuthService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+
+/**
+ * Controlador de autenticación
+ * Generado automáticamente desde diagrama UML
+ */
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+@Slf4j
+@Validated
+@CrossOrigin(origins = "*")
+public class AuthController {
+
+    private final AuthService authService;
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO request) {
+        log.info("REST: Login attempt for {}", request.getEmail());
+        AuthResponseDTO response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<AuthResponseDTO> register(@Valid @RequestBody RegisterRequestDTO request) {
+        log.info("REST: Register attempt for {}", request.getEmail());
+        AuthResponseDTO response = authService.register(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/validate")
+    public ResponseEntity<String> validateToken() {
+        return ResponseEntity.ok("Token válido");
+    }
+}`;
+    }
+
+    generateLoginRequestDTO() {
+        return `package ${this.packageName}.auth.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+/**
+ * DTO para solicitud de login
+ * Generado automáticamente desde diagrama UML
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class LoginRequestDTO {
+
+    @NotBlank(message = "El email es obligatorio")
+    @Email(message = "El formato del email no es válido")
+    private String email;
+
+    @NotBlank(message = "La contraseña es obligatoria")
+    private String password;
+}`;
+    }
+
+    generateRegisterRequestDTO(userEntity, authInfo) {
+        const EMAIL_PATTERNS = ['email', 'correo', 'mail', 'e-mail'];
+        const PASSWORD_PATTERNS = ['password', 'contraseña', 'clave', 'pass', 'pwd'];
+
+        const userAttributes = userEntity.attributes
+            .filter(attr => {
+                const attrLower = attr.toLowerCase();
+                return !attrLower.includes('id') &&
+                       !attrLower.includes('created') &&
+                       !attrLower.includes('updated');
+            })
+            .map(attr => {
+                const attrData = this.parseAttribute(attr);
+                const javaType = this.mapUMLTypeToJava(attrData.type);
+                let fieldName = attrData.name;
+
+                // Estandarizar nombres para consistencia en DTOs
+                const fieldLower = fieldName.toLowerCase();
+                if (EMAIL_PATTERNS.some(pattern => fieldLower.includes(pattern))) {
+                    fieldName = 'email';
+                } else if (PASSWORD_PATTERNS.some(pattern => fieldLower.includes(pattern))) {
+                    fieldName = 'password';
+                }
+
+                let validation = '';
+                if (fieldName === 'email') {
+                    validation = `    @NotBlank(message = "El email es obligatorio")
+    @Email(message = "El formato del email no es válido")`;
+                } else if (fieldName === 'password') {
+                    validation = `    @NotBlank(message = "La contraseña es obligatoria")
+    @Size(min = 6, message = "La contraseña debe tener al menos 6 caracteres")`;
+                } else if (javaType === 'String') {
+                    validation = `    @NotBlank(message = "El campo ${fieldName} es obligatorio")`;
+                } else {
+                    validation = `    @NotNull(message = "El campo ${fieldName} es obligatorio")`;
+                }
+
+                return `${validation}
+    private ${javaType} ${fieldName};`;
+            }).join('\n\n');
+
+        return `package ${this.packageName}.auth.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.*;
+
+/**
+ * DTO para solicitud de registro
+ * Generado automáticamente desde diagrama UML
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RegisterRequestDTO {
+
+${userAttributes}
+}`;
+    }    generateAuthResponseDTO() {
+        return `package ${this.packageName}.auth.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * DTO para respuesta de autenticación
+ * Generado automáticamente desde diagrama UML
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AuthResponseDTO {
+
+    private String token;
+    private String email;
+    private String message;
+    private String type = "Bearer";
+}`;
+    }
+
+    generateJwtAuthenticationFilter() {
+        return `package ${this.packageName}.auth.filter;
+
+import ${this.packageName}.auth.service.UserDetailsServiceImpl;
+import ${this.packageName}.config.JwtUtil;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+/**
+ * Filtro para autenticación JWT
+ * Generado automáticamente desde diagrama UML
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtUtil jwtUtil;
+    private final UserDetailsServiceImpl userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                  HttpServletResponse response,
+                                  FilterChain filterChain) throws ServletException, IOException {
+
+        final String authHeader = request.getHeader("Authorization");
+        final String jwt;
+        final String userEmail;
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        jwt = authHeader.substring(7);
+
+        try {
+            userEmail = jwtUtil.extractUsername(jwt);
+
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+
+                if (jwtUtil.validateToken(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error procesando token JWT: {}", e.getMessage());
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}`;
+    }
+
+    generateGlobalExceptionHandler() {
+        return `package ${this.packageName}.exception;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Manejador global de excepciones
+ * Generado automáticamente desde diagrama UML
+ */
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleEntityNotFoundException(EntityNotFoundException ex) {
+        log.error("Entity not found: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.NOT_FOUND.value())
+            .error("Not Found")
+            .message(ex.getMessage())
+            .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
+        log.error("Bad credentials: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.UNAUTHORIZED.value())
+            .error("Unauthorized")
+            .message("Credenciales inválidas")
+            .build();
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUsernameNotFound(UsernameNotFoundException ex) {
+        log.error("Username not found: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.UNAUTHORIZED.value())
+            .error("Unauthorized")
+            .message("Usuario no encontrado")
+            .build();
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+
+        ErrorResponse error = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error("Validation Failed")
+            .message("Datos de entrada inválidos")
+            .validationErrors(errors)
+            .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
+        log.error("Runtime exception: {}", ex.getMessage(), ex);
+
+        ErrorResponse error = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+            .error("Internal Server Error")
+            .message(ex.getMessage())
+            .build();
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
+        log.error("Unexpected exception: {}", ex.getMessage(), ex);
+
+        ErrorResponse error = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+            .error("Internal Server Error")
+            .message("Error interno del servidor")
+            .build();
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+}
+
+@lombok.Data
+@lombok.Builder
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
+class ErrorResponse {
+    private LocalDateTime timestamp;
+    private int status;
+    private String error;
+    private String message;
+    private Map<String, String> validationErrors;
+}`;
+    }
+
+    generateEntityNotFoundException() {
+        return `package ${this.packageName}.exception;
+
+/**
+ * Excepción para entidad no encontrada
+ * Generada automáticamente desde diagrama UML
+ */
+public class EntityNotFoundException extends RuntimeException {
+
+    public EntityNotFoundException(String message) {
+        super(message);
+    }
+
+    public EntityNotFoundException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public static EntityNotFoundException notFound(String entityName, Object id) {
+        return new EntityNotFoundException(
+            String.format("%s no encontrado con ID: %s", entityName, id)
+        );
+    }
+}`;
+    }
+
+    generateAuthenticationException() {
+        return `package ${this.packageName}.exception;
+
+/**
+ * Excepción para errores de autenticación
+ * Generada automáticamente desde diagrama UML
+ */
+public class AuthenticationException extends RuntimeException {
+
+    public AuthenticationException(String message) {
+        super(message);
+    }
+
+    public AuthenticationException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}`;
+    }
 
     sanitizeProjectName(name) {
         return name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
