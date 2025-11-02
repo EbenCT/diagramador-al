@@ -1302,6 +1302,10 @@ spring.jackson.default-property-inclusion=NON_NULL
 spring.jackson.date-format=yyyy-MM-dd HH:mm:ss
 spring.jackson.time-zone=GMT-5
 
+# JWT Configuration (Secure 256-bit key)
+jwt.secret=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+jwt.expiration=86400000
+
 # Profile
 spring.profiles.active=dev`;
     }
@@ -1319,6 +1323,10 @@ spring.datasource.password=root
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 spring.jpa.format-sql=true
+
+# JWT Development
+jwt.secret=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+jwt.expiration=86400000
 
 # Logging Development
 logging.level.root=INFO
@@ -1688,7 +1696,7 @@ import java.util.function.Function;
 @Slf4j
 public class JwtUtil {
 
-    @Value("\${jwt.secret:mySecretKey}")
+    @Value("\${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
     private String secret;
 
     @Value("\${jwt.expiration:86400000}") // 24 horas
@@ -1745,8 +1753,16 @@ public class JwtUtil {
     }
 
     private Key getSignKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
-        return Keys.hmacShaKeyFor(keyBytes);
+        try {
+            // Decodificar la clave secreta desde Base64 hexadecimal
+            byte[] keyBytes = Decoders.BASE64.decode(secret);
+            // Crear clave HMAC segura (mínimo 256 bits)
+            return Keys.hmacShaKeyFor(keyBytes);
+        } catch (Exception e) {
+            log.error("Error generando clave JWT: {}", e.getMessage());
+            // Fallback: generar clave segura automáticamente
+            return Keys.secretKeyFor(SignatureAlgorithm.HS256);
+        }
     }
 }`;
     }
@@ -1873,7 +1889,8 @@ public class AuthService {
         user.${emailSetter}(request.getEmail());
         user.${passwordSetter}(passwordEncoder.encode(request.getPassword()));
 
-        // TODO: Mapear otros campos del RegisterRequestDTO
+        // Mapear automáticamente otros campos de la entidad
+${this.generateFieldMappingForRegister(userEntity, authInfo)}
 
         ${userEntity.name} savedUser = userRepository.save(user);
 
@@ -1890,7 +1907,52 @@ public class AuthService {
             .build();
     }
 }`;
-    }    // ==================== MÉTODOS UTILITARIOS ====================
+    }
+
+    generateFieldMappingForRegister(userEntity, authInfo) {
+        const mappings = [];
+        const emailField = authInfo.emailField || 'email';
+        const passwordField = authInfo.passwordField || 'password';
+        const EMAIL_PATTERNS = ['email', 'correo', 'mail', 'e-mail'];
+        const PASSWORD_PATTERNS = ['password', 'contraseña', 'clave', 'pass', 'pwd'];
+
+        // Mapear todos los campos excepto email y password que ya están mapeados
+        userEntity.attributes.forEach(attrString => {
+            const attrData = this.parseAttribute(attrString);
+            const fieldName = attrData.name;
+
+            // Saltar campos ya mapeados o campos automáticos
+            if (fieldName.toLowerCase() === 'id' ||
+                fieldName === emailField ||
+                fieldName === passwordField ||
+                fieldName.toLowerCase() === 'createdat' ||
+                fieldName.toLowerCase() === 'updatedat') {
+                return;
+            }
+
+            // Determinar el nombre del campo en el DTO (mismo que en RegisterRequestDTO)
+            const fieldLower = fieldName.toLowerCase();
+            let dtoFieldName = fieldName; // Por defecto usar el nombre original
+
+            // En el DTO se estandarizan email y password, otros campos mantienen nombre original
+            if (EMAIL_PATTERNS.some(pattern => fieldLower.includes(pattern))) {
+                dtoFieldName = 'email';
+            } else if (PASSWORD_PATTERNS.some(pattern => fieldLower.includes(pattern))) {
+                dtoFieldName = 'password';
+            }
+
+            // Generar setter para la entidad y getter del DTO
+            const entitySetter = `set${this.capitalizeFirst(fieldName)}`;
+            const dtoGetter = `get${this.capitalizeFirst(dtoFieldName)}`;
+
+            mappings.push(`        user.${entitySetter}(request.${dtoGetter}());`);
+            console.log(`Mapeo generado: request.${dtoGetter}() -> user.${entitySetter}()`);
+        });
+
+        return mappings.join('\n');
+    }
+
+    // ==================== MÉTODOS UTILITARIOS ====================
 
     generateAuthController(userEntity) {
         return `package ${this.packageName}.auth.controller;
