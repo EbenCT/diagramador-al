@@ -24,6 +24,9 @@ export class SimplePostmanGenerator {
             const entities = this.extractEntities();
             this.relationships = this.extractRelationships();
 
+            // Sincronizar relaciones con el generador Java
+            this.javaGenerator.relationships = this.relationships;
+
             if (entities.length === 0) {
                 alert('⚠️ No hay clases en el diagrama para generar endpoints.');
                 return;
@@ -805,7 +808,11 @@ export class SimplePostmanGenerator {
     generateRelationshipFieldsForPostman(className) {
         const fields = {};
 
+        console.log(`🔍 Postman: Generando FK para ${className}`);
+        console.log(`🔍 Postman: Relaciones disponibles:`, this.relationships?.length || 0);
+
         if (!this.relationships || this.relationships.length === 0) {
+            console.log(`⚠️ Postman: No hay relaciones para procesar en ${className}`);
             return fields;
         }
 
@@ -840,6 +847,7 @@ export class SimplePostmanGenerator {
             }
         });
 
+        console.log(`✅ Postman: FK generadas para ${className}:`, Object.keys(fields));
         return fields;
     }
 

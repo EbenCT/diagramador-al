@@ -22,6 +22,13 @@
                         🗑️ Limpiar
                     </button>
 
+                    {{-- Botón de Importación --}}
+                    <button
+                        id="import-xmi-btn"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center">
+                        📁 Importar XML/XMI
+                    </button>
+
                     {{-- Dropdown de Exportación --}}
                     <div class="relative" x-data="{ open: false }">
                         <button
