@@ -810,21 +810,32 @@ export class SimplePostmanGenerator {
         }
 
         this.relationships.forEach(rel => {
-            // Solo procesar relaciones donde esta clase es el lado "muchos" (tiene foreign key)
-            if (rel.target === className) {
-                // Relación @ManyToOne - esta clase tiene foreign key
-                const fieldName = this.javaGenerator.generateUniqueFieldName(rel.source.toLowerCase(), className);
+            console.log(`🔍 Postman: Analizando relación para ${className}:`, rel);
+
+            let needsForeignKey = false;
+            let relatedClass = null;
+
+            // Determinar si esta clase necesita foreign key (misma lógica que el generador Java)
+            if (rel.targetClass === className) {
+                // Esta clase es el target de la relación
+                if (rel.sourceMultiplicity === '1' && (rel.targetMultiplicity === '*' || rel.targetMultiplicity === 'many')) {
+                    needsForeignKey = true;
+                    relatedClass = rel.sourceClass;
+                }
+            } else if (rel.sourceClass === className) {
+                // Esta clase es el source de la relación
+                if (rel.targetMultiplicity === '1' && (rel.sourceMultiplicity === '*' || rel.sourceMultiplicity === 'many')) {
+                    needsForeignKey = true;
+                    relatedClass = rel.targetClass;
+                }
+            }
+
+            // Agregar foreign key field si es necesario
+            if (needsForeignKey && relatedClass) {
+                const fieldName = relatedClass.toLowerCase();
                 const foreignKeyField = `${fieldName}Id`;
 
-                // Valor de ejemplo para ID de relación
-                fields[foreignKeyField] = 1;
-
-            } else if (rel.source === className && rel.type === 'association' && rel.sourceMultiplicity !== 'many') {
-                // Relación @OneToOne donde esta clase tiene foreign key
-                const fieldName = this.javaGenerator.generateUniqueFieldName(rel.target.toLowerCase(), className);
-                const foreignKeyField = `${fieldName}Id`;
-
-                // Valor de ejemplo para ID de relación
+                console.log(`🔗 Postman: Agregando campo de relación a ${className}: ${foreignKeyField} -> ${relatedClass}`);
                 fields[foreignKeyField] = 1;
             }
         });

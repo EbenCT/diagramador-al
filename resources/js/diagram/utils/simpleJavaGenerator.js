@@ -676,13 +676,17 @@ ${userSpecificMethods}
     generateService(cls) {
         const className = cls.name;
 
+        // Generar imports para relaciones
+        const relationshipImports = this.generateServiceRelationshipImports(className);
+        const relationshipRepositories = this.generateServiceRelationshipRepositories(className);
+
         return `package ${this.packageName}.domain.service;
 
 import ${this.packageName}.domain.model.${className};
 import ${this.packageName}.domain.repository.${className}Repository;
 import ${this.packageName}.web.dto.${className}RequestDTO;
 import ${this.packageName}.web.dto.${className}ResponseDTO;
-import ${this.packageName}.exception.EntityNotFoundException;
+import ${this.packageName}.exception.EntityNotFoundException;${relationshipImports}
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -703,7 +707,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class ${className}Service {
 
-    private final ${className}Repository ${this.decapitalizeFirst(className)}Repository;
+    private final ${className}Repository ${this.decapitalizeFirst(className)}Repository;${relationshipRepositories}
 
     /**
      * Crear nueva entidad ${className}
@@ -846,36 +850,106 @@ public class ${className}Service {
         }
 
         this.relationships.forEach(rel => {
-            // Solo procesar relaciones donde esta clase es el lado "muchos" (tiene foreign key)
-            if (rel.target === className) {
-                // Relación @ManyToOne - esta clase tiene foreign key
-                const fieldName = this.generateUniqueFieldName(rel.source.toLowerCase(), className);
+            console.log(`🔧 Generando mapeo de relación para ${className}:`, rel);
+
+            let needsForeignKey = false;
+            let relatedClass = null;
+
+            // Determinar si esta clase necesita foreign key basándose en multiplicidades
+            if (rel.targetClass === className) {
+                // Esta clase es el target de la relación
+                if (rel.sourceMultiplicity === '1' && (rel.targetMultiplicity === '*' || rel.targetMultiplicity === 'many')) {
+                    needsForeignKey = true;
+                    relatedClass = rel.sourceClass;
+                }
+            } else if (rel.sourceClass === className) {
+                // Esta clase es el source de la relación
+                if (rel.targetMultiplicity === '1' && (rel.sourceMultiplicity === '*' || rel.sourceMultiplicity === 'many')) {
+                    needsForeignKey = true;
+                    relatedClass = rel.targetClass;
+                }
+            }
+
+            // Generar mapeo si necesita FK
+            if (needsForeignKey && relatedClass) {
+                const fieldName = relatedClass.toLowerCase();
                 const foreignKeyField = `${fieldName}Id`;
                 const capitalizedFK = this.capitalizeFirst(foreignKeyField);
                 const relationField = this.capitalizeFirst(fieldName);
 
+                console.log(`🔗 Mapeando FK: ${foreignKeyField} -> ${relatedClass}`);
                 mappings.push(`        if (requestDTO.get${capitalizedFK}() != null) {
-            ${rel.source} ${fieldName} = ${rel.source.toLowerCase()}Repository.findById(requestDTO.get${capitalizedFK}())
-                .orElseThrow(() -> new EntityNotFoundException("${rel.source} no encontrado con ID: " + requestDTO.get${capitalizedFK}()));
-            entity.set${relationField}(${fieldName});
-        }`);
-
-            } else if (rel.source === className && rel.type === 'association' && rel.sourceMultiplicity !== 'many') {
-                // Relación @OneToOne donde esta clase tiene foreign key
-                const fieldName = this.generateUniqueFieldName(rel.target.toLowerCase(), className);
-                const foreignKeyField = `${fieldName}Id`;
-                const capitalizedFK = this.capitalizeFirst(foreignKeyField);
-                const relationField = this.capitalizeFirst(fieldName);
-
-                mappings.push(`        if (requestDTO.get${capitalizedFK}() != null) {
-            ${rel.target} ${fieldName} = ${rel.target.toLowerCase()}Repository.findById(requestDTO.get${capitalizedFK}())
-                .orElseThrow(() -> new EntityNotFoundException("${rel.target} no encontrado con ID: " + requestDTO.get${capitalizedFK}()));
+            ${relatedClass} ${fieldName} = ${this.decapitalizeFirst(relatedClass)}Repository.findById(requestDTO.get${capitalizedFK}())
+                .orElseThrow(() -> new EntityNotFoundException("${relatedClass} no encontrado con ID: " + requestDTO.get${capitalizedFK}()));
             entity.set${relationField}(${fieldName});
         }`);
             }
+        });        return mappings;
+    }
+
+    /**
+     * Genera imports para entidades y repositorios relacionados en Services
+     */
+    generateServiceRelationshipImports(className) {
+        const imports = new Set();
+
+        if (!this.relationships || this.relationships.length === 0) {
+            return '';
+        }
+
+        this.relationships.forEach(rel => {
+            let relatedClass = null;
+
+            // Determinar qué entidad relacionada necesitamos importar
+            if (rel.targetClass === className) {
+                if (rel.sourceMultiplicity === '1' && (rel.targetMultiplicity === '*' || rel.targetMultiplicity === 'many')) {
+                    relatedClass = rel.sourceClass;
+                }
+            } else if (rel.sourceClass === className) {
+                if (rel.targetMultiplicity === '1' && (rel.sourceMultiplicity === '*' || rel.sourceMultiplicity === 'many')) {
+                    relatedClass = rel.targetClass;
+                }
+            }
+
+            if (relatedClass) {
+                imports.add(`import ${this.packageName}.domain.model.${relatedClass};`);
+                imports.add(`import ${this.packageName}.domain.repository.${relatedClass}Repository;`);
+            }
         });
 
-        return mappings;
+        return imports.size > 0 ? '\n' + Array.from(imports).join('\n') : '';
+    }
+
+    /**
+     * Genera campos de repositorios para entidades relacionadas en Services
+     */
+    generateServiceRelationshipRepositories(className) {
+        const repositories = [];
+
+        if (!this.relationships || this.relationships.length === 0) {
+            return '';
+        }
+
+        this.relationships.forEach(rel => {
+            let relatedClass = null;
+
+            // Determinar qué repositorio necesitamos
+            if (rel.targetClass === className) {
+                if (rel.sourceMultiplicity === '1' && (rel.targetMultiplicity === '*' || rel.targetMultiplicity === 'many')) {
+                    relatedClass = rel.sourceClass;
+                }
+            } else if (rel.sourceClass === className) {
+                if (rel.targetMultiplicity === '1' && (rel.sourceMultiplicity === '*' || rel.sourceMultiplicity === 'many')) {
+                    relatedClass = rel.targetClass;
+                }
+            }
+
+            if (relatedClass) {
+                repositories.push(`    private final ${relatedClass}Repository ${this.decapitalizeFirst(relatedClass)}Repository;`);
+            }
+        });
+
+        return repositories.length > 0 ? '\n' + repositories.join('\n') : '';
     }
 
     generateEntityToResponseMapping(attributes) {
@@ -1122,32 +1196,43 @@ ${this.generateDTOAttributes(cls.attributes, false, cls.name)}
         }
 
         this.relationships.forEach(rel => {
-            // Solo procesar relaciones donde esta clase es el lado "muchos" (tiene foreign key)
-            if (rel.target === className) {
-                // Relación @ManyToOne - esta clase tiene foreign key
-                const fieldName = this.generateUniqueFieldName(rel.source.toLowerCase(), className);
+            console.log(`🔍 Analizando relación para ${className}:`, rel);
+
+            let needsForeignKey = false;
+            let relatedClass = null;
+
+            // Determinar si esta clase necesita foreign key basándose en multiplicidades
+            if (rel.targetClass === className) {
+                // Esta clase es el target de la relación
+                // Si source es "1" y target es "*", entonces target (esta clase) necesita FK
+                if (rel.sourceMultiplicity === '1' && (rel.targetMultiplicity === '*' || rel.targetMultiplicity === 'many')) {
+                    needsForeignKey = true;
+                    relatedClass = rel.sourceClass;
+                    console.log(`📋 ${className} es lado MANY, necesita FK hacia ${relatedClass}`);
+                }
+            } else if (rel.sourceClass === className) {
+                // Esta clase es el source de la relación
+                // Si target es "1" y source es "*", entonces source (esta clase) necesita FK
+                if (rel.targetMultiplicity === '1' && (rel.sourceMultiplicity === '*' || rel.sourceMultiplicity === 'many')) {
+                    needsForeignKey = true;
+                    relatedClass = rel.targetClass;
+                    console.log(`📋 ${className} es lado MANY, necesita FK hacia ${relatedClass}`);
+                }
+            }
+
+            // Agregar foreign key field al DTO
+            if (needsForeignKey && relatedClass) {
+                const fieldName = relatedClass.toLowerCase();
                 const foreignKeyField = `${fieldName}Id`;
 
-                const validation = isRequest ? '\n    @NotNull(message = "El ID de ' + rel.source.toLowerCase() + ' es obligatorio")' : '';
+                const validation = isRequest ? '\n    @NotNull(message = "El ID de ' + relatedClass.toLowerCase() + ' es obligatorio")' : '';
 
-                relationshipFields.push(`
-    ${validation}
-    private Long ${foreignKeyField};`);
-
-            } else if (rel.source === className && rel.type === 'association' && rel.sourceMultiplicity !== 'many') {
-                // Relación @OneToOne donde esta clase tiene foreign key
-                const fieldName = this.generateUniqueFieldName(rel.target.toLowerCase(), className);
-                const foreignKeyField = `${fieldName}Id`;
-
-                const validation = isRequest ? '\n    @NotNull(message = "El ID de ' + rel.target.toLowerCase() + ' es obligatorio")' : '';
-
+                console.log(`➕ Agregando foreign key a ${className}: ${foreignKeyField} -> ${relatedClass}`);
                 relationshipFields.push(`
     ${validation}
     private Long ${foreignKeyField};`);
             }
-        });
-
-        return relationshipFields;
+        });        return relationshipFields;
     }
 
     generateValidations(type, nullable) {
