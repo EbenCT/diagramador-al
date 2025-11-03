@@ -12,6 +12,7 @@ import { DiagramCursorManager } from './DiagramCursorManager.js';
 import { SimpleImageExporter } from './utils/simpleImageExport.js';
 import { SimpleXMIExporter } from './utils/simpleXMIExport.js';
 import { SimpleXMIImporter } from './utils/simpleXMIImport.js';
+import { SimpleImageImporter } from './utils/simpleImageImport.js';
 import { SimpleSQLGenerator } from './utils/simpleSQLGenerator.js';
 import { SimpleJavaGenerator } from './utils/simpleJavaGenerator.js';
 import { SimplePostmanGenerator } from './utils/simplePostmanGenerator.js';
@@ -63,6 +64,7 @@ class UMLDiagramEditor {
         this.aiAnalyzer = new DiagramAIAnalyzer(this);
         this.aiEditor = new DiagramAIEditor(this);
         this.xmiImporter = new SimpleXMIImporter(this);
+        this.imageImporter = new SimpleImageImporter(this);
         this.setupEventListeners();
         this.zoomManager.setupZoomButtons();
         this.zoomManager.setupPanNavigation();
@@ -237,6 +239,12 @@ async initializeCollaboration() {
         const importXMIBtn = document.getElementById('import-xmi-btn');
         if (importXMIBtn) {
             importXMIBtn.addEventListener('click', () => this.importFromXMI());
+        }
+
+        // Botón de importación desde imagen
+        const importImageBtn = document.getElementById('import-image-btn');
+        if (importImageBtn) {
+            importImageBtn.addEventListener('click', () => this.importFromImage());
         }
 
         // Botón de generación SQL
@@ -456,10 +464,14 @@ async initializeCollaboration() {
             SimpleXMIExporter.quickExportXMI(this);
         }
 
-        // ==================== MÉTODO DE IMPORTACIÓN XMI ====================
+        // ==================== MÉTODOS DE IMPORTACIÓN ====================
 
         importFromXMI() {
             this.showXMIImportModal();
+        }
+
+        importFromImage() {
+            this.showImageImportModal();
         }
 
         showXMIImportModal() {
@@ -796,6 +808,367 @@ async initializeCollaboration() {
                 } finally {
                     startImportBtn.disabled = false;
                     startImportBtn.style.background = '#007bff';
+                    startImportBtn.style.cursor = 'pointer';
+                }
+            });
+        }
+
+        showImageImportModal() {
+            // Crear modal de importación de imágenes con CSS inline
+            const modalHtml = `
+                <div id="imageImportModal" style="
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 9999;
+                ">
+                    <div style="
+                        background: white;
+                        border-radius: 8px;
+                        width: 90%;
+                        max-width: 600px;
+                        max-height: 80vh;
+                        overflow-y: auto;
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                    ">
+                        <!-- Header -->
+                        <div style="
+                            padding: 20px;
+                            border-bottom: 1px solid #e5e5e5;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                        ">
+                            <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #333;">
+                                📷 Importar desde Imagen
+                            </h3>
+                            <button id="closeImageModalBtn" style="
+                                background: none;
+                                border: none;
+                                font-size: 24px;
+                                cursor: pointer;
+                                color: #666;
+                                padding: 0;
+                                width: 30px;
+                                height: 30px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">×</button>
+                        </div>
+
+                        <!-- Body -->
+                        <div style="padding: 20px;">
+                            <div style="margin-bottom: 20px;">
+                                <label for="imageFileInput" style="
+                                    display: block;
+                                    margin-bottom: 8px;
+                                    font-weight: 500;
+                                    color: #555;
+                                ">
+                                    Seleccionar imagen de diagrama UML:
+                                </label>
+                                <input type="file" id="imageFileInput" accept=".jpg,.jpeg,.png,.webp" style="
+                                    width: 100%;
+                                    padding: 10px;
+                                    border: 2px dashed #ddd;
+                                    border-radius: 4px;
+                                    background: #f9f9f9;
+                                    cursor: pointer;
+                                ">
+                                <p style="
+                                    margin-top: 8px;
+                                    font-size: 12px;
+                                    color: #666;
+                                    margin-bottom: 0;
+                                ">
+                                    Formatos soportados: JPG, PNG, WebP • Tamaño máximo: 5MB
+                                </p>
+                            </div>
+
+                            <div style="
+                                margin-bottom: 20px;
+                                padding: 15px;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                color: white;
+                                border-radius: 8px;
+                            ">
+                                <div style="display: flex; align-items: flex-start;">
+                                    <span style="margin-right: 10px; font-size: 24px;">🤖</span>
+                                    <div>
+                                        <p style="margin: 0 0 8px 0; font-weight: 600;">Powered by Groq AI + Llama Vision</p>
+                                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">
+                                            La IA analizará tu diagrama UML y recreará automáticamente las clases y relaciones.
+                                            Funciona con diagramas dibujados a mano, digitales, fotografías, etc.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="
+                                margin-bottom: 20px;
+                                padding: 15px;
+                                background: #fff3cd;
+                                border: 1px solid #ffeaa7;
+                                border-radius: 4px;
+                            ">
+                                <p style="margin: 0; font-size: 14px; color: #856404;">
+                                    💡 <strong>Consejos para mejores resultados:</strong><br>
+                                    • Asegúrate de que el texto sea legible<br>
+                                    • Usa imágenes con buen contraste<br>
+                                    • Incluye nombres de clases y métodos claros
+                                </p>
+                            </div>
+
+                            <!-- Progress -->
+                            <div id="imageImportProgress" style="display: none; margin-bottom: 20px;">
+                                <div style="
+                                    width: 100%;
+                                    height: 6px;
+                                    background: #f0f0f0;
+                                    border-radius: 3px;
+                                    overflow: hidden;
+                                    margin-bottom: 10px;
+                                ">
+                                    <div style="
+                                        width: 100%;
+                                        height: 100%;
+                                        background: linear-gradient(90deg, #667eea, #764ba2);
+                                        animation: pulse 1.5s ease-in-out infinite alternate;
+                                    "></div>
+                                </div>
+                                <p style="text-align: center; margin: 0; color: #666;">
+                                    🤖 Analizando imagen con IA...
+                                </p>
+                            </div>
+
+                            <!-- Result -->
+                            <div id="imageImportResult" style="display: none;"></div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="
+                            padding: 20px;
+                            border-top: 1px solid #e5e5e5;
+                            display: flex;
+                            justify-content: flex-end;
+                            gap: 10px;
+                        ">
+                            <button id="cancelImageImportBtn" style="
+                                padding: 10px 20px;
+                                border: 1px solid #ddd;
+                                background: #f8f9fa;
+                                color: #666;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 14px;
+                            ">Cancelar</button>
+                            <button id="startImageImportBtn" style="
+                                padding: 10px 20px;
+                                border: none;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                color: white;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 5px;
+                            ">
+                                🤖 Analizar con IA
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <style>
+                    @keyframes pulse {
+                        0% { opacity: 0.6; }
+                        100% { opacity: 1; }
+                    }
+
+                    #cancelImageImportBtn:hover {
+                        background: #e9ecef !important;
+                    }
+
+                    #startImageImportBtn:hover {
+                        background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%) !important;
+                    }
+
+                    #startImageImportBtn:disabled {
+                        background: #6c757d !important;
+                        cursor: not-allowed !important;
+                    }
+                </style>
+            `;
+
+            // Remover modal anterior si existe
+            const existingModal = document.getElementById('imageImportModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            // Agregar modal al DOM
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+            // Configurar eventos
+            this.setupImageImportEvents();
+
+            // Focus en el input de archivo
+            setTimeout(() => {
+                const fileInput = document.getElementById('imageFileInput');
+                if (fileInput) fileInput.focus();
+            }, 100);
+        }
+
+        setupImageImportEvents() {
+            const modal = document.getElementById('imageImportModal');
+            const fileInput = document.getElementById('imageFileInput');
+            const startImportBtn = document.getElementById('startImageImportBtn');
+            const closeModalBtn = document.getElementById('closeImageModalBtn');
+            const cancelImportBtn = document.getElementById('cancelImageImportBtn');
+            const progressDiv = document.getElementById('imageImportProgress');
+            const resultDiv = document.getElementById('imageImportResult');
+
+            if (!fileInput || !startImportBtn) {
+                console.error('Elementos del modal de importación de imagen no encontrados');
+                return;
+            }
+
+            // Función para cerrar el modal
+            const closeModal = () => {
+                if (modal) {
+                    modal.remove();
+                }
+            };
+
+            // Eventos de cierre
+            closeModalBtn.addEventListener('click', closeModal);
+            cancelImportBtn.addEventListener('click', closeModal);
+
+            // Cerrar al hacer clic fuera del modal
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+
+            // Cerrar con tecla Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal) {
+                    closeModal();
+                }
+            });
+
+            startImportBtn.addEventListener('click', async () => {
+                const file = fileInput.files[0];
+                if (!file) {
+                    this.showAlert('Por favor selecciona una imagen', 'warning');
+                    return;
+                }
+
+                try {
+                    // Mostrar progreso
+                    progressDiv.style.display = 'block';
+                    resultDiv.style.display = 'none';
+                    startImportBtn.disabled = true;
+                    startImportBtn.style.background = '#6c757d';
+                    startImportBtn.style.cursor = 'not-allowed';
+
+                    // Importar desde imagen usando el ImageImporter
+                    const result = await this.imageImporter.importFromImage(file);
+
+                    // Ocultar progreso
+                    progressDiv.style.display = 'none';
+
+                    // Mostrar resultado
+                    let resultHtml = '';
+                    if (result.success) {
+                        resultHtml = `
+                            <div style="
+                                padding: 15px;
+                                background: #d4edda;
+                                border: 1px solid #c3e6cb;
+                                border-left: 4px solid #28a745;
+                                border-radius: 4px;
+                                color: #155724;
+                            ">
+                                <div style="display: flex; align-items: flex-start;">
+                                    <span style="margin-right: 10px; color: #28a745; font-size: 18px;">✅</span>
+                                    <div>
+                                        <p style="margin: 0 0 8px 0; font-weight: 600;">¡Análisis de imagen exitoso!</p>
+                                        <div style="font-size: 14px;">
+                                            <p style="margin: 0;">Clases detectadas: ${result.classesCreated || 0}</p>
+                                            <p style="margin: 0;">Relaciones detectadas: ${result.relationshipsCreated || 0}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        // Cerrar modal después de 3 segundos
+                        setTimeout(() => {
+                            closeModal();
+                        }, 3000);
+                    } else {
+                        resultHtml = `
+                            <div style="
+                                padding: 15px;
+                                background: #f8d7da;
+                                border: 1px solid #f5c6cb;
+                                border-left: 4px solid #dc3545;
+                                border-radius: 4px;
+                                color: #721c24;
+                            ">
+                                <div style="display: flex; align-items: flex-start;">
+                                    <span style="margin-right: 10px; color: #dc3545; font-size: 18px;">❌</span>
+                                    <div>
+                                        <p style="margin: 0 0 5px 0; font-weight: 600;">Error en el análisis</p>
+                                        <p style="margin: 0; font-size: 14px;">${result.error || 'Error desconocido'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    resultDiv.innerHTML = resultHtml;
+                    resultDiv.style.display = 'block';
+
+                } catch (error) {
+                    console.error('Error durante la importación de imagen:', error);
+
+                    // Ocultar progreso
+                    progressDiv.style.display = 'none';
+
+                    // Mostrar error
+                    resultDiv.innerHTML = `
+                        <div style="
+                            padding: 15px;
+                            background: #f8d7da;
+                            border: 1px solid #f5c6cb;
+                            border-left: 4px solid #dc3545;
+                            border-radius: 4px;
+                            color: #721c24;
+                        ">
+                            <div style="display: flex; align-items: flex-start;">
+                                <span style="margin-right: 10px; color: #dc3545; font-size: 18px;">❌</span>
+                                <div>
+                                    <p style="margin: 0 0 5px 0; font-weight: 600;">Error:</p>
+                                    <p style="margin: 0; font-size: 14px;">${error.message}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                } finally {
+                    startImportBtn.disabled = false;
+                    startImportBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
                     startImportBtn.style.cursor = 'pointer';
                 }
             });
