@@ -1,12 +1,16 @@
 // resources/js/diagram/utils/simplePostmanGenerator.js
 // Generador simple de colecciones Postman desde diagramas UML
 
+import { SimpleJavaGenerator } from './simpleJavaGenerator.js';
+
 export class SimplePostmanGenerator {
     constructor(editor) {
         this.editor = editor;
         this.projectName = 'MiProyecto';
         this.baseUrl = 'http://localhost:8080';
         this.collectionId = this.generateUUID();
+        // Instancia del generador Java para usar su lógica de mapeo
+        this.javaGenerator = new SimpleJavaGenerator(editor);
     }
 
     generatePostmanCollection() {
@@ -18,7 +22,7 @@ export class SimplePostmanGenerator {
 
             // Extraer clases entities del diagrama (misma lógica que Java Generator)
             const entities = this.extractEntities();
-            const relationships = this.extractRelationships();
+            this.relationships = this.extractRelationships();
 
             if (entities.length === 0) {
                 alert('⚠️ No hay clases en el diagrama para generar endpoints.');
@@ -29,7 +33,7 @@ export class SimplePostmanGenerator {
             const authInfo = this.detectAuthenticationEntities(entities);
 
             // Generar colección completa
-            const collection = this.buildPostmanCollection(entities, relationships, authInfo);
+            const collection = this.buildPostmanCollection(entities, this.relationships, authInfo);
 
             // Descargar
             this.downloadCollection(collection);
@@ -332,8 +336,9 @@ export class SimplePostmanGenerator {
                 return;
             }
 
-            // Agregar campo con valor de ejemplo
-            requestBody[fieldName] = this.generateSampleValue(attrData.type, fieldName);
+            // Agregar campo con valor de ejemplo usando tipos Java exactos
+            const javaType = this.javaGenerator.mapUMLTypeToJava(attrData.type);
+            requestBody[fieldName] = this.generateSampleValueForJavaType(javaType, fieldName, attrData.type);
         });
 
         return {
@@ -778,13 +783,53 @@ export class SimplePostmanGenerator {
     generateRequestBody(entity) {
         const body = {};
 
+        // Agregar atributos regulares
         entity.attributes.forEach(attr => {
             const attrData = this.parseAttribute(attr);
-            // Usar camelCase como en los DTOs del Spring Boot generator
-            body[attrData.name] = this.generateSampleValue(attrData.type, attrData.name);
+            const javaType = this.javaGenerator.mapUMLTypeToJava(attrData.type);
+
+            // Usar exactamente la misma lógica que los DTOs del backend
+            body[attrData.name] = this.generateSampleValueForJavaType(javaType, attrData.name, attrData.type);
         });
 
+        // Agregar campos de relación (foreign keys)
+        const relationshipFields = this.generateRelationshipFieldsForPostman(entity.name);
+        Object.assign(body, relationshipFields);
+
         return body;
+    }
+
+    /**
+     * Genera campos de relación (foreign keys) para Postman
+     */
+    generateRelationshipFieldsForPostman(className) {
+        const fields = {};
+
+        if (!this.relationships || this.relationships.length === 0) {
+            return fields;
+        }
+
+        this.relationships.forEach(rel => {
+            // Solo procesar relaciones donde esta clase es el lado "muchos" (tiene foreign key)
+            if (rel.target === className) {
+                // Relación @ManyToOne - esta clase tiene foreign key
+                const fieldName = this.javaGenerator.generateUniqueFieldName(rel.source.toLowerCase(), className);
+                const foreignKeyField = `${fieldName}Id`;
+
+                // Valor de ejemplo para ID de relación
+                fields[foreignKeyField] = 1;
+
+            } else if (rel.source === className && rel.type === 'association' && rel.sourceMultiplicity !== 'many') {
+                // Relación @OneToOne donde esta clase tiene foreign key
+                const fieldName = this.javaGenerator.generateUniqueFieldName(rel.target.toLowerCase(), className);
+                const foreignKeyField = `${fieldName}Id`;
+
+                // Valor de ejemplo para ID de relación
+                fields[foreignKeyField] = 1;
+            }
+        });
+
+        return fields;
     }
 
     generateSampleResponse(entity, type) {
@@ -796,8 +841,9 @@ export class SimplePostmanGenerator {
 
         entity.attributes.forEach(attr => {
             const attrData = this.parseAttribute(attr);
-            // Usar camelCase como en los ResponseDTOs del Spring Boot generator
-            body[attrData.name] = this.generateSampleValue(attrData.type, attrData.name);
+            const javaType = this.javaGenerator.mapUMLTypeToJava(attrData.type);
+            // Usar exactamente la misma lógica que los ResponseDTOs del Spring Boot generator
+            body[attrData.name] = this.generateSampleValueForJavaType(javaType, attrData.name, attrData.type);
         });
 
         let responseBody;
@@ -879,6 +925,47 @@ export class SimplePostmanGenerator {
         };
 
         return typeMap[type] || 'Valor de ejemplo';
+    }
+
+    /**
+     * Genera valores de ejemplo basados exactamente en los tipos Java del backend
+     */
+    generateSampleValueForJavaType(javaType, fieldName, originalType) {
+        const lowerName = fieldName.toLowerCase();
+
+        // Valores específicos basados en el nombre del campo (prioritarios)
+        if (lowerName.includes('email')) return 'usuario@ejemplo.com';
+        if (lowerName.includes('password') || lowerName.includes('contraseña')) return 'MiContraseña123';
+        if (lowerName.includes('nombre') || lowerName.includes('name')) return 'Ejemplo Nombre';
+        if (lowerName.includes('descripcion') || lowerName.includes('description')) return 'Descripción de ejemplo';
+        if (lowerName.includes('precio') || lowerName.includes('price')) return '99.99';
+        if (lowerName.includes('cantidad') || lowerName.includes('quantity')) return 10;
+        if (lowerName.includes('telefono') || lowerName.includes('phone')) return '+1234567890';
+        if (lowerName.includes('direccion') || lowerName.includes('address')) return 'Calle Ejemplo 123';
+        if (lowerName.includes('codigo') || lowerName.includes('code')) return 'ABC123';
+        if (lowerName.includes('sitio') || lowerName.includes('web') || lowerName.includes('url')) return 'https://ejemplo.com';
+
+        // Mapeo exacto por tipos Java (como los genera el SimpleJavaGenerator)
+        const javaTypeMap = {
+            'String': 'Valor de ejemplo',
+            'int': 42,
+            'Integer': 42,
+            'long': 123456789,
+            'Long': 123456789,
+            'double': 99.99,
+            'Double': 99.99,
+            'float': 99.9,
+            'Float': 99.9,
+            'boolean': true,
+            'Boolean': true,
+            'Date': '2024-01-15T10:30:00',
+            'LocalDateTime': '2024-01-15T10:30:00',
+            'LocalDate': '2024-01-15',
+            'LocalTime': '14:30:00',
+            'BigDecimal': '999.99'
+        };
+
+        return javaTypeMap[javaType] || 'Valor de ejemplo';
     }
 
     // ==================== GENERADORES DE TESTS ====================

@@ -22,7 +22,7 @@ export class SimpleJavaGenerator {
 
             // Extraer clases y relaciones del diagrama
             const classes = this.extractClasses();
-            const relationships = this.extractRelationships();
+            this.relationships = this.extractRelationships();
 
             if (classes.length === 0) {
                 alert('⚠️ No hay clases en el diagrama para generar código.');
@@ -30,7 +30,7 @@ export class SimpleJavaGenerator {
             }
 
             // Generar proyecto completo
-            const zip = await this.buildSpringBootProject(classes, relationships);
+            const zip = await this.buildSpringBootProject(classes, this.relationships);
 
             // Descargar
             this.downloadProject(zip);
@@ -171,6 +171,33 @@ extractRelationships() {
     });
 
     console.log('🔗 Relaciones extraídas:', relationships.length);
+
+    // Debug detallado de relaciones para diagramas complejos
+    if (relationships.length > 0) {
+        console.group('📊 Análisis de relaciones:');
+        relationships.forEach((rel, index) => {
+            console.log(`${index + 1}. ${rel.sourceClass} (${rel.sourceMultiplicity || '1'}) ${rel.type} ${rel.targetClass} (${rel.targetMultiplicity || '1'})`);
+        });
+
+        // Detectar posibles conflictos de nombres
+        const entityRelationCounts = {};
+        relationships.forEach(rel => {
+            const sourceKey = `${rel.sourceClass}`;
+            const targetKey = `${rel.targetClass}`;
+            entityRelationCounts[sourceKey] = (entityRelationCounts[sourceKey] || 0) + 1;
+            entityRelationCounts[targetKey] = (entityRelationCounts[targetKey] || 0) + 1;
+        });
+
+        const complexEntities = Object.entries(entityRelationCounts)
+            .filter(([entity, count]) => count > 2)
+            .map(([entity, count]) => `${entity}(${count} relaciones)`);
+
+        if (complexEntities.length > 0) {
+            console.warn('⚠️ Entidades con múltiples relaciones (posibles conflictos de nombres):', complexEntities);
+        }
+        console.groupEnd();
+    }
+
     return relationships;
 }
 
@@ -264,11 +291,13 @@ extractRelationships() {
             // Filtro JWT
             zip.file(`${srcPath}/auth/filter/JwtAuthenticationFilter.java`, this.generateJwtAuthenticationFilter());
 
-            // Excepciones personalizadas
-            zip.file(`${srcPath}/exception/GlobalExceptionHandler.java`, this.generateGlobalExceptionHandler());
-            zip.file(`${srcPath}/exception/EntityNotFoundException.java`, this.generateEntityNotFoundException());
+            // Excepciones de autenticación
             zip.file(`${srcPath}/exception/AuthenticationException.java`, this.generateAuthenticationException());
         }
+
+        // Excepciones globales (siempre necesarias para los Services)
+        zip.file(`${srcPath}/exception/GlobalExceptionHandler.java`, this.generateGlobalExceptionHandler(authInfo.needsAuth));
+        zip.file(`${srcPath}/exception/EntityNotFoundException.java`, this.generateEntityNotFoundException());
 
         // Generar archivos de configuración
         zip.file('pom.xml', this.generatePomXml(authInfo.needsAuth));
@@ -373,6 +402,7 @@ ${this.generateEntityRelationships(className, entityRelationships)}
 
 generateEntityRelationships(className, relationships) {
     const allRelationships = [];
+    const generatedFields = new Set(); // Para evitar campos duplicados
 
     relationships.forEach(rel => {
         console.log('🔗 Procesando relación para clase:', className, rel);
@@ -384,7 +414,8 @@ generateEntityRelationships(className, relationships) {
         if (isSource) {
             // Esta clase es la fuente de la relación
             const targetClass = rel.targetClass;
-            const fieldName = this.decapitalizeFirst(targetClass);
+            const baseFieldName = this.decapitalizeFirst(targetClass);
+            const fieldName = this.generateUniqueFieldName(baseFieldName, generatedFields, rel);
 
             // Para determinar mappedBy, necesitamos el nombre del campo en el target que apunta de vuelta
             // Si es 1-to-many, el lado many (target) debe tener un campo que referencie al uno (source)
@@ -396,27 +427,66 @@ generateEntityRelationships(className, relationships) {
 
             const relationship = this.generateRelationshipSide(rel, 'source', className, targetClass, fieldName, mappedByFieldName);
             if (relationship) {
-                console.log('✅ Lado SOURCE generado para', className, '->', targetClass);
+                console.log('✅ Lado SOURCE generado para', className, '->', targetClass, 'campo:', fieldName);
                 allRelationships.push(relationship);
+                generatedFields.add(fieldName);
             }
         }
 
         if (isTarget) {
             // Esta clase es el destino de la relación
             const sourceClass = rel.sourceClass;
-            const fieldName = this.decapitalizeFirst(sourceClass);
+            const baseFieldName = this.decapitalizeFirst(sourceClass);
+            const fieldName = this.generateUniqueFieldName(baseFieldName, generatedFields, rel);
 
             // El lado target nunca usa mappedBy en relaciones OneToMany (es el lado que posee la FK)
             const relationship = this.generateRelationshipSide(rel, 'target', className, sourceClass, fieldName, null);
             if (relationship) {
-                console.log('✅ Lado TARGET generado para', sourceClass, '->', className);
+                console.log('✅ Lado TARGET generado para', sourceClass, '->', className, 'campo:', fieldName);
                 allRelationships.push(relationship);
+                generatedFields.add(fieldName);
             }
         }
     });
 
     return allRelationships.join('\n');
-}generateRelationshipSide(rel, side, currentClass, otherClass, fieldName, mappedByFieldName = null) {
+}
+
+generateUniqueFieldName(baseFieldName, generatedFields, rel) {
+    let fieldName = baseFieldName;
+    let counter = 1;
+
+    // Si ya existe, agregar sufijo basado en el tipo de relación o contador
+    while (generatedFields.has(fieldName)) {
+        // Intentar nombres más descriptivos basados en el tipo de relación
+        if (counter === 1) {
+            if (rel.type === 'composition') {
+                fieldName = `${baseFieldName}Composition`;
+            } else if (rel.type === 'aggregation') {
+                fieldName = `${baseFieldName}Aggregation`;
+            } else if (rel.name && rel.name.trim()) {
+                // Usar el nombre de la relación si está disponible
+                fieldName = this.decapitalizeFirst(rel.name.trim().replace(/\s+/g, ''));
+            } else {
+                fieldName = `${baseFieldName}${counter}`;
+            }
+        } else {
+            fieldName = `${baseFieldName}${counter}`;
+        }
+        counter++;
+
+        // Prevenir bucle infinito
+        if (counter > 10) {
+            fieldName = `${baseFieldName}${Date.now()}`;
+            break;
+        }
+    }
+
+    console.log(`🏷️ Campo único generado: ${baseFieldName} -> ${fieldName}`);
+    return fieldName;
+}
+
+generateRelationshipSide(rel, side, currentClass, otherClass, fieldName, mappedByFieldName = null) {
     console.log('🔧 Generando lado de relación:', {
         side: side,
         currentClass: currentClass,
@@ -712,7 +782,7 @@ public class ${className}Service {
     private void mapRequestToEntity(${className}RequestDTO requestDTO, ${className} entity) {
         // TODO: Implementar mapeo específico de campos
         // Ejemplo básico:
-        ${this.generateDtoToEntityMapping(cls.attributes)}
+        ${this.generateDtoToEntityMapping(cls.attributes, cls.name)}
     }
 
     private ${className}ResponseDTO mapEntityToResponse(${className} entity) {
@@ -730,8 +800,11 @@ public class ${className}Service {
 }`;
     }
 
-    generateDtoToEntityMapping(attributes) {
-        return attributes.map(attr => {
+    generateDtoToEntityMapping(attributes, className = null) {
+        let mappings = [];
+
+        // Mapeo de atributos regulares
+        mappings = mappings.concat(attributes.map(attr => {
             const attrData = this.parseAttribute(attr);
             const fieldName = attrData.name;
             const capitalizedField = this.capitalizeFirst(fieldName);
@@ -752,7 +825,57 @@ public class ${className}Service {
 
             mapping += `        }`;
             return mapping;
-        }).join('\n');
+        }));
+
+        // Mapeo de relaciones (foreign keys)
+        if (className && this.relationships) {
+            mappings = mappings.concat(this.generateRelationshipMappings(className));
+        }
+
+        return mappings.join('\n');
+    }
+
+    /**
+     * Genera mapeos de campos de relación (foreign keys) en DTOs
+     */
+    generateRelationshipMappings(className) {
+        const mappings = [];
+
+        if (!this.relationships || this.relationships.length === 0) {
+            return mappings;
+        }
+
+        this.relationships.forEach(rel => {
+            // Solo procesar relaciones donde esta clase es el lado "muchos" (tiene foreign key)
+            if (rel.target === className) {
+                // Relación @ManyToOne - esta clase tiene foreign key
+                const fieldName = this.generateUniqueFieldName(rel.source.toLowerCase(), className);
+                const foreignKeyField = `${fieldName}Id`;
+                const capitalizedFK = this.capitalizeFirst(foreignKeyField);
+                const relationField = this.capitalizeFirst(fieldName);
+
+                mappings.push(`        if (requestDTO.get${capitalizedFK}() != null) {
+            ${rel.source} ${fieldName} = ${rel.source.toLowerCase()}Repository.findById(requestDTO.get${capitalizedFK}())
+                .orElseThrow(() -> new EntityNotFoundException("${rel.source} no encontrado con ID: " + requestDTO.get${capitalizedFK}()));
+            entity.set${relationField}(${fieldName});
+        }`);
+
+            } else if (rel.source === className && rel.type === 'association' && rel.sourceMultiplicity !== 'many') {
+                // Relación @OneToOne donde esta clase tiene foreign key
+                const fieldName = this.generateUniqueFieldName(rel.target.toLowerCase(), className);
+                const foreignKeyField = `${fieldName}Id`;
+                const capitalizedFK = this.capitalizeFirst(foreignKeyField);
+                const relationField = this.capitalizeFirst(fieldName);
+
+                mappings.push(`        if (requestDTO.get${capitalizedFK}() != null) {
+            ${rel.target} ${fieldName} = ${rel.target.toLowerCase()}Repository.findById(requestDTO.get${capitalizedFK}())
+                .orElseThrow(() -> new EntityNotFoundException("${rel.target} no encontrado con ID: " + requestDTO.get${capitalizedFK}()));
+            entity.set${relationField}(${fieldName});
+        }`);
+            }
+        });
+
+        return mappings;
     }
 
     generateEntityToResponseMapping(attributes) {
@@ -889,7 +1012,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ${className}RequestDTO {
 
-${this.generateDTOAttributes(cls.attributes, true)}
+${this.generateDTOAttributes(cls.attributes, true, cls.name)}
 
     // TODO: Agregar validaciones específicas según reglas de negocio
 }`;
@@ -917,7 +1040,7 @@ public class ${className}ResponseDTO {
 
     private Long id;
 
-${this.generateDTOAttributes(cls.attributes, false)}
+${this.generateDTOAttributes(cls.attributes, false, cls.name)}
 
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
@@ -965,17 +1088,66 @@ ${this.generateDTOAttributes(cls.attributes, false)}
         return typeMap[umlType] || 'String';
     }
 
-    generateDTOAttributes(attributes, isRequest) {
-        return attributes.map(attr => {
+    generateDTOAttributes(attributes, isRequest, className = null) {
+        let dtoFields = [];
+
+        // Agregar atributos regulares
+        attributes.forEach(attr => {
             const attrData = this.parseAttribute(attr);
             const javaType = this.mapUMLTypeToJava(attrData.type);
-            const validations = isRequest ? this.generateValidations(attrData.type, true) : '';
+            const validations = isRequest ? this.generateValidations(attrData.type, false) : '';
 
-            return `
+            dtoFields.push(`
     ${validations}
-    @JsonProperty("${this.camelToSnakeCase(attrData.name)}")
-    private ${javaType} ${attrData.name};`;
-        }).join('\n');
+    private ${javaType} ${attrData.name};`);
+        });
+
+        // Si tenemos el nombre de la clase, agregar campos de relación
+        if (className && this.relationships) {
+            const relationshipFields = this.generateRelationshipDTOFields(className, isRequest);
+            dtoFields = dtoFields.concat(relationshipFields);
+        }
+
+        return dtoFields.join('\n');
+    }
+
+    /**
+     * Genera campos de relación (foreign keys) para DTOs
+     */
+    generateRelationshipDTOFields(className, isRequest) {
+        const relationshipFields = [];
+
+        if (!this.relationships || this.relationships.length === 0) {
+            return relationshipFields;
+        }
+
+        this.relationships.forEach(rel => {
+            // Solo procesar relaciones donde esta clase es el lado "muchos" (tiene foreign key)
+            if (rel.target === className) {
+                // Relación @ManyToOne - esta clase tiene foreign key
+                const fieldName = this.generateUniqueFieldName(rel.source.toLowerCase(), className);
+                const foreignKeyField = `${fieldName}Id`;
+
+                const validation = isRequest ? '\n    @NotNull(message = "El ID de ' + rel.source.toLowerCase() + ' es obligatorio")' : '';
+
+                relationshipFields.push(`
+    ${validation}
+    private Long ${foreignKeyField};`);
+
+            } else if (rel.source === className && rel.type === 'association' && rel.sourceMultiplicity !== 'many') {
+                // Relación @OneToOne donde esta clase tiene foreign key
+                const fieldName = this.generateUniqueFieldName(rel.target.toLowerCase(), className);
+                const foreignKeyField = `${fieldName}Id`;
+
+                const validation = isRequest ? '\n    @NotNull(message = "El ID de ' + rel.target.toLowerCase() + ' es obligatorio")' : '';
+
+                relationshipFields.push(`
+    ${validation}
+    private Long ${foreignKeyField};`);
+            }
+        });
+
+        return relationshipFields;
     }
 
     generateValidations(type, nullable) {
@@ -2187,14 +2359,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 }`;
     }
 
-    generateGlobalExceptionHandler() {
+    generateGlobalExceptionHandler(needsAuth = false) {
+        const securityImports = needsAuth ?
+            `import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;` : '';
+
         return `package ${this.packageName}.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.http.ResponseEntity;${securityImports ? '\n' + securityImports : ''}
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -2224,7 +2398,7 @@ public class GlobalExceptionHandler {
             .build();
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-    }
+    }${needsAuth ? `
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
@@ -2252,7 +2426,7 @@ public class GlobalExceptionHandler {
             .build();
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-    }
+    }` : ''}
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
