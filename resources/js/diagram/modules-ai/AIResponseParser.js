@@ -116,7 +116,7 @@ extractBubbles(text) {
 }
 
 extractProblems(text) {
-   
+
     return this.extractStructuredMessages(text, 'ADVERTENCIA');
 }
 
@@ -360,7 +360,7 @@ extractErrors(text) {
         const elements = this.editor.graph.getElements();
         return elements.find(element => {
             const umlData = element.get('umlData');
-            return umlData?.className === className;
+            return umlData?.className?.toLowerCase() === className?.toLowerCase();
         });
     }
 
@@ -454,13 +454,13 @@ isUniqueChange(change) {
             const element = this.findElementByClassName(change.className);
             if (!element) return false;
             const attributes = element.get('umlData')?.attributes || [];
-            return !attributes.includes(change.attribute);
+            return !attributes.some(attr => attr.toLowerCase() === change.attribute.toLowerCase());
 
         case 'ADD_METHOD':
             const elementM = this.findElementByClassName(change.className);
             if (!elementM) return false;
             const methods = elementM.get('umlData')?.methods || [];
-            return !methods.includes(change.method);
+            return !methods.some(method => method.toLowerCase() === change.method.toLowerCase());
 
         case 'CREATE_RELATION':
             const sourceEl = this.findElementByClassName(change.sourceClass);

@@ -1,12 +1,16 @@
 // resources/js/diagram/utils/simplePostmanGenerator.js
 // Generador simple de colecciones Postman desde diagramas UML
 
+import { SimpleJavaGenerator } from './simpleJavaGenerator.js';
+
 export class SimplePostmanGenerator {
     constructor(editor) {
         this.editor = editor;
         this.projectName = 'MiProyecto';
         this.baseUrl = 'http://localhost:8080';
         this.collectionId = this.generateUUID();
+        // Instancia del generador Java para usar su lógica de mapeo
+        this.javaGenerator = new SimpleJavaGenerator(editor);
     }
 
     generatePostmanCollection() {
@@ -18,15 +22,21 @@ export class SimplePostmanGenerator {
 
             // Extraer clases entities del diagrama (misma lógica que Java Generator)
             const entities = this.extractEntities();
-            const relationships = this.extractRelationships();
+            this.relationships = this.extractRelationships();
+
+            // Sincronizar relaciones con el generador Java
+            this.javaGenerator.relationships = this.relationships;
 
             if (entities.length === 0) {
-                alert('⚠️ No hay entidades (clases con estereotipo <<entity>>) en el diagrama para generar endpoints.');
+                alert('⚠️ No hay clases en el diagrama para generar endpoints.');
                 return;
             }
 
+            // Detectar si necesita autenticación JWT
+            const authInfo = this.detectAuthenticationEntities(entities);
+
             // Generar colección completa
-            const collection = this.buildPostmanCollection(entities, relationships);
+            const collection = this.buildPostmanCollection(entities, this.relationships, authInfo);
 
             // Descargar
             this.downloadCollection(collection);
@@ -48,28 +58,92 @@ export class SimplePostmanGenerator {
         });
     }
 
+    // Copiar lógica de detección de autenticación del Spring Boot Generator
+    detectAuthenticationEntities(entities) {
+        // Patrones de detección (mismos que Spring Boot Generator)
+        const USER_PATTERNS = ['user', 'usuario', 'account', 'cuenta', 'cliente', 'client'];
+        const EMAIL_PATTERNS = ['email', 'correo', 'mail', 'e-mail'];
+        const PASSWORD_PATTERNS = ['password', 'contraseña', 'clave', 'pass', 'pwd'];
+
+        // Buscar entidad de usuario
+        const userEntity = entities.find(entity => {
+            const className = entity.name.toLowerCase();
+            return USER_PATTERNS.some(pattern => className.includes(pattern));
+        });
+
+        if (!userEntity) {
+            console.log('❌ No se encontró entidad de usuario para autenticación');
+            return { needsAuth: false };
+        }
+
+        console.log('✅ Entidad de usuario encontrada:', userEntity.name);
+
+        // Verificar si tiene campos de email y password
+        const attributes = userEntity.attributes.map(attr => attr.toLowerCase());
+
+        const hasEmail = attributes.some(attr =>
+            EMAIL_PATTERNS.some(pattern => attr.includes(pattern))
+        );
+
+        const hasPassword = attributes.some(attr =>
+            PASSWORD_PATTERNS.some(pattern => attr.includes(pattern))
+        );
+
+        console.log('📧 Tiene email:', hasEmail);
+        console.log('🔒 Tiene password:', hasPassword);
+
+        if (hasEmail && hasPassword) {
+            console.log('🎉 Endpoints de autenticación JWT serán incluidos');
+            return {
+                needsAuth: true,
+                userEntity: userEntity,
+                emailField: this.findFieldName(userEntity.attributes, EMAIL_PATTERNS),
+                passwordField: this.findFieldName(userEntity.attributes, PASSWORD_PATTERNS)
+            };
+        }
+
+        console.log('⚠️ Faltan campos necesarios para autenticación');
+        return { needsAuth: false };
+    }
+
+    findFieldName(attributes, patterns) {
+        const foundAttr = attributes.find(attr => {
+            const attrLower = attr.toLowerCase();
+            return patterns.some(pattern => attrLower.includes(pattern));
+        });
+
+        if (foundAttr) {
+            const parsed = this.parseAttribute(foundAttr);
+            return parsed.name;
+        }
+        return null;
+    }
+
     extractEntities() {
         const entities = [];
         const elements = this.editor.graph.getElements();
 
         elements.forEach(element => {
             const umlData = element.get('umlData');
-            // Solo procesar clases con estereotipo 'entity'
-            if (umlData && umlData.type === 'class' && umlData.uml25?.stereotype === 'entity') {
+            // Procesar TODAS las clases (misma lógica que Spring Boot Generator)
+            if (umlData && umlData.type === 'class') {
                 const className = umlData.className || 'UnnamedEntity';
+                const stereotype = umlData.uml25?.stereotype || 'entity'; // Default a entity
 
                 entities.push({
                     id: element.id,
                     name: className,
+                    stereotype: stereotype,
                     attributes: umlData.attributes || [],
                     methods: umlData.methods || [],
-                    responsibilities: umlData.uml25?.responsibilities || []
+                    responsibilities: umlData.uml25?.responsibilities || [],
+                    constraints: umlData.uml25?.constraints || []
                 });
             }
         });
 
-        console.log('🏗️ Entidades extraídas:', entities.length,
-            'clases:', entities.map(e => e.name));
+        console.log('🏗️ Entidades extraídas:', entities.length, 'con estereotipos:',
+            entities.map(e => `${e.name}(${e.stereotype})`));
         return entities;
     }
 
@@ -86,47 +160,67 @@ export class SimplePostmanGenerator {
                 const sourceUml = source.get('umlData');
                 const targetUml = target.get('umlData');
 
-                // Solo relaciones entre entities
-                if (sourceUml?.type === 'class' && targetUml?.type === 'class' &&
-                    sourceUml?.uml25?.stereotype === 'entity' && targetUml?.uml25?.stereotype === 'entity') {
+                // Procesar relaciones entre TODAS las clases (misma lógica que Spring Boot)
+                if (sourceUml?.type === 'class' && targetUml?.type === 'class') {
                     relationships.push({
-                        sourceEntity: sourceUml.className,
-                        targetEntity: targetUml.className,
+                        id: link.id,
+                        sourceClass: sourceUml.className,
+                        targetClass: targetUml.className,
+                        sourceEntity: sourceUml.className, // Compatibilidad
+                        targetEntity: targetUml.className, // Compatibilidad
                         type: umlData.relationshipType || 'association',
-                        sourceMultiplicity: umlData.sourceMultiplicity || '',
-                        targetMultiplicity: umlData.targetMultiplicity || ''
+                        sourceMultiplicity: umlData.sourceMultiplicity || '1',
+                        targetMultiplicity: umlData.targetMultiplicity || '1',
+                        name: umlData.name || ''
                     });
                 }
             }
         });
 
-        console.log('🔗 Relaciones entre entidades:', relationships.length);
+        console.log('🔗 Relaciones extraídas:', relationships.length,
+            'relaciones:', relationships.map(r => `${r.sourceClass} -> ${r.targetClass}`));
         return relationships;
     }
 
-    buildPostmanCollection(entities, relationships) {
+    buildPostmanCollection(entities, relationships, authInfo = { needsAuth: false }) {
+        const authSection = authInfo.needsAuth ?
+            `**🔐 Autenticación JWT:**\\n` +
+            `- Sistema de autenticación detectado automáticamente\\n` +
+            `- JWT seguro con clave de 256 bits (cumple RFC 7518)\\n` +
+            `- Usar /api/auth/login para obtener token\\n` +
+            `- Token se guarda automáticamente en variable {{jwtToken}}\\n` +
+            `- Expiración: 24 horas (configurable en application.properties)\\n\\n` : '';
+
         const collection = {
             info: {
                 _postman_id: this.collectionId,
                 name: `${this.projectName} - API REST`,
                 description: `Colección Postman generada automáticamente desde diagrama UML\\n\\n` +
                             `**Entidades incluidas:** ${entities.map(e => e.name).join(', ')}\\n\\n` +
+                            authSection +
                             `**Configuración:**\\n` +
                             `- Configura la variable {{baseUrl}} = ${this.baseUrl}\\n` +
                             `- Asegúrate de que el servidor Spring Boot esté ejecutándose\\n\\n` +
                             `**Endpoints generados:**\\n` +
                             `- CRUD completo para cada entidad\\n` +
-                            `- Tests automáticos incluidos\\n\\n` +
+                            `- Tests automáticos incluidos\\n` +
+                            `- Autenticación JWT (si se detectó usuario)\\n\\n` +
                             `*Generado por UML Diagrammer*`,
                 schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
             },
             item: [],
-            variable: this.generateEnvironmentVariables()
+            variable: this.generateEnvironmentVariables(authInfo.needsAuth)
         };
+
+        // Agregar carpeta de autenticación JWT si se detectó
+        if (authInfo.needsAuth) {
+            const authFolder = this.generateAuthFolder(authInfo);
+            collection.item.push(authFolder);
+        }
 
         // Generar carpetas y endpoints por entidad
         entities.forEach(entity => {
-            const entityFolder = this.generateEntityFolder(entity, relationships);
+            const entityFolder = this.generateEntityFolder(entity, relationships, authInfo.needsAuth);
             collection.item.push(entityFolder);
         });
 
@@ -143,7 +237,173 @@ export class SimplePostmanGenerator {
         return collection;
     }
 
-    generateEntityFolder(entity, relationships) {
+    generateAuthFolder(authInfo) {
+        return {
+            name: "🔐 Autenticación JWT",
+            item: [
+                this.generateLoginEndpoint(authInfo),
+                this.generateRegisterEndpoint(authInfo)
+            ]
+        };
+    }
+
+    generateLoginEndpoint(authInfo) {
+        const requestBody = {};
+        requestBody[authInfo.emailField] = "usuario@ejemplo.com";
+        requestBody[authInfo.passwordField] = "password123";
+
+        return {
+            name: "🔑 Login",
+            request: {
+                method: "POST",
+                header: [
+                    {
+                        key: "Content-Type",
+                        value: "application/json"
+                    },
+                    {
+                        key: "Accept",
+                        value: "application/json"
+                    }
+                ],
+                body: {
+                    mode: "raw",
+                    raw: JSON.stringify(requestBody, null, 2)
+                },
+                url: {
+                    raw: "{{baseUrl}}/api/auth/login",
+                    host: ["{{baseUrl}}"],
+                    path: ["api", "auth", "login"]
+                },
+                description: `Autenticación con JWT Token seguro\\n\\n` +
+                           `**Credenciales de ejemplo:**\\n` +
+                           `- ${authInfo.emailField}: usuario@ejemplo.com\\n` +
+                           `- ${authInfo.passwordField}: password123\\n\\n` +
+                           `**Seguridad JWT:**\\n` +
+                           `- Algoritmo: HMAC-SHA256 (HS256)\\n` +
+                           `- Clave: 256 bits (cumple RFC 7518)\\n` +
+                           `- Expiración: 24 horas\\n\\n` +
+                           `**Respuesta esperada:**\\n` +
+                           `- Status: 200 OK\\n` +
+                           `- JWT token seguro en el response\\n` +
+                           `- Token se guarda automáticamente en variable {{jwtToken}}`
+            },
+            event: [
+                {
+                    listen: "test",
+                    script: {
+                        exec: [
+                            "pm.test('Login exitoso', function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});",
+                            "",
+                            "pm.test('Response contiene token JWT', function () {",
+                            "    const jsonData = pm.response.json();",
+                            "    pm.expect(jsonData).to.have.property('token');",
+                            "    pm.expect(jsonData.token).to.be.a('string');",
+                            "});",
+                            "",
+                            "// Guardar token JWT para otros endpoints",
+                            "if (pm.response.code === 200) {",
+                            "    const jsonData = pm.response.json();",
+                            "    pm.collectionVariables.set('jwtToken', jsonData.token);",
+                            "    console.log('🔑 JWT Token guardado para requests posteriores');",
+                            "}"
+                        ]
+                    }
+                }
+            ]
+        };
+    }
+
+    generateRegisterEndpoint(authInfo) {
+        const requestBody = {};
+        // En el RegisterRequestDTO, email y password se estandarizan
+        requestBody["email"] = "nuevo@ejemplo.com";
+        requestBody["password"] = "password123";
+
+        // Otros campos mantienen sus nombres originales de la entidad
+        // Agregar todos los campos no-email/password de la entidad usuario
+        authInfo.userEntity.attributes.forEach(attrString => {
+            const attrData = this.parseAttribute(attrString);
+            const fieldName = attrData.name;
+            const fieldLower = fieldName.toLowerCase();
+
+            // Saltar campos automáticos y ya incluidos
+            if (fieldName.toLowerCase() === 'id' ||
+                fieldLower.includes('email') ||
+                fieldLower.includes('password') ||
+                fieldLower.includes('contraseña') ||
+                fieldName.toLowerCase() === 'createdat' ||
+                fieldName.toLowerCase() === 'updatedat') {
+                return;
+            }
+
+            // Agregar campo con valor de ejemplo usando tipos Java exactos
+            const javaType = this.javaGenerator.mapUMLTypeToJava(attrData.type);
+            requestBody[fieldName] = this.generateSampleValueForJavaType(javaType, fieldName, attrData.type);
+        });
+
+        return {
+            name: "📝 Register",
+            request: {
+                method: "POST",
+                header: [
+                    {
+                        key: "Content-Type",
+                        value: "application/json"
+                    },
+                    {
+                        key: "Accept",
+                        value: "application/json"
+                    }
+                ],
+                body: {
+                    mode: "raw",
+                    raw: JSON.stringify(requestBody, null, 2)
+                },
+                url: {
+                    raw: "{{baseUrl}}/api/auth/register",
+                    host: ["{{baseUrl}}"],
+                    path: ["api", "auth", "register"]
+                },
+                description: `Registro de nuevo usuario\\n\\n` +
+                           `**Datos requeridos:**\\n` +
+                           `- ${authInfo.emailField}: Email único\\n` +
+                           `- ${authInfo.passwordField}: Contraseña (mín. 6 caracteres)\\n` +
+                           `- nombre: Nombre del usuario\\n\\n` +
+                           `**Respuesta esperada:**\\n` +
+                           `- Status: 201 Created\\n` +
+                           `- JWT token del nuevo usuario`
+            },
+            event: [
+                {
+                    listen: "test",
+                    script: {
+                        exec: [
+                            "pm.test('Registro exitoso', function () {",
+                            "    pm.response.to.have.status(201);",
+                            "});",
+                            "",
+                            "pm.test('Response contiene token JWT', function () {",
+                            "    const jsonData = pm.response.json();",
+                            "    pm.expect(jsonData).to.have.property('token');",
+                            "});",
+                            "",
+                            "// Guardar token del nuevo usuario",
+                            "if (pm.response.code === 201) {",
+                            "    const jsonData = pm.response.json();",
+                            "    pm.collectionVariables.set('jwtToken', jsonData.token);",
+                            "    console.log('🔑 JWT Token del nuevo usuario guardado');",
+                            "}"
+                        ]
+                    }
+                }
+            ]
+        };
+    }
+
+    generateEntityFolder(entity, relationships, hasAuth = false) {
         const entityName = entity.name;
         const entityPath = this.camelToKebabCase(entityName);
         const entityRelationships = relationships.filter(r =>
@@ -153,30 +413,39 @@ export class SimplePostmanGenerator {
         return {
             name: `📦 ${entityName}`,
             item: [
-                this.generateGetAllEndpoint(entity),
-                this.generateGetByIdEndpoint(entity),
-                this.generateCreateEndpoint(entity),
-                this.generateUpdateEndpoint(entity),
-                this.generateDeleteEndpoint(entity),
+                this.generateGetAllEndpoint(entity, hasAuth),
+                this.generateGetByIdEndpoint(entity, hasAuth),
+                this.generateCreateEndpoint(entity, hasAuth),
+                this.generateUpdateEndpoint(entity, hasAuth),
+                this.generateDeleteEndpoint(entity, hasAuth),
                 // Endpoints específicos de relaciones para esta entidad
                 ...this.generateEntityRelationshipEndpoints(entity, entityRelationships)
             ]
         };
     }
 
-    generateGetAllEndpoint(entity) {
+    generateGetAllEndpoint(entity, hasAuth = false) {
         const entityPath = this.camelToKebabCase(entity.name);
+        const headers = [
+            {
+                key: "Accept",
+                value: "application/json"
+            }
+        ];
+
+        // Agregar header JWT si hay autenticación
+        if (hasAuth) {
+            headers.push({
+                key: "Authorization",
+                value: "Bearer {{jwtToken}}"
+            });
+        }
 
         return {
             name: `📋 Obtener todos los ${entity.name}`,
             request: {
                 method: "GET",
-                header: [
-                    {
-                        key: "Accept",
-                        value: "application/json"
-                    }
-                ],
+                header: headers,
                 url: {
                     raw: "{{baseUrl}}/api/" + entityPath,
                     host: ["{{baseUrl}}"],
@@ -196,19 +465,27 @@ export class SimplePostmanGenerator {
         };
     }
 
-    generateGetByIdEndpoint(entity) {
+    generateGetByIdEndpoint(entity, hasAuth = false) {
         const entityPath = this.camelToKebabCase(entity.name);
+        const headers = [
+            {
+                key: "Accept",
+                value: "application/json"
+            }
+        ];
+
+        if (hasAuth) {
+            headers.push({
+                key: "Authorization",
+                value: "Bearer {{jwtToken}}"
+            });
+        }
 
         return {
             name: `🔍 Obtener ${entity.name} por ID`,
             request: {
                 method: "GET",
-                header: [
-                    {
-                        key: "Accept",
-                        value: "application/json"
-                    }
-                ],
+                header: headers,
                 url: {
                     raw: "{{baseUrl}}/api/" + entityPath + "/{{entityId}}",
                     host: ["{{baseUrl}}"],
@@ -230,24 +507,32 @@ export class SimplePostmanGenerator {
         };
     }
 
-    generateCreateEndpoint(entity) {
+    generateCreateEndpoint(entity, hasAuth = false) {
         const entityPath = this.camelToKebabCase(entity.name);
         const requestBody = this.generateRequestBody(entity);
+        const headers = [
+            {
+                key: "Content-Type",
+                value: "application/json"
+            },
+            {
+                key: "Accept",
+                value: "application/json"
+            }
+        ];
+
+        if (hasAuth) {
+            headers.push({
+                key: "Authorization",
+                value: "Bearer {{jwtToken}}"
+            });
+        }
 
         return {
             name: `➕ Crear nuevo ${entity.name}`,
             request: {
                 method: "POST",
-                header: [
-                    {
-                        key: "Content-Type",
-                        value: "application/json"
-                    },
-                    {
-                        key: "Accept",
-                        value: "application/json"
-                    }
-                ],
+                header: headers,
                 body: {
                     mode: "raw",
                     raw: JSON.stringify(requestBody, null, 2)
@@ -273,24 +558,32 @@ export class SimplePostmanGenerator {
         };
     }
 
-    generateUpdateEndpoint(entity) {
+    generateUpdateEndpoint(entity, hasAuth = false) {
         const entityPath = this.camelToKebabCase(entity.name);
         const requestBody = this.generateRequestBody(entity);
+        const headers = [
+            {
+                key: "Content-Type",
+                value: "application/json"
+            },
+            {
+                key: "Accept",
+                value: "application/json"
+            }
+        ];
+
+        if (hasAuth) {
+            headers.push({
+                key: "Authorization",
+                value: "Bearer {{jwtToken}}"
+            });
+        }
 
         return {
             name: `✏️ Actualizar ${entity.name}`,
             request: {
                 method: "PUT",
-                header: [
-                    {
-                        key: "Content-Type",
-                        value: "application/json"
-                    },
-                    {
-                        key: "Accept",
-                        value: "application/json"
-                    }
-                ],
+                header: headers,
                 body: {
                     mode: "raw",
                     raw: JSON.stringify(requestBody, null, 2)
@@ -318,19 +611,27 @@ export class SimplePostmanGenerator {
         };
     }
 
-    generateDeleteEndpoint(entity) {
+    generateDeleteEndpoint(entity, hasAuth = false) {
         const entityPath = this.camelToKebabCase(entity.name);
+        const headers = [
+            {
+                key: "Accept",
+                value: "application/json"
+            }
+        ];
+
+        if (hasAuth) {
+            headers.push({
+                key: "Authorization",
+                value: "Bearer {{jwtToken}}"
+            });
+        }
 
         return {
             name: `🗑️ Eliminar ${entity.name}`,
             request: {
                 method: "DELETE",
-                header: [
-                    {
-                        key: "Accept",
-                        value: "application/json"
-                    }
-                ],
+                header: headers,
                 url: {
                     raw: "{{baseUrl}}/api/" + entityPath + "/{{entityId}}",
                     host: ["{{baseUrl}}"],
@@ -485,24 +786,83 @@ export class SimplePostmanGenerator {
     generateRequestBody(entity) {
         const body = {};
 
+        // Agregar atributos regulares
         entity.attributes.forEach(attr => {
             const attrData = this.parseAttribute(attr);
-            body[this.camelToSnakeCase(attrData.name)] = this.generateSampleValue(attrData.type, attrData.name);
+            const javaType = this.javaGenerator.mapUMLTypeToJava(attrData.type);
+
+            // Usar exactamente la misma lógica que los DTOs del backend
+            body[attrData.name] = this.generateSampleValueForJavaType(javaType, attrData.name, attrData.type);
         });
 
+        // Agregar campos de relación (foreign keys)
+        const relationshipFields = this.generateRelationshipFieldsForPostman(entity.name);
+        Object.assign(body, relationshipFields);
+
         return body;
+    }
+
+    /**
+     * Genera campos de relación (foreign keys) para Postman
+     */
+    generateRelationshipFieldsForPostman(className) {
+        const fields = {};
+
+        console.log(`🔍 Postman: Generando FK para ${className}`);
+        console.log(`🔍 Postman: Relaciones disponibles:`, this.relationships?.length || 0);
+
+        if (!this.relationships || this.relationships.length === 0) {
+            console.log(`⚠️ Postman: No hay relaciones para procesar en ${className}`);
+            return fields;
+        }
+
+        this.relationships.forEach(rel => {
+            console.log(`🔍 Postman: Analizando relación para ${className}:`, rel);
+
+            let needsForeignKey = false;
+            let relatedClass = null;
+
+            // Determinar si esta clase necesita foreign key (misma lógica que el generador Java)
+            if (rel.targetClass === className) {
+                // Esta clase es el target de la relación
+                if (rel.sourceMultiplicity === '1' && (rel.targetMultiplicity === '*' || rel.targetMultiplicity === 'many')) {
+                    needsForeignKey = true;
+                    relatedClass = rel.sourceClass;
+                }
+            } else if (rel.sourceClass === className) {
+                // Esta clase es el source de la relación
+                if (rel.targetMultiplicity === '1' && (rel.sourceMultiplicity === '*' || rel.sourceMultiplicity === 'many')) {
+                    needsForeignKey = true;
+                    relatedClass = rel.targetClass;
+                }
+            }
+
+            // Agregar foreign key field si es necesario
+            if (needsForeignKey && relatedClass) {
+                const fieldName = relatedClass.toLowerCase();
+                const foreignKeyField = `${fieldName}Id`;
+
+                console.log(`🔗 Postman: Agregando campo de relación a ${className}: ${foreignKeyField} -> ${relatedClass}`);
+                fields[foreignKeyField] = 1;
+            }
+        });
+
+        console.log(`✅ Postman: FK generadas para ${className}:`, Object.keys(fields));
+        return fields;
     }
 
     generateSampleResponse(entity, type) {
         const body = {
             id: 1,
-            created_at: "2024-01-15T10:30:00",
-            updated_at: "2024-01-15T10:30:00"
+            createdAt: "2024-01-15T10:30:00",
+            updatedAt: "2024-01-15T10:30:00"
         };
 
         entity.attributes.forEach(attr => {
             const attrData = this.parseAttribute(attr);
-            body[this.camelToSnakeCase(attrData.name)] = this.generateSampleValue(attrData.type, attrData.name);
+            const javaType = this.javaGenerator.mapUMLTypeToJava(attrData.type);
+            // Usar exactamente la misma lógica que los ResponseDTOs del Spring Boot generator
+            body[attrData.name] = this.generateSampleValueForJavaType(javaType, attrData.name, attrData.type);
         });
 
         let responseBody;
@@ -586,6 +946,47 @@ export class SimplePostmanGenerator {
         return typeMap[type] || 'Valor de ejemplo';
     }
 
+    /**
+     * Genera valores de ejemplo basados exactamente en los tipos Java del backend
+     */
+    generateSampleValueForJavaType(javaType, fieldName, originalType) {
+        const lowerName = fieldName.toLowerCase();
+
+        // Valores específicos basados en el nombre del campo (prioritarios)
+        if (lowerName.includes('email')) return 'usuario@ejemplo.com';
+        if (lowerName.includes('password') || lowerName.includes('contraseña')) return 'MiContraseña123';
+        if (lowerName.includes('nombre') || lowerName.includes('name')) return 'Ejemplo Nombre';
+        if (lowerName.includes('descripcion') || lowerName.includes('description')) return 'Descripción de ejemplo';
+        if (lowerName.includes('precio') || lowerName.includes('price')) return '99.99';
+        if (lowerName.includes('cantidad') || lowerName.includes('quantity')) return 10;
+        if (lowerName.includes('telefono') || lowerName.includes('phone')) return '+1234567890';
+        if (lowerName.includes('direccion') || lowerName.includes('address')) return 'Calle Ejemplo 123';
+        if (lowerName.includes('codigo') || lowerName.includes('code')) return 'ABC123';
+        if (lowerName.includes('sitio') || lowerName.includes('web') || lowerName.includes('url')) return 'https://ejemplo.com';
+
+        // Mapeo exacto por tipos Java (como los genera el SimpleJavaGenerator)
+        const javaTypeMap = {
+            'String': 'Valor de ejemplo',
+            'int': 42,
+            'Integer': 42,
+            'long': 123456789,
+            'Long': 123456789,
+            'double': 99.99,
+            'Double': 99.99,
+            'float': 99.9,
+            'Float': 99.9,
+            'boolean': true,
+            'Boolean': true,
+            'Date': '2024-01-15T10:30:00',
+            'LocalDateTime': '2024-01-15T10:30:00',
+            'LocalDate': '2024-01-15',
+            'LocalTime': '14:30:00',
+            'BigDecimal': '999.99'
+        };
+
+        return javaTypeMap[javaType] || 'Valor de ejemplo';
+    }
+
     // ==================== GENERADORES DE TESTS ====================
 
     generateBasicTest(operationName) {
@@ -598,12 +999,30 @@ export class SimplePostmanGenerator {
                     "});",
                     "",
                     "pm.test('Response time razonable', function () {",
-                    "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                    "    pm.expect(pm.response.responseTime).to.be.below(3000);",
                     "});",
+                    "",
+                    "// Validar JWT si hay token en headers",
+                    "if (pm.request.headers.get('Authorization')) {",
+                    "    pm.test('JWT Token present', function () {",
+                    "        const authHeader = pm.request.headers.get('Authorization');",
+                    "        pm.expect(authHeader).to.include('Bearer');",
+                    "    });",
+                    "}",
                     "",
                     "if (pm.response.code === 200 || pm.response.code === 201) {",
                     "    pm.test('Content-Type es JSON', function () {",
                     "        pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                    "    });",
+                    "",
+                    "    pm.test('Response structure válida', function () {",
+                    "        const jsonData = pm.response.json();",
+                    "        pm.expect(jsonData).to.be.an('object');",
+                    "        if (Array.isArray(jsonData)) {",
+                    "            pm.expect(jsonData).to.be.an('array');",
+                    "        } else {",
+                    "            pm.expect(jsonData).to.have.property('id');",
+                    "        }",
                     "    });",
                     "}"
                 ]
@@ -661,8 +1080,8 @@ export class SimplePostmanGenerator {
 
     // ==================== CONFIGURACIÓN DE VARIABLES ====================
 
-    generateEnvironmentVariables() {
-        return [
+    generateEnvironmentVariables(hasAuth = false) {
+        const variables = [
             {
                 key: "baseUrl",
                 value: this.baseUrl,
@@ -674,6 +1093,16 @@ export class SimplePostmanGenerator {
                 description: "ID de entidad para pruebas (se actualiza automáticamente)"
             }
         ];
+
+        if (hasAuth) {
+            variables.push({
+                key: "jwtToken",
+                value: "",
+                description: "JWT Token de autenticación (se llena automáticamente al hacer login)"
+            });
+        }
+
+        return variables;
     }
 
     // ==================== MÉTODOS AUXILIARES ====================
