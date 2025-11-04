@@ -186,6 +186,17 @@
                                 Generar Postman
                                 <span class="ml-auto text-xs text-gray-400">API Collection</span>
                             </button>
+
+                            <button
+                                id="generate-flutter-btn"
+                                @click="open = false"
+                                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 flex items-center">
+                                <svg class="w-4 h-4 mr-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                </svg>
+                                Generar Flutter
+                                <span class="ml-auto text-xs text-gray-400">Mobile App</span>
+                            </button>
                         </div>
                     </div>
                 </div>

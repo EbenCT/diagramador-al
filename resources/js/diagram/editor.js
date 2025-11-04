@@ -16,6 +16,7 @@ import { SimpleImageImporter } from './utils/simpleImageImport.js';
 import { SimpleSQLGenerator } from './utils/simpleSQLGenerator.js';
 import { SimpleJavaGenerator } from './utils/simpleJavaGenerator.js';
 import { SimplePostmanGenerator } from './utils/simplePostmanGenerator.js';
+import { SimpleFlutterGenerator } from './utils/simpleFlutterGenerator.js';
 import { DiagramAIAnalyzer } from './modules-ai/DiagramAIAnalyzer.js';
 import { DiagramAIEditor } from './modules-ai/DiagramAIEditor.js';
 // Configurar JointJS correctamente
@@ -262,6 +263,12 @@ async initializeCollaboration() {
         if (generatePostmanBtn) {
             generatePostmanBtn.addEventListener('click', () => this.generatePostmanCollection());
         }
+
+        // Botón de generación Flutter
+        const generateFlutterBtn = document.getElementById('generate-flutter-btn');
+        if (generateFlutterBtn) {
+            generateFlutterBtn.addEventListener('click', () => this.generateFlutterProject());
+        }
     }
 
     // ==================== SELECCIÓN DE HERRAMIENTAS ====================
@@ -424,6 +431,28 @@ async initializeCollaboration() {
 
     generatePostmanCollection() {
         SimplePostmanGenerator.quickGeneratePostman(this);
+    }
+
+    async generateFlutterProject() {
+        console.log('📱 Generando proyecto Flutter...');
+
+        try {
+            const result = await SimpleFlutterGenerator.quickGenerateFlutter(this);
+
+            if (result.success) {
+                console.log('✅ Proyecto Flutter generado exitosamente');
+                alert(`✅ Proyecto Flutter generado exitosamente!\n\n` +
+                      `📊 ${result.entitiesCount} entidades procesadas\n` +
+                      `🔐 Autenticación: ${result.hasAuth ? 'Incluida' : 'No detectada'}\n\n` +
+                      `El proyecto Flutter completo se ha descargado como ZIP.`);
+            } else {
+                console.error('❌ Error generando proyecto Flutter:', result.error);
+                alert(`❌ Error generando proyecto Flutter:\n${result.error}`);
+            }
+        } catch (error) {
+            console.error('❌ Error generando proyecto Flutter:', error);
+            alert(`❌ Error generando proyecto Flutter:\n${error.message}`);
+        }
     }
 
     getState() {
