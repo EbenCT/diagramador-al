@@ -138,14 +138,16 @@ export class SimpleFlutterGenerator {
         // Buscar clases con campos de autenticación
         for (const cls of this.classes) {
             const attributes = cls.attributes || [];
-            const hasEmail = attributes.some(attr =>
-                attr.toLowerCase().includes('email') ||
-                attr.toLowerCase().includes('username')
-            );
-            const hasPassword = attributes.some(attr =>
-                attr.toLowerCase().includes('password') ||
-                attr.toLowerCase().includes('pass')
-            );
+            const hasEmail = attributes.some(attr => {
+                const attrName = typeof attr === 'string' ? attr : attr.name;
+                return attrName.toLowerCase().includes('email') ||
+                       attrName.toLowerCase().includes('username');
+            });
+            const hasPassword = attributes.some(attr => {
+                const attrName = typeof attr === 'string' ? attr : attr.name;
+                return attrName.toLowerCase().includes('password') ||
+                       attrName.toLowerCase().includes('pass');
+            });
 
             if (hasEmail && hasPassword) {
                 this.hasAuthentication = true;
@@ -1250,27 +1252,27 @@ ${attributes.filter(attr => attr.name !== 'id').map(attr => {
     return `            CustomTextField(
               controller: _${attr.name}Controller,
               label: '${attr.name}',
-              ${attr.required ? 'validator: (value) => value?.isEmpty ?? true ? \'${attr.name} is required\' : null,' : ''}
+              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} is required' : null,` : ''}
             ),`;
   } else if (attr.dartType === 'int' || attr.dartType === 'double') {
     return `            CustomTextField(
               controller: _${attr.name}Controller,
               label: '${attr.name}',
               keyboardType: TextInputType.number,
-              ${attr.required ? 'validator: (value) => value?.isEmpty ?? true ? \'${attr.name} is required\' : null,' : ''}
+              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} is required' : null,` : ''}
             ),`;
   } else if (attr.dartType === 'DateTime') {
     return `            CustomTextField(
               controller: _${attr.name}Controller,
               label: '${attr.name}',
               keyboardType: TextInputType.datetime,
-              ${attr.required ? 'validator: (value) => value?.isEmpty ?? true ? \'${attr.name} is required\' : null,' : ''}
+              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} is required' : null,` : ''}
             ),`;
   }
   return `            CustomTextField(
               controller: _${attr.name}Controller,
               label: '${attr.name}',
-              ${attr.required ? 'validator: (value) => value?.isEmpty ?? true ? \'${attr.name} is required\' : null,' : ''}
+              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} is required' : null,` : ''}
             ),`;
 }).join('\n            const SizedBox(height: 16),\n')}
 
@@ -1284,7 +1286,7 @@ ${foreignKeys.map(fk => `            Consumer<${fk.className}Provider>(
                     child: Text(item.toString()), // TODO: Implement proper display
                   )).toList(),
                   onChanged: (value) => setState(() => _selected${fk.className}Id = value),
-                  ${fk.required ? 'validator: (value) => value == null ? \'${fk.className} is required\' : null,' : ''}
+                  ${fk.required ? `validator: (value) => value == null ? '${fk.className} is required' : null,` : ''}
                 );
               },
             ),`).join('\n            const SizedBox(height: 16),\n')}
