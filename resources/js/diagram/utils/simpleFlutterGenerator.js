@@ -179,8 +179,12 @@ export class SimpleFlutterGenerator {
             'lib/utils',
             'android',
             'android/app',
+            'android/gradle',
+            'android/gradle/wrapper',
             'android/app/src',
             'android/app/src/main',
+            'android/app/src/main/kotlin',
+            `android/app/src/main/kotlin/${this.packageName.replace(/\./g, '/')}`,
             'ios',
             'ios/Runner'
         ];
@@ -306,7 +310,7 @@ class AppTheme {
         centerTitle: true,
         elevation: 0,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -799,6 +803,27 @@ ${this.classes.map(cls => `            _buildMenuCard(
         // Android config
         zip.file('android/app/build.gradle', this.generateAndroidBuildGradle());
         zip.file('android/app/src/main/AndroidManifest.xml', this.generateAndroidManifest());
+        zip.file(`android/app/src/main/kotlin/${this.packageName.replace(/\./g, '/')}/MainActivity.kt`, this.generateMainActivity());
+        zip.file('android/build.gradle', this.generateRootBuildGradle());
+        zip.file('android/gradle.properties', this.generateGradleProperties());
+        zip.file('android/settings.gradle', this.generateSettingsGradle());
+        zip.file('android/gradle/wrapper/gradle-wrapper.properties', this.generateGradleWrapperProperties());
+
+        // Android resources
+        zip.file('android/app/src/main/res/values/styles.xml', this.generateAndroidStylesXml());
+        zip.file('android/app/src/main/res/values-night/styles.xml', this.generateAndroidStylesNightXml());
+        zip.file('android/app/src/main/res/drawable/launch_background.xml', this.generateLaunchBackgroundXml());
+        zip.file('android/app/src/main/res/drawable-v21/launch_background.xml', this.generateLaunchBackgroundV21Xml());
+
+        // Android launcher icons (placeholder for all densities)
+        const iconBase64 = this.generateAndroidIconPlaceholder();
+        const densities = ['hdpi', 'mdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi'];
+        densities.forEach(density => {
+            zip.file(`android/app/src/main/res/mipmap-${density}/ic_launcher.png`, iconBase64, {base64: true});
+        });
+
+        // iOS config basic
+        zip.file('ios/Runner/Info.plist', this.generateInfoPlist());
     }
 
     generatePubspec() {
@@ -1852,72 +1877,53 @@ analyzer:
     }
 
     generateAndroidBuildGradle() {
-        return `def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
+        return `plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id "dev.flutter.flutter-gradle-plugin"
 }
-
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-}
-
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "\$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
-    compileSdkVersion 33
-    ndkVersion flutter.ndkVersion
+    namespace = "${this.packageName}"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'
-    }
-
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
+        jvmTarget = JavaVersion.VERSION_1_8
     }
 
     defaultConfig {
-        applicationId "${this.packageName}"
-        minSdkVersion 21
-        targetSdkVersion 33
-        versionCode 1
-        versionName "1.0"
+        applicationId = "${this.packageName}"
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig = signingConfigs.debug
         }
     }
 }
 
 flutter {
-    source '../..'
-}
-
-dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:\$kotlin_version"
+    source = "../.."
 }`;
     }
 
     generateAndroidManifest() {
-        return `<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="${this.packageName}">
-
+        return `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-   <application
+    <application
         android:label="${this.projectName}"
         android:name="\${applicationName}"
         android:icon="@mipmap/ic_launcher">
@@ -1925,23 +1931,41 @@ dependencies {
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
+            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
-            <intent-filter android:autoVerify="true">
+            <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
 </manifest>`;
     }
 
@@ -1968,6 +1992,208 @@ dependencies {
   static const int networkTimeout = 30;
   static const int maxRetries = 3;
 }`;
+    }
+
+    generateMainActivity() {
+        return `package ${this.packageName}
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity: FlutterActivity()`;
+    }
+
+    generateAndroidStylesXml() {
+        return `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is off -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <!-- Show a splash screen on the activity. Automatically removed when
+             the Flutter engine draws its first frame -->
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <!-- Theme applied to the Android Window as soon as the process has started.
+         This theme determines the color of the Android Window while your
+         Flutter UI initializes, as well as behind your Flutter UI while its
+         running.
+
+         This Theme is only used starting with V2 of Flutter's Android embedding. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>`;
+    }
+
+    generateAndroidStylesNightXml() {
+        return `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is on -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <!-- Show a splash screen on the activity. Automatically removed when
+             the Flutter engine draws its first frame -->
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <!-- Theme applied to the Android Window as soon as the process has started.
+         This theme determines the color of the Android Window while your
+         Flutter UI initializes, as well as behind your Flutter UI while its
+         running.
+
+         This Theme is only used starting with V2 of Flutter's Android embedding. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>`;
+    }
+
+    generateLaunchBackgroundXml() {
+        return `<?xml version="1.0" encoding="utf-8"?>
+<!-- Modify this file to customize your launch splash screen -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
+
+    <!-- You can insert your own image assets here -->
+    <!-- <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/launch_image" />
+    </item> -->
+</layer-list>`;
+    }
+
+    generateLaunchBackgroundV21Xml() {
+        return `<?xml version="1.0" encoding="utf-8"?>
+<!-- Modify this file to customize your launch splash screen -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="?android:colorBackground" />
+
+    <!-- You can insert your own image assets here -->
+    <!-- <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/launch_image" />
+    </item> -->
+</layer-list>`;
+    }
+
+    generateAndroidIconPlaceholder() {
+        // Create a simple base64 PNG placeholder icon (48x48 white square with blue border)
+        return 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADYSURBVGhD7ZjBDYAgDEWpB7yYneMS13AUN5gbIx6QgRqTGiAk0P+ThENf+dCUJFmWZQ2Uusd1mXXD5V74LXJcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JcF3JclySJbQD2fM5HMLL+RQAAAABJRU5ErkJggg==';
+    }
+
+    generateRootBuildGradle() {
+        return `allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "\${rootProject.buildDir}/\${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}`;
+    }
+
+    generateGradleProperties() {
+        return `org.gradle.jvmargs=-Xmx1536M
+android.useAndroidX=true
+android.enableJetifier=true`;
+    }
+
+    generateSettingsGradle() {
+        return `pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
+
+    includeBuild("\$flutterSdkPath/packages/flutter_tools/gradle")
+
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "8.1.0" apply false
+    id "org.jetbrains.kotlin.android" version "1.8.22" apply false
+}
+
+include ":app"`;
+    }
+
+    generateInfoPlist() {
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>\$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>\${PRODUCT_NAME}</string>
+	<key>CFBundleExecutable</key>
+	<string>\$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>\$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>\${PRODUCT_NAME}</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>\$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>\$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+</dict>
+</plist>`;
+    }
+
+    generateGradleWrapperProperties() {
+        return `distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.3-all.zip`;
     }
 
     // ==================== UTILIDADES DE NAMING ====================
