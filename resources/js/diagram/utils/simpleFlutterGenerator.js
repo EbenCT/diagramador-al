@@ -449,7 +449,17 @@ ${allAttributes.map(attr => `    this.${attr.name},`).join('\n')}
 
   factory ${cls.className}.fromJson(Map<String, dynamic> json) {
     return ${cls.className}(
-${allAttributes.map(attr => `      ${attr.name}: json['${attr.jsonKey}'],`).join('\n')}
+${allAttributes.map(attr => {
+  if (attr.dartType === 'DateTime') {
+    return `      ${attr.name}: json['${attr.jsonKey}'] != null ? DateTime.parse(json['${attr.jsonKey}']) : null,`;
+  } else if (attr.dartType === 'int') {
+    return `      ${attr.name}: json['${attr.jsonKey}']?.toInt(),`;
+  } else if (attr.dartType === 'double') {
+    return `      ${attr.name}: json['${attr.jsonKey}']?.toDouble(),`;
+  } else {
+    return `      ${attr.name}: json['${attr.jsonKey}'],`;
+  }
+}).join('\n')}
     );
   }
 
@@ -457,7 +467,7 @@ ${allAttributes.map(attr => `      ${attr.name}: json['${attr.jsonKey}'],`).join
     return {
 ${allAttributes.map(attr => {
   if (attr.dartType === 'DateTime') {
-    return `      '${attr.jsonKey}': ${attr.name}?.toIso8601String().split('T')[0],`;
+    return `      '${attr.jsonKey}': ${attr.name}?.toIso8601String(),`;
   } else {
     return `      '${attr.jsonKey}': ${attr.name},`;
   }
