@@ -213,9 +213,13 @@ export class SimpleFlutterGenerator {
         return `import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'app.dart';
+import 'services/api_service.dart';
 ${this.generateProviderImports()}
 
 void main() {
+  // Initialize API Service
+  ApiService().initialize();
+
   runApp(
     MultiProvider(
       providers: [
@@ -263,8 +267,20 @@ class MyApp extends StatelessWidget {
     }
 
     generateApiConfig() {
-        return `class ApiConfig {
-  static const String baseUrl = 'http://${this.baseUrl}/api';
+        return `import 'package:flutter/foundation.dart' show kIsWeb;
+
+class ApiConfig {
+  // Detectar plataforma y usar URL apropiada
+  static String get baseUrl {
+    if (kIsWeb) {
+      // Para Flutter Web usar localhost
+      return 'http://localhost:8080/api';
+    } else {
+      // Para Android emulador usar 10.0.2.2
+      // Para iOS simulador, cambiar a 'http://localhost:8080/api'
+      return 'http://10.0.2.2:8080/api';
+    }
+  }
 
   // Endpoints
   static const String auth = '/auth';
@@ -556,6 +572,7 @@ class ${cls.className}Service {
         // Auth screens
         if (this.hasAuthentication) {
             zip.file('lib/screens/auth/login_screen.dart', this.generateLoginScreen());
+            zip.file('lib/screens/auth/register_screen.dart', this.generateRegisterScreen());
         }
 
         // Home screen
@@ -652,6 +669,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   text: 'Login',
                   isLoading: _isLoading,
                 ),
+                const SizedBox(height: 16),
+
+                // Register link
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Don\\'t have an account? '),
+                    TextButton(
+                      onPressed: () => context.go('/register'),
+                      child: const Text('Register'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -692,6 +722,197 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    super.dispose();
+  }
+}`;
+    }
+
+    generateRegisterScreen() {
+        if (!this.hasAuthentication) return '';
+
+        return `import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import '../../providers/auth_provider.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/custom_button.dart';
+
+class RegisterScreen extends StatefulWidget {
+  @override
+  _RegisterScreenState createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Register'),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 24),
+
+                // Title
+                Text(
+                  'Create Account',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Sign up to get started',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 48),
+
+                // Name field
+                CustomTextField(
+                  controller: _nameController,
+                  label: 'Full Name',
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Name is required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Email field
+                CustomTextField(
+                  controller: _emailController,
+                  label: 'Email',
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Email is required';
+                    }
+                    if (!value!.contains('@')) {
+                      return 'Invalid email format';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Password field
+                CustomTextField(
+                  controller: _passwordController,
+                  label: 'Password',
+                  obscureText: true,
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Password is required';
+                    }
+                    if (value!.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Confirm Password field
+                CustomTextField(
+                  controller: _confirmPasswordController,
+                  label: 'Confirm Password',
+                  obscureText: true,
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Please confirm your password';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Register button
+                CustomButton(
+                  onPressed: _isLoading ? null : _handleRegister,
+                  text: 'Register',
+                  isLoading: _isLoading,
+                ),
+                const SizedBox(height: 16),
+
+                // Login link
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Already have an account? '),
+                    TextButton(
+                      onPressed: () => context.go('/login'),
+                      child: const Text('Login'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleRegister() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      await authProvider.register(
+        _nameController.text.trim(),
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registration successful! Please login.')),
+        );
+        context.go('/login');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed: \$e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 }`;
@@ -885,24 +1106,26 @@ flutter:
             const match = attr.match(/^([+\-#~]?)\s*(\w+):\s*(.+)$/);
             if (match) {
                 const [, visibility, name, type] = match;
+                const camelName = this.toCamelCase(name);
                 return {
-                    name: this.toCamelCase(name),
+                    name: camelName,
                     type: type.trim(),
                     dartType: this.mapToDartType(type.trim()),
                     visibility: visibility || '+',
                     nullable: type.includes('?'),
                     required: !type.includes('?') && name.toLowerCase() !== 'id',
-                    jsonKey: this.toSnakeCase(name)
+                    jsonKey: camelName // Usar camelCase para coincidir con backend Java
                 };
             }
+            const camelName = this.toCamelCase(attr);
             return {
-                name: this.toCamelCase(attr),
+                name: camelName,
                 type: 'String',
                 dartType: 'String',
                 visibility: '+',
                 nullable: true,
                 required: false,
-                jsonKey: this.toSnakeCase(attr)
+                jsonKey: camelName // Usar camelCase para coincidir con backend Java
             };
         });
     }
@@ -964,6 +1187,7 @@ flutter:
         if (this.hasAuthentication) {
             routes.push('    GoRoute(path: \'/\', redirect: (context, state) => \'/login\'),');
             routes.push('    GoRoute(path: \'/login\', builder: (context, state) => LoginScreen()),');
+            routes.push('    GoRoute(path: \'/register\', builder: (context, state) => RegisterScreen()),');
         } else {
             routes.push('    GoRoute(path: \'/\', redirect: (context, state) => \'/home\'),');
         }
@@ -979,7 +1203,8 @@ flutter:
 
         return `import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-${this.hasAuthentication ? "import '../screens/auth/login_screen.dart';" : ''}
+${this.hasAuthentication ? `import '../screens/auth/login_screen.dart';
+import '../screens/auth/register_screen.dart';` : ''}
 import '../screens/home/home_screen.dart';
 ${this.classes.map(cls => `import '../screens/entities/${cls.tableName}_list_screen.dart';
 import '../screens/entities/${cls.tableName}_form_screen.dart';`).join('\n')}
@@ -1301,20 +1526,28 @@ ${attributes.filter(attr => attr.name !== 'id').map(attr => {
             ),`;
 }).join('\n            const SizedBox(height: 16),\n')}
 
-${foreignKeys.map(fk => `            Consumer<${fk.className}Provider>(
+${foreignKeys.map(fk => {
+  const relatedClass = this.classes.find(c => c.className === fk.className);
+  const displayAttr = this.getFirstDisplayAttribute(relatedClass);
+
+  return `            Consumer<${fk.className}Provider>(
               builder: (context, provider, child) {
+                if (provider.isLoading) {
+                  return const CircularProgressIndicator();
+                }
                 return CustomDropdown<int>(
                   label: '${fk.className}',
                   value: _selected${fk.className}Id,
                   items: provider.items.map((item) => DropdownMenuItem<int>(
                     value: item.id,
-                    child: Text(item.toString()), // TODO: Implement proper display
+                    child: Text(${displayAttr}),
                   )).toList(),
                   onChanged: (value) => setState(() => _selected${fk.className}Id = value),
                   ${fk.required ? `validator: (value) => value == null ? '${fk.className} is required' : null,` : ''}
                 );
               },
-            ),`).join('\n            const SizedBox(height: 16),\n')}
+            ),`;
+}).join('\n            const SizedBox(height: 16),\n')}
 
             const SizedBox(height: 32),
             CustomButton(
@@ -1715,24 +1948,81 @@ class CustomErrorWidget extends StatelessWidget {
     getForeignKeys(cls) {
         const attributes = this.parseAttributes(cls.attributes);
         const foreignKeys = [];
+        const addedKeys = new Set(); // Para evitar duplicados
 
+        // 1. Detectar FKs por nombre (ej: universidadId, userId, etc.)
         for (const attr of attributes) {
-            // Detectar FKs por nombre (ej: universidadId, userId, etc.)
             if (attr.name.toLowerCase().endsWith('id') && attr.name.toLowerCase() !== 'id') {
                 const entityName = attr.name.substring(0, attr.name.length - 2);
                 const relatedClass = this.classes.find(c =>
-                    c.variableName.toLowerCase() === entityName.toLowerCase()
+                    c.variableName.toLowerCase() === entityName.toLowerCase() ||
+                    c.className.toLowerCase() === entityName.toLowerCase()
                 );
 
                 if (relatedClass) {
-                    foreignKeys.push({
-                        propertyName: attr.name,
-                        className: relatedClass.className,
-                        tableName: relatedClass.tableName,
-                        required: attr.required
-                    });
+                    const key = `${attr.name}_${relatedClass.className}`;
+                    if (!addedKeys.has(key)) {
+                        foreignKeys.push({
+                            propertyName: attr.name,
+                            className: relatedClass.className,
+                            tableName: relatedClass.tableName,
+                            variableName: relatedClass.variableName,
+                            required: attr.required
+                        });
+                        addedKeys.add(key);
+                    }
                 }
             }
+        }
+
+        // 2. Detectar FKs desde relaciones del diagrama
+        if (this.relationships && this.relationships.length > 0) {
+            this.relationships.forEach(rel => {
+                let needsForeignKey = false;
+                let relatedClass = null;
+                let fkName = null;
+
+                // Determinar si esta clase necesita FK basándose en multiplicidades
+                if (rel.targetClass === cls.className) {
+                    // Si source es "1" y target es "*", entonces target necesita FK
+                    if ((rel.sourceMultiplicity === '1' || rel.sourceMultiplicity === '1..1') &&
+                        (rel.targetMultiplicity === '*' || rel.targetMultiplicity === '0..*' || rel.targetMultiplicity === '1..*' || rel.targetMultiplicity === 'many')) {
+                        needsForeignKey = true;
+                        const sourceClassObj = this.classes.find(c => c.className === rel.sourceClass);
+                        if (sourceClassObj) {
+                            relatedClass = sourceClassObj;
+                            fkName = `${sourceClassObj.variableName}Id`;
+                        }
+                    }
+                } else if (rel.sourceClass === cls.className) {
+                    // Si target es "1" y source es "*", entonces source necesita FK
+                    if ((rel.targetMultiplicity === '1' || rel.targetMultiplicity === '1..1') &&
+                        (rel.sourceMultiplicity === '*' || rel.sourceMultiplicity === '0..*' || rel.sourceMultiplicity === '1..*' || rel.sourceMultiplicity === 'many')) {
+                        needsForeignKey = true;
+                        const targetClassObj = this.classes.find(c => c.className === rel.targetClass);
+                        if (targetClassObj) {
+                            relatedClass = targetClassObj;
+                            fkName = `${targetClassObj.variableName}Id`;
+                        }
+                    }
+                }
+
+                // Agregar FK si no está ya en la lista
+                if (needsForeignKey && relatedClass && fkName) {
+                    const key = `${fkName}_${relatedClass.className}`;
+                    if (!addedKeys.has(key)) {
+                        foreignKeys.push({
+                            propertyName: fkName,
+                            className: relatedClass.className,
+                            tableName: relatedClass.tableName,
+                            variableName: relatedClass.variableName,
+                            required: true // Las FKs de relaciones son generalmente requeridas
+                        });
+                        addedKeys.add(key);
+                        console.log(`🔑 FK detectada desde relación: ${cls.className}.${fkName} -> ${relatedClass.className}`);
+                    }
+                }
+            });
         }
 
         return foreignKeys;
@@ -1747,6 +2037,36 @@ class CustomErrorWidget extends StatelessWidget {
         }
 
         return `return 'ID: \${item.id ?? ""}';`;
+    }
+
+    getFirstDisplayAttribute(cls) {
+        if (!cls) return `'ID: \${item.id ?? ""}'`;
+
+        const attributes = this.parseAttributes(cls.attributes);
+
+        // Priorizar atributos comunes para display
+        const priorityNames = ['nombre', 'name', 'titulo', 'title', 'descripcion', 'description', 'email', 'username'];
+
+        // Buscar primero en atributos prioritarios
+        for (const priority of priorityNames) {
+            const attr = attributes.find(a => a.name.toLowerCase() === priority);
+            if (attr) {
+                return `'\${item.${attr.name} ?? "Sin ${attr.name}"} (ID: \${item.id})'`;
+            }
+        }
+
+        // Si no hay atributo prioritario, usar el primer atributo que no sea ID
+        const firstAttr = attributes.find(attr =>
+            attr.name.toLowerCase() !== 'id' &&
+            !attr.name.toLowerCase().endsWith('id')
+        );
+
+        if (firstAttr) {
+            return `'\${item.${firstAttr.name} ?? "Sin ${firstAttr.name}"} (ID: \${item.id})'`;
+        }
+
+        // Fallback: solo mostrar ID
+        return `'ID: \${item.id ?? ""}'`;
     }
 
     generateAuthProvider() {
@@ -1790,6 +2110,21 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _setError('Login failed: \$e');
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> register(String name, String email, String password) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await _authService.register(name, email, password);
+      notifyListeners();
+    } catch (e) {
+      _setError('Registration failed: \$e');
       rethrow;
     } finally {
       _setLoading(false);
@@ -1849,6 +2184,27 @@ class AuthService {
       throw Exception('Invalid credentials');
     } catch (e) {
       throw Exception('Login failed: \$e');
+    }
+  }
+
+  Future<Map<String, dynamic>> register(String name, String email, String password) async {
+    try {
+      final response = await _apiService.dio.post(
+        ApiConfig.register,
+        data: {
+          'name': name,
+          'email': email,
+          'password': password,
+        },
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return response.data;
+      }
+
+      throw Exception('Registration failed');
+    } catch (e) {
+      throw Exception('Registration failed: \$e');
     }
   }
 
