@@ -635,14 +635,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Email field
                 CustomTextField(
                   controller: _emailController,
-                  label: 'Email',
+                  label: 'Correo Electrónico',
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
                     if (value?.isEmpty ?? true) {
-                      return 'Email is required';
+                      return 'El correo electrónico es requerido';
                     }
                     if (!value!.contains('@')) {
-                      return 'Invalid email format';
+                      return 'Formato de correo inválido';
                     }
                     return null;
                   },
@@ -652,11 +652,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Password field
                 CustomTextField(
                   controller: _passwordController,
-                  label: 'Password',
+                  label: 'Contraseña',
                   obscureText: true,
                   validator: (value) {
                     if (value?.isEmpty ?? true) {
-                      return 'Password is required';
+                      return 'La contraseña es requerida';
                     }
                     return null;
                   },
@@ -666,7 +666,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Login button
                 CustomButton(
                   onPressed: _isLoading ? null : _handleLogin,
-                  text: 'Login',
+                  text: 'Iniciar Sesión',
                   isLoading: _isLoading,
                 ),
                 const SizedBox(height: 16),
@@ -675,10 +675,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Don\\'t have an account? '),
+                    const Text('¿No tienes cuenta? '),
                     TextButton(
                       onPressed: () => context.go('/register'),
-                      child: const Text('Register'),
+                      child: const Text('Registrarse'),
                     ),
                   ],
                 ),
@@ -708,7 +708,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: \$e')),
+          SnackBar(content: Text('Error al iniciar sesión: \$e')),
         );
       }
     } finally {
@@ -754,7 +754,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Register'),
+        title: const Text('Registrarse'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -768,7 +768,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                 // Title
                 Text(
-                  'Create Account',
+                  'Crear Cuenta',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -776,7 +776,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign up to get started',
+                  'Regístrate para comenzar',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Colors.grey[600],
                   ),
@@ -787,10 +787,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Name field
                 CustomTextField(
                   controller: _nameController,
-                  label: 'Full Name',
+                  label: 'Nombre Completo',
                   validator: (value) {
                     if (value?.isEmpty ?? true) {
-                      return 'Name is required';
+                      return 'El nombre es requerido';
                     }
                     return null;
                   },
@@ -800,14 +800,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Email field
                 CustomTextField(
                   controller: _emailController,
-                  label: 'Email',
+                  label: 'Correo Electrónico',
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
                     if (value?.isEmpty ?? true) {
-                      return 'Email is required';
+                      return 'El correo electrónico es requerido';
                     }
                     if (!value!.contains('@')) {
-                      return 'Invalid email format';
+                      return 'Formato de correo inválido';
                     }
                     return null;
                   },
@@ -817,14 +817,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Password field
                 CustomTextField(
                   controller: _passwordController,
-                  label: 'Password',
+                  label: 'Contraseña',
                   obscureText: true,
                   validator: (value) {
                     if (value?.isEmpty ?? true) {
-                      return 'Password is required';
+                      return 'La contraseña es requerida';
                     }
                     if (value!.length < 6) {
-                      return 'Password must be at least 6 characters';
+                      return 'La contraseña debe tener al menos 6 caracteres';
                     }
                     return null;
                   },
@@ -834,14 +834,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Confirm Password field
                 CustomTextField(
                   controller: _confirmPasswordController,
-                  label: 'Confirm Password',
+                  label: 'Confirmar Contraseña',
                   obscureText: true,
                   validator: (value) {
                     if (value?.isEmpty ?? true) {
-                      return 'Please confirm your password';
+                      return 'Por favor confirma tu contraseña';
                     }
                     if (value != _passwordController.text) {
-                      return 'Passwords do not match';
+                      return 'Las contraseñas no coinciden';
                     }
                     return null;
                   },
@@ -851,7 +851,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Register button
                 CustomButton(
                   onPressed: _isLoading ? null : _handleRegister,
-                  text: 'Register',
+                  text: 'Registrarse',
                   isLoading: _isLoading,
                 ),
                 const SizedBox(height: 16),
@@ -860,10 +860,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Already have an account? '),
+                    const Text('¿Ya tienes cuenta? '),
                     TextButton(
                       onPressed: () => context.go('/login'),
-                      child: const Text('Login'),
+                      child: const Text('Iniciar Sesión'),
                     ),
                   ],
                 ),
@@ -890,14 +890,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration successful! Please login.')),
+          const SnackBar(content: Text('¡Registro exitoso! Por favor inicia sesión.')),
         );
         context.go('/login');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Registration failed: \$e')),
+          SnackBar(content: Text('Error en el registro: \$e')),
         );
       }
     } finally {
@@ -927,7 +927,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: const Text('Panel Principal'),
         actions: [
           ${this.hasAuthentication ? `
           IconButton(
@@ -987,12 +987,12 @@ ${this.classes.map(cls => `            _buildMenuCard(
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: const Text('Cerrar Sesión'),
+        content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () {
@@ -1000,7 +1000,7 @@ ${this.classes.map(cls => `            _buildMenuCard(
               // TODO: Clear auth and navigate to login
               context.go('/login');
             },
-            child: const Text('Logout'),
+            child: const Text('Cerrar Sesión'),
           ),
         ],
       ),
@@ -1246,6 +1246,10 @@ class _${cls.className}ListScreenState extends State<${cls.className}ListScreen>
     return Scaffold(
       appBar: AppBar(
         title: Text('${cls.name}'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/home'),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -1298,14 +1302,14 @@ class _${cls.className}ListScreenState extends State<${cls.className}ListScreen>
               value: 'edit',
               child: ListTile(
                 leading: Icon(Icons.edit),
-                title: Text('Edit'),
+                title: Text('Editar'),
               ),
             ),
             const PopupMenuItem(
               value: 'delete',
               child: ListTile(
                 leading: Icon(Icons.delete, color: Colors.red),
-                title: Text('Delete'),
+                title: Text('Eliminar'),
               ),
             ),
           ],
@@ -1333,14 +1337,14 @@ class _${cls.className}ListScreenState extends State<${cls.className}ListScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'No ${cls.tableName} found',
+            'No hay ${cls.tableName}',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.grey[600],
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Tap the + button to create your first ${cls.tableName}',
+            'Toca el botón + para crear tu primer ${cls.tableName}',
             style: TextStyle(color: Colors.grey[600]),
           ),
         ],
@@ -1363,19 +1367,19 @@ class _${cls.className}ListScreenState extends State<${cls.className}ListScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: Text('Are you sure you want to delete this ${cls.tableName}?'),
+        title: const Text('Confirmar Eliminación'),
+        content: Text('¿Estás seguro de que deseas eliminar este ${cls.tableName}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _deleteItem(item);
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -1387,13 +1391,13 @@ class _${cls.className}ListScreenState extends State<${cls.className}ListScreen>
       await context.read<${cls.className}Provider>().delete(item.id!);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('${cls.className} deleted successfully')),
+          const SnackBar(content: Text('${cls.className} eliminado exitosamente')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting ${cls.tableName}: \$e')),
+          SnackBar(content: Text('Error eliminando ${cls.tableName}: \$e')),
         );
       }
     }
@@ -1404,6 +1408,12 @@ class _${cls.className}ListScreenState extends State<${cls.className}ListScreen>
     generateFormScreen(cls) {
         const attributes = this.parseAttributes(cls.attributes);
         const foreignKeys = this.getForeignKeys(cls);
+
+        // Filtrar atributos que NO son foreign keys
+        const fkPropertyNames = foreignKeys.map(fk => fk.propertyName);
+        const regularAttributes = attributes.filter(attr =>
+            attr.name !== 'id' && !fkPropertyNames.includes(attr.name)
+        );
 
         return `import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -1429,8 +1439,8 @@ class _${cls.className}FormScreenState extends State<${cls.className}FormScreen>
   bool _isLoading = false;
   ${cls.className}? _current${cls.className};
 
-  // Controllers
-${attributes.filter(attr => attr.name !== 'id').map(attr =>
+  // Controllers (solo para atributos regulares, no FKs)
+${regularAttributes.map(attr =>
   `  final _${attr.name}Controller = TextEditingController();`
 ).join('\n')}
 
@@ -1458,7 +1468,7 @@ ${foreignKeys.map(fk => `    context.read<${fk.className}Provider>().loadAll();`
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error loading ${cls.tableName}: \$e')),
+            SnackBar(content: Text('Error cargando ${cls.tableName}: \$e')),
           );
         }
       }
@@ -1466,7 +1476,7 @@ ${foreignKeys.map(fk => `    context.read<${fk.className}Provider>().loadAll();`
   }
 
   void _populateForm(${cls.className} item) {
-${attributes.filter(attr => attr.name !== 'id').map(attr => {
+${regularAttributes.map(attr => {
   if (attr.dartType === 'String') {
     return `    _${attr.name}Controller.text = item.${attr.name} ?? '';`;
   } else if (attr.dartType === 'int' || attr.dartType === 'double') {
@@ -1484,11 +1494,15 @@ ${foreignKeys.map(fk => `    _selected${fk.className}Id = item.${fk.propertyName
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.id == null ? 'New ${cls.className}' : 'Edit ${cls.className}'),
+        title: Text(widget.id == null ? 'Nuevo ${cls.className}' : 'Editar ${cls.className}'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/home'),
+        ),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _handleSave,
-            child: const Text('SAVE'),
+            child: const Text('GUARDAR'),
           ),
         ],
       ),
@@ -1497,32 +1511,32 @@ ${foreignKeys.map(fk => `    _selected${fk.className}Id = item.${fk.propertyName
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-${attributes.filter(attr => attr.name !== 'id').map(attr => {
+${regularAttributes.map(attr => {
   if (attr.dartType === 'String') {
     return `            CustomTextField(
               controller: _${attr.name}Controller,
               label: '${attr.name}',
-              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} is required' : null,` : ''}
+              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} es requerido' : null,` : ''}
             ),`;
   } else if (attr.dartType === 'int' || attr.dartType === 'double') {
     return `            CustomTextField(
               controller: _${attr.name}Controller,
               label: '${attr.name}',
               keyboardType: TextInputType.number,
-              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} is required' : null,` : ''}
+              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} es requerido' : null,` : ''}
             ),`;
   } else if (attr.dartType === 'DateTime') {
     return `            CustomTextField(
               controller: _${attr.name}Controller,
               label: '${attr.name}',
               keyboardType: TextInputType.datetime,
-              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} is required' : null,` : ''}
+              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} es requerido' : null,` : ''}
             ),`;
   }
   return `            CustomTextField(
               controller: _${attr.name}Controller,
               label: '${attr.name}',
-              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} is required' : null,` : ''}
+              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} es requerido' : null,` : ''}
             ),`;
 }).join('\n            const SizedBox(height: 16),\n')}
 
@@ -1543,7 +1557,7 @@ ${foreignKeys.map(fk => {
                     child: Text(${displayAttr}),
                   )).toList(),
                   onChanged: (value) => setState(() => _selected${fk.className}Id = value),
-                  ${fk.required ? `validator: (value) => value == null ? '${fk.className} is required' : null,` : ''}
+                  ${fk.required ? `validator: (value) => value == null ? '${fk.className} es requerido' : null,` : ''}
                 );
               },
             ),`;
@@ -1552,7 +1566,7 @@ ${foreignKeys.map(fk => {
             const SizedBox(height: 32),
             CustomButton(
               onPressed: _isLoading ? null : _handleSave,
-              text: widget.id == null ? 'Create' : 'Update',
+              text: widget.id == null ? 'Crear' : 'Actualizar',
               isLoading: _isLoading,
             ),
           ],
@@ -1568,7 +1582,7 @@ ${foreignKeys.map(fk => {
 
     try {
       final ${cls.variableName} = ${cls.className}(
-${attributes.filter(attr => attr.name !== 'id').map(attr => {
+${regularAttributes.map(attr => {
   if (attr.dartType === 'int') {
     return `        ${attr.name}: int.tryParse(_${attr.name}Controller.text.trim()),`;
   } else if (attr.dartType === 'double') {
@@ -1597,7 +1611,7 @@ ${attributes.filter(attr => attr.name !== 'id').map(attr => {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving ${cls.tableName}: \$e')),
+          SnackBar(content: Text('Error guardando ${cls.tableName}: \$e')),
         );
       }
     } finally {
@@ -1609,7 +1623,7 @@ ${attributes.filter(attr => attr.name !== 'id').map(attr => {
 
   @override
   void dispose() {
-${attributes.filter(attr => attr.name !== 'id').map(attr =>
+${regularAttributes.map(attr =>
   `    _${attr.name}Controller.dispose();`
 ).join('\n')}
     super.dispose();
@@ -1935,7 +1949,7 @@ class CustomErrorWidget extends StatelessWidget {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: onRetry,
-              child: const Text('Retry'),
+              child: const Text('Reintentar'),
             ),
           ],
         ],
