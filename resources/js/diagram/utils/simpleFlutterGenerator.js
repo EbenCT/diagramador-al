@@ -254,6 +254,7 @@ ${this.generateProvidersList()}
 
     generateAppDart() {
         return `import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'config/routes.dart';
 import 'config/theme.dart';
@@ -267,6 +268,18 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       routerConfig: AppRoutes.router,
       debugShowCheckedModeBanner: false,
+
+      // Configuración de localización
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'ES'), // Español
+        Locale('en', 'US'), // Inglés como fallback
+      ],
+      locale: const Locale('es', 'ES'),
     );
   }
 }`;
@@ -442,7 +455,13 @@ ${allAttributes.map(attr => `      ${attr.name}: json['${attr.jsonKey}'],`).join
 
   Map<String, dynamic> toJson() {
     return {
-${allAttributes.map(attr => `      '${attr.jsonKey}': ${attr.name},`).join('\n')}
+${allAttributes.map(attr => {
+  if (attr.dartType === 'DateTime') {
+    return `      '${attr.jsonKey}': ${attr.name}?.toIso8601String().split('T')[0],`;
+  } else {
+    return `      '${attr.jsonKey}': ${attr.name},`;
+  }
+}).join('\n')}
     };
   }
 
@@ -1111,14 +1130,18 @@ dependencies:
   # Navigation
   go_router: ^12.1.1
 
+  # Date formatting
+  intl: ^0.20.2
+
+  # Localization
+  flutter_localizations:
+    sdk: flutter
+
   # UI
   cupertino_icons: ^1.0.6
 
   # Storage
   shared_preferences: ^2.2.2
-
-  # Utils
-  intl: ^0.18.1
 
 dev_dependencies:
   flutter_test:
@@ -1462,6 +1485,7 @@ import '../../providers/${cls.tableName}_provider.dart';
 ${foreignKeys.map(fk => `import '../../providers/${fk.tableName}_provider.dart';`).join('\n')}
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/common/custom_dropdown.dart';
+import '../../widgets/common/custom_date_picker.dart';
 import '../../widgets/common/custom_button.dart';
 
 class ${cls.className}FormScreen extends StatefulWidget {
@@ -1479,9 +1503,13 @@ class _${cls.className}FormScreenState extends State<${cls.className}FormScreen>
   ${cls.className}? _current${cls.className};
 
   // Controllers (solo para atributos regulares, no FKs)
-${regularAttributes.map(attr =>
-  `  final _${attr.name}Controller = TextEditingController();`
-).join('\n')}
+${regularAttributes.map(attr => {
+  if (attr.dartType === 'DateTime') {
+    return `  DateTime? _${attr.name};`;
+  } else {
+    return `  final _${attr.name}Controller = TextEditingController();`;
+  }
+}).join('\n')}
 
   // Selected values for foreign keys
 ${foreignKeys.map(fk => `  int? _selected${fk.className}Id;`).join('\n')}
@@ -1521,7 +1549,7 @@ ${regularAttributes.map(attr => {
   } else if (attr.dartType === 'int' || attr.dartType === 'double') {
     return `    _${attr.name}Controller.text = item.${attr.name}?.toString() ?? '';`;
   } else if (attr.dartType === 'DateTime') {
-    return `    _${attr.name}Controller.text = item.${attr.name}?.toLocal().toString().split(' ')[0] ?? '';`;
+    return `    _${attr.name} = item.${attr.name};`;
   }
   return `    _${attr.name}Controller.text = item.${attr.name}?.toString() ?? '';`;
 }).join('\n')}
@@ -1565,11 +1593,15 @@ ${regularAttributes.map(attr => {
               ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} es requerido' : null,` : ''}
             ),`;
   } else if (attr.dartType === 'DateTime') {
-    return `            CustomTextField(
-              controller: _${attr.name}Controller,
+    return `            CustomDatePicker(
+              value: _${attr.name},
               label: '${attr.name}',
-              keyboardType: TextInputType.datetime,
-              ${attr.required ? `validator: (value) => value?.isEmpty ?? true ? '${attr.name} es requerido' : null,` : ''}
+              onChanged: (DateTime? value) {
+                setState(() {
+                  _${attr.name} = value;
+                });
+              },
+              ${attr.required ? `validator: (value) => value == null ? '${attr.name} es requerido' : null,` : ''}
             ),`;
   }
   return `            CustomTextField(
@@ -1627,7 +1659,7 @@ ${regularAttributes.map(attr => {
   } else if (attr.dartType === 'double') {
     return `        ${attr.name}: double.tryParse(_${attr.name}Controller.text.trim()),`;
   } else if (attr.dartType === 'DateTime') {
-    return `        ${attr.name}: DateTime.tryParse(_${attr.name}Controller.text.trim()),`;
+    return `        ${attr.name}: _${attr.name},`;
   } else if (attr.dartType === 'bool') {
     return `        ${attr.name}: _${attr.name}Controller.text.trim().toLowerCase() == 'true',`;
   } else {
@@ -1662,7 +1694,7 @@ ${regularAttributes.map(attr => {
 
   @override
   void dispose() {
-${regularAttributes.map(attr =>
+${regularAttributes.filter(attr => attr.dartType !== 'DateTime').map(attr =>
   `    _${attr.name}Controller.dispose();`
 ).join('\n')}
     super.dispose();
@@ -1782,6 +1814,7 @@ class ${cls.className}Provider with ChangeNotifier {
         zip.file('lib/widgets/common/custom_text_field.dart', this.generateCustomTextField());
         zip.file('lib/widgets/common/custom_button.dart', this.generateCustomButton());
         zip.file('lib/widgets/common/custom_dropdown.dart', this.generateCustomDropdown());
+        zip.file('lib/widgets/common/custom_date_picker.dart', this.generateCustomDatePicker());
         zip.file('lib/widgets/common/loading_widget.dart', this.generateLoadingWidget());
         zip.file('lib/widgets/common/error_widget.dart', this.generateErrorWidget());
     }
@@ -1914,6 +1947,100 @@ class CustomDropdown<T> extends StatelessWidget {
       onChanged: onChanged,
       validator: validator,
     );
+  }
+}`;
+    }
+
+    generateCustomDatePicker() {
+        return `import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+class CustomDatePicker extends StatefulWidget {
+  final String label;
+  final DateTime? value;
+  final void Function(DateTime?)? onChanged;
+  final String? Function(DateTime?)? validator;
+  final DateTime? firstDate;
+  final DateTime? lastDate;
+
+  const CustomDatePicker({
+    Key? key,
+    required this.label,
+    this.value,
+    this.onChanged,
+    this.validator,
+    this.firstDate,
+    this.lastDate,
+  }) : super(key: key);
+
+  @override
+  _CustomDatePickerState createState() => _CustomDatePickerState();
+}
+
+class _CustomDatePickerState extends State<CustomDatePicker> {
+  final TextEditingController _controller = TextEditingController();
+  final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
+
+  @override
+  void initState() {
+    super.initState();
+    _updateControllerText();
+  }
+
+  @override
+  void didUpdateWidget(CustomDatePicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      _updateControllerText();
+    }
+  }
+
+  void _updateControllerText() {
+    if (widget.value != null) {
+      _controller.text = _dateFormat.format(widget.value!);
+    } else {
+      _controller.text = '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: _controller,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        hintText: 'Seleccionar fecha',
+        suffixIcon: const Icon(Icons.calendar_today),
+      ),
+      readOnly: true,
+      onTap: _selectDate,
+      validator: widget.validator != null
+          ? (value) => widget.validator!(widget.value)
+          : null,
+    );
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: widget.value ?? DateTime.now(),
+      firstDate: widget.firstDate ?? DateTime(1900),
+      lastDate: widget.lastDate ?? DateTime(2100),
+      // No especificamos locale aquí porque ya está configurado globalmente
+      helpText: 'Seleccionar fecha',
+      cancelText: 'Cancelar',
+      confirmText: 'Confirmar',
+    );
+
+    if (picked != null && picked != widget.value) {
+      widget.onChanged?.call(picked);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 }`;
     }
