@@ -114,24 +114,45 @@ export class SimpleFlutterGenerator {
         // Detectar autenticación
         this.detectAuthentication();
 
-        // Extraer relaciones
+        // Extraer relaciones (igual que el backend Java)
         this.relationships = links.map(link => {
-            const linkData = link.get('linkData') || {};
+            const relationData = link.get('relationData') || {};
             const sourceElement = link.getSourceElement();
             const targetElement = link.getTargetElement();
 
+            const sourceClass = sourceElement?.get('umlData')?.className || 'Unknown';
+            const targetClass = targetElement?.get('umlData')?.className || 'Unknown';
+
+            // Obtener multiplicidades (usa relationData como fuente principal)
+            const sourceMultiplicity = relationData.sourceMultiplicity || '1';
+            const targetMultiplicity = relationData.targetMultiplicity || '1';
+            const relationType = relationData.type || 'association';
+
+            console.log(`🔗 Relación detectada: ${sourceClass}(${sourceMultiplicity}) -> ${targetClass}(${targetMultiplicity}) [${relationType}]`);
+
             return {
                 id: link.id,
-                type: linkData.type || 'association',
-                source: sourceElement?.get('umlData')?.className || 'Unknown',
-                target: targetElement?.get('umlData')?.className || 'Unknown',
-                sourceMultiplicity: linkData.sourceMultiplicity,
-                targetMultiplicity: linkData.targetMultiplicity
+                type: relationType,
+                sourceClass: sourceClass,  // ✅ Usar sourceClass como en backend
+                targetClass: targetClass,  // ✅ Usar targetClass como en backend
+                sourceMultiplicity: sourceMultiplicity,
+                targetMultiplicity: targetMultiplicity
             };
         });
 
         console.log(`📊 Análisis completado: ${this.classes.length} clases, ${this.relationships.length} relaciones`);
         console.log(`🔐 Autenticación detectada: ${this.hasAuthentication ? 'SÍ' : 'NO'}`);
+
+        // Debug detallado de relaciones
+        if (this.relationships.length > 0) {
+            console.group('📋 Resumen de relaciones encontradas:');
+            this.relationships.forEach((rel, i) => {
+                console.log(`${i+1}. ${rel.sourceClass}(${rel.sourceMultiplicity}) ${rel.type} ${rel.targetClass}(${rel.targetMultiplicity})`);
+            });
+            console.groupEnd();
+        } else {
+            console.warn('⚠️ No se encontraron relaciones en el diagrama');
+        }
     }
 
     detectAuthentication() {
@@ -373,6 +394,7 @@ class AppTheme {
 
     generateModelClass(cls) {
         const attributes = this.parseAttributes(cls.attributes);
+        const foreignKeys = this.getForeignKeys(cls);
 
         // Agregar ID si no existe
         const hasId = attributes.some(attr => attr.name.toLowerCase() === 'id');
@@ -388,30 +410,47 @@ class AppTheme {
             });
         }
 
+        // Combinar atributos regulares con foreign keys
+        const allAttributes = [...attributes];
+
+        // Agregar foreign keys como atributos del modelo
+        foreignKeys.forEach(fk => {
+            console.log(`➕ Agregando FK al modelo ${cls.className}: ${fk.propertyName} -> ${fk.className}`);
+            allAttributes.push({
+                name: fk.propertyName,
+                type: 'int',
+                dartType: 'int',
+                visibility: '+',
+                nullable: !fk.required,
+                required: fk.required,
+                jsonKey: fk.propertyName // camelCase para JSON
+            });
+        });
+
         return `class ${cls.className} {
-${attributes.map(attr => `  final ${attr.dartType}? ${attr.name};`).join('\n')}
+${allAttributes.map(attr => `  final ${attr.dartType}? ${attr.name};`).join('\n')}
 
   ${cls.className}({
-${attributes.map(attr => `    this.${attr.name},`).join('\n')}
+${allAttributes.map(attr => `    this.${attr.name},`).join('\n')}
   });
 
   factory ${cls.className}.fromJson(Map<String, dynamic> json) {
     return ${cls.className}(
-${attributes.map(attr => `      ${attr.name}: json['${attr.jsonKey}'],`).join('\n')}
+${allAttributes.map(attr => `      ${attr.name}: json['${attr.jsonKey}'],`).join('\n')}
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-${attributes.map(attr => `      '${attr.jsonKey}': ${attr.name},`).join('\n')}
+${allAttributes.map(attr => `      '${attr.jsonKey}': ${attr.name},`).join('\n')}
     };
   }
 
   ${cls.className} copyWith({
-${attributes.map(attr => `    ${attr.dartType}? ${attr.name},`).join('\n')}
+${allAttributes.map(attr => `    ${attr.dartType}? ${attr.name},`).join('\n')}
   }) {
     return ${cls.className}(
-${attributes.map(attr => `      ${attr.name}: ${attr.name} ?? this.${attr.name},`).join('\n')}
+${allAttributes.map(attr => `      ${attr.name}: ${attr.name} ?? this.${attr.name},`).join('\n')}
     );
   }
 
@@ -1960,86 +1999,109 @@ class CustomErrorWidget extends StatelessWidget {
     }
 
     getForeignKeys(cls) {
-        const attributes = this.parseAttributes(cls.attributes);
         const foreignKeys = [];
         const addedKeys = new Set(); // Para evitar duplicados
 
-        // 1. Detectar FKs por nombre (ej: universidadId, userId, etc.)
-        for (const attr of attributes) {
-            if (attr.name.toLowerCase().endsWith('id') && attr.name.toLowerCase() !== 'id') {
-                const entityName = attr.name.substring(0, attr.name.length - 2);
-                const relatedClass = this.classes.find(c =>
-                    c.variableName.toLowerCase() === entityName.toLowerCase() ||
-                    c.className.toLowerCase() === entityName.toLowerCase()
-                );
+        console.log(`🔍 Buscando FKs para ${cls.className}...`);
+        console.log(`📊 Total relaciones disponibles: ${this.relationships?.length || 0}`);
 
-                if (relatedClass) {
-                    const key = `${attr.name}_${relatedClass.className}`;
-                    if (!addedKeys.has(key)) {
-                        foreignKeys.push({
-                            propertyName: attr.name,
-                            className: relatedClass.className,
-                            tableName: relatedClass.tableName,
-                            variableName: relatedClass.variableName,
-                            required: attr.required
-                        });
-                        addedKeys.add(key);
-                    }
-                }
-            }
-        }
-
-        // 2. Detectar FKs desde relaciones del diagrama
         if (this.relationships && this.relationships.length > 0) {
-            this.relationships.forEach(rel => {
-                let needsForeignKey = false;
-                let relatedClass = null;
-                let fkName = null;
-
-                // Determinar si esta clase necesita FK basándose en multiplicidades
-                if (rel.targetClass === cls.className) {
-                    // Si source es "1" y target es "*", entonces target necesita FK
-                    if ((rel.sourceMultiplicity === '1' || rel.sourceMultiplicity === '1..1') &&
-                        (rel.targetMultiplicity === '*' || rel.targetMultiplicity === '0..*' || rel.targetMultiplicity === '1..*' || rel.targetMultiplicity === 'many')) {
-                        needsForeignKey = true;
-                        const sourceClassObj = this.classes.find(c => c.className === rel.sourceClass);
-                        if (sourceClassObj) {
-                            relatedClass = sourceClassObj;
-                            fkName = `${sourceClassObj.variableName}Id`;
-                        }
-                    }
-                } else if (rel.sourceClass === cls.className) {
-                    // Si target es "1" y source es "*", entonces source necesita FK
-                    if ((rel.targetMultiplicity === '1' || rel.targetMultiplicity === '1..1') &&
-                        (rel.sourceMultiplicity === '*' || rel.sourceMultiplicity === '0..*' || rel.sourceMultiplicity === '1..*' || rel.sourceMultiplicity === 'many')) {
-                        needsForeignKey = true;
-                        const targetClassObj = this.classes.find(c => c.className === rel.targetClass);
-                        if (targetClassObj) {
-                            relatedClass = targetClassObj;
-                            fkName = `${targetClassObj.variableName}Id`;
-                        }
-                    }
-                }
-
-                // Agregar FK si no está ya en la lista
-                if (needsForeignKey && relatedClass && fkName) {
-                    const key = `${fkName}_${relatedClass.className}`;
-                    if (!addedKeys.has(key)) {
-                        foreignKeys.push({
-                            propertyName: fkName,
-                            className: relatedClass.className,
-                            tableName: relatedClass.tableName,
-                            variableName: relatedClass.variableName,
-                            required: true // Las FKs de relaciones son generalmente requeridas
-                        });
-                        addedKeys.add(key);
-                        console.log(`🔑 FK detectada desde relación: ${cls.className}.${fkName} -> ${relatedClass.className}`);
-                    }
-                }
+            console.log('🔗 Relaciones existentes:');
+            this.relationships.forEach((rel, i) => {
+                console.log(`  ${i+1}. ${rel.sourceClass}(${rel.sourceMultiplicity}) -> ${rel.targetClass}(${rel.targetMultiplicity}) [${rel.type}]`);
             });
         }
 
+        // Detectar FKs SOLO desde relaciones del diagrama (igual que el backend)
+        if (!this.relationships || this.relationships.length === 0) {
+            console.log(`⚠️ No hay relaciones en el diagrama`);
+            return foreignKeys;
+        }
+
+        this.relationships.forEach(rel => {
+            const isSourceMany = this.isMany(rel.sourceMultiplicity);
+            const isTargetMany = this.isMany(rel.targetMultiplicity);
+
+            console.log(`🔗 Analizando relación: ${rel.sourceClass}(${rel.sourceMultiplicity}) -> ${rel.targetClass}(${rel.targetMultiplicity})`);
+
+            // LÓGICA EXACTA DEL BACKEND:
+            // Esta clase ES EL TARGET de la relación Y el source es "1" y target es "*"
+            // Entonces esta clase (target) necesita FK hacia source
+            if (rel.targetClass === cls.className && !isSourceMany && isTargetMany) {
+                const sourceClassObj = this.classes.find(c => c.className === rel.sourceClass);
+                if (sourceClassObj) {
+                    const fkName = `${sourceClassObj.variableName}Id`;
+                    const key = `${fkName}_${sourceClassObj.className}`;
+
+                    if (!addedKeys.has(key)) {
+                        foreignKeys.push({
+                            propertyName: fkName,
+                            className: sourceClassObj.className,
+                            tableName: sourceClassObj.tableName,
+                            variableName: sourceClassObj.variableName,
+                            required: true
+                        });
+                        addedKeys.add(key);
+                        console.log(`✅ FK detectada: ${cls.className}.${fkName} -> ${sourceClassObj.className} (target side ManyToOne)`);
+                    }
+                }
+            }
+
+            // Esta clase ES EL SOURCE de la relación Y el target es "1" y source es "*"
+            // Entonces esta clase (source) necesita FK hacia target
+            if (rel.sourceClass === cls.className && isSourceMany && !isTargetMany) {
+                const targetClassObj = this.classes.find(c => c.className === rel.targetClass);
+                if (targetClassObj) {
+                    const fkName = `${targetClassObj.variableName}Id`;
+                    const key = `${fkName}_${targetClassObj.className}`;
+
+                    if (!addedKeys.has(key)) {
+                        foreignKeys.push({
+                            propertyName: fkName,
+                            className: targetClassObj.className,
+                            tableName: targetClassObj.tableName,
+                            variableName: targetClassObj.variableName,
+                            required: true
+                        });
+                        addedKeys.add(key);
+                        console.log(`✅ FK detectada: ${cls.className}.${fkName} -> ${targetClassObj.className} (source side ManyToOne)`);
+                    }
+                }
+            }
+
+            // OneToOne: ambos lados pueden tener FK, por defecto el source la posee
+            if (rel.sourceClass === cls.className && !isSourceMany && !isTargetMany) {
+                const targetClassObj = this.classes.find(c => c.className === rel.targetClass);
+                if (targetClassObj) {
+                    const fkName = `${targetClassObj.variableName}Id`;
+                    const key = `${fkName}_${targetClassObj.className}`;
+
+                    if (!addedKeys.has(key)) {
+                        foreignKeys.push({
+                            propertyName: fkName,
+                            className: targetClassObj.className,
+                            tableName: targetClassObj.tableName,
+                            variableName: targetClassObj.variableName,
+                            required: false // OneToOne puede ser opcional
+                        });
+                        addedKeys.add(key);
+                        console.log(`✅ FK detectada: ${cls.className}.${fkName} -> ${targetClassObj.className} (OneToOne)`);
+                    }
+                }
+            }
+        });
+
+        console.log(`📊 Total FKs encontradas para ${cls.className}: ${foreignKeys.length}`);
         return foreignKeys;
+    }
+
+    isMany(multiplicity) {
+        if (!multiplicity) return false;
+        return multiplicity.includes('*') ||
+               multiplicity.includes('n') ||
+               multiplicity.includes('..') ||
+               multiplicity === '0..*' ||
+               multiplicity === '1..*';
     }
 
     getFirstNonIdAttribute(cls) {
