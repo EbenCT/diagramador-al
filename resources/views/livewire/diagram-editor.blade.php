@@ -22,12 +22,66 @@
                         🗑️ Limpiar
                     </button>
 
-                    {{-- Botón de Importación --}}
-                    <button
-                        id="import-xmi-btn"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center">
-                        📁 Importar XML/XMI
-                    </button>
+                    {{-- Dropdown de Importación --}}
+                    <div class="relative" x-data="{ open: false }">
+                        <button
+                            @click="open = !open"
+                            @click.outside="open = false"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center">
+                            📁 Importar
+                            <svg class="ml-2 w-4 h-4" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+
+                        {{-- Menú desplegable --}}
+                        <div
+                            x-show="open"
+                            x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0 scale-95"
+                            x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:leave="transition ease-in duration-150"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            class="absolute top-full right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50"
+                            style="display: none;">
+
+                            {{-- Importación desde archivos --}}
+                            <div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                Desde Archivo
+                            </div>
+
+                            <button
+                                id="import-xmi-btn"
+                                @click="open = false"
+                                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 flex items-center">
+                                <svg class="w-4 h-4 mr-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Importar XML/XMI
+                                <span class="ml-auto text-xs text-gray-400">UML 2.5</span>
+                            </button>
+
+                            {{-- Separador --}}
+                            <div class="border-t border-gray-100 my-1"></div>
+
+                            {{-- Importación con IA --}}
+                            <div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Desde Imagen (IA)
+                            </div>
+
+                            <button
+                                id="import-image-btn"
+                                @click="open = false"
+                                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-900 flex items-center">
+                                <svg class="w-4 h-4 mr-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                Analizar Imagen
+                                <span class="ml-auto text-xs text-purple-400">Groq AI</span>
+                            </button>
+                        </div>
+                    </div>
 
                     {{-- Dropdown de Exportación --}}
                     <div class="relative" x-data="{ open: false }">
@@ -131,6 +185,17 @@
                                 </svg>
                                 Generar Postman
                                 <span class="ml-auto text-xs text-gray-400">API Collection</span>
+                            </button>
+
+                            <button
+                                id="generate-flutter-btn"
+                                @click="open = false"
+                                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 flex items-center">
+                                <svg class="w-4 h-4 mr-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                </svg>
+                                Generar Flutter
+                                <span class="ml-auto text-xs text-gray-400">Mobile App</span>
                             </button>
                         </div>
                     </div>

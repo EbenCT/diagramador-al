@@ -319,7 +319,7 @@ export class SimplePostmanGenerator {
     generateRegisterEndpoint(authInfo) {
         const requestBody = {};
         // En el RegisterRequestDTO, email y password se estandarizan
-        requestBody["email"] = "nuevo@ejemplo.com";
+        requestBody["email"] = "usuario@ejemplo.com";
         requestBody["password"] = "password123";
 
         // Otros campos mantienen sus nombres originales de la entidad
